@@ -1,6 +1,6 @@
 # 开发与证据晋级流程
 
-状态：Active v0.1
+状态：Active v0.2
 
 ## 1. 开发顺序
 
@@ -17,15 +17,24 @@
 
 ## 2. 环境
 
-信息采集核心支持 Python 3.11 及以上。模型探索统一使用独立 Python 3.11 环境，避免 PyTorch、MediaPipe、Whisper 等模型栈受到系统 Python 3.13 兼容性影响。
+信息采集核心支持 Python 3.11 及以上。模型探索使用独立虚拟环境；当前 Slurm 集群的 Python 3.13.13 + CUDA Torch 已通过 smoke，但这不是对所有模型库的通用兼容承诺。
 
 ```bash
-python3 -m venv .venv
+python3 -m venv --system-site-packages .venv
 source .venv/bin/activate
 python -m pip install -e ".[dev,media]"
 ```
 
-真实模型依赖不进入核心安装项；每类模型在后续 extra 或独立环境文件中固定版本。
+Slurm 已提供 CUDA Torch 时，不重新安装 CPU Torch。安装模型栈并检查 ABI：
+
+```bash
+python -m pip install -r requirements/slurm-models.txt
+python -m pip install -e ".[dev]"
+python -m pip check
+python -c 'import torch, torchaudio; print(torch.__version__, torchaudio.__version__)'
+```
+
+`torchaudio` 必须与集群 Torch/CUDA 构建兼容；不能只依据 Python 包版本号假定 ABI 一致。
 
 ## 3. 密钥和真实数据
 
@@ -75,6 +84,33 @@ kangshield-info inspect-ezviz device-snapshot.json \
 
 输入可以是 SDK/API 的本地脱敏快照。即使出现 support/capability 字段，也只能说明“字段出现”；直播、回放、抓图和音频仍需功能调用才能达到 E3。
 
+### 视频 + 语言回放
+
+```bash
+kangshield-info run-multimodal sample.mp4 sample.wav \
+  --pose-model models/yolo26n-pose.pt \
+  --offline-models \
+  --pose-sample-fps 5 \
+  --fusion-window-ms 1000
+```
+
+当前音频输入必须是无压缩 PCM WAV。独立视频和音频被假设共享零时刻；真实 C6c 需要优先保留同容器时间基，或在适配器中显式记录时钟偏差。
+
+### Slurm GPU
+
+模型先在可联网登录节点进入本地缓存；计算节点使用 `--offline-models`：
+
+```bash
+.venv/bin/python scripts/prepare_multimodal_models.py
+export KANG_VIDEO_INPUT="$PWD/sample.mp4"
+export KANG_AUDIO_INPUT="$PWD/sample.wav"
+sbatch scripts/slurm/v1_multimodal_smoke.sbatch
+squeue -j <job_id>
+sacct -j <job_id> --format=JobID,State,ExitCode,Elapsed,NodeList
+```
+
+脚本会清除指向 `127.0.0.1` 的代理变量，避免计算节点尝试连接登录节点本地代理。权重和运行目录不进入 Git；报告必须保存权重摘要和 Slurm job_id。
+
 ## 5. 运行检查
 
 每次运行后检查：
@@ -85,6 +121,8 @@ kangshield-info inspect-ezviz device-snapshot.json \
 4. reports 中是否出现原始密钥、序列号、姓名或电话。
 5. warning/error 是否被解释，而不是静默忽略。
 6. 输入文件哈希是否与原始文件一致。
+7. processing 与 cold-start 实时系数是否分开解释。
+8. 完整转写是否只存在于受控 FeatureEvent，而未复制到汇总报告。
 
 快速检查：
 

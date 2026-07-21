@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kangshield"
-version = "0.1.0"
+version = "0.2.0"
 description = "KangShield information-side V1 exploration pipeline"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -14,7 +14,18 @@ dependencies = [
 
 [project.optional-dependencies]
 media = [
+    "numpy>=1.26,<3",
     "opencv-python-headless>=4.10,<5",
+]
+multimodal = [
+    "numpy>=1.26,<3",
+    "opencv-python-headless>=4.10,<5",
+    "torch>=2.3",
+    "torchaudio>=2.11",
+    "ultralytics>=8.4,<9",
+    "funasr>=1.3.22,<1.4",
+    "lapx>=0.9.4,<1",
+    "soundfile>=0.12.1,<1",
 ]
 dev = [
     "pytest>=8,<10",

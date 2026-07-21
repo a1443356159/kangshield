@@ -1,6 +1,6 @@
 # 康盾工程架构与模块设计
 
-状态：Draft v0.1
+状态：Draft v0.2
 
 更新时间：2026-07-22
 
@@ -79,6 +79,7 @@ runs/<run_id>/
 ├── source_assets.jsonl
 ├── observations.jsonl
 ├── features.jsonl
+├── multimodal_windows.jsonl
 ├── reports/
 ├── logs/
 └── artifacts/
@@ -105,9 +106,13 @@ runs/<run_id>/
 
 描述模型派生信息：feature_id、observation_id、feature_type、value、unit、confidence、quality、extractor_name、extractor_version、time_range。
 
+### ModelBinding 与 MultimodalWindow
+
+ModelBinding 冻结模型仓库、框架版本、权重摘要、许可证、设备和推理配置。MultimodalWindow 使用媒体相对毫秒，把姿态帧、语音段、转写引用和词面标签聚合到固定窗口；窗口保留来源引用，不复制原始媒体。
+
 ### RunManifest
 
-描述一次可复现实验：run_id、stage、evidence_level、配置摘要、代码版本与 dirty 状态、输入 ID、步骤状态、开始/结束时间、问题和产物路径。模型与硬件版本先写入 configuration；V1-R1 再决定是否升级为显式契约字段。
+描述一次可复现实验：run_id、stage、evidence_level、配置摘要、代码版本与 dirty 状态、输入 ID、步骤状态、开始/结束时间、问题和产物路径。多模态模型由显式 ModelBinding 记录；设备探针仍可先把硬件版本写入 configuration，V1-R1 再决定最终公共字段。
 
 V1 暂不冻结 RiskAssessment、AlertEvent 和 FeedbackEvent；这些对象在 V1 Review 后，根据实际可获得的特征设计 V2 版本。
 

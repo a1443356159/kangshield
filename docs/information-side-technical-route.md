@@ -1,6 +1,6 @@
 # 信息侧模块详细技术路线
 
-状态：Implementation Baseline v0.1
+状态：Implementation Baseline v0.2
 
 更新时间：2026-07-22
 
@@ -70,7 +70,11 @@ src/kangshield/information/
 ├── media_probe.py        # 文件、WAV、OpenCV 视频事实与质量探测
 ├── sleep_profile.py      # JSON/CSV 字段发现与映射候选
 ├── ezviz_snapshot.py     # SDK/API 脱敏快照分析与证据分级
-├── extractor.py          # 后续模型插件 Protocol
+├── extractor.py          # 通用模型插件 Protocol
+├── streaming.py          # OpenCV 时间戳回放、PCM WAV 读取/重采样
+├── pose_backend.py       # YOLO26n-pose + ByteTrack 适配器
+├── speech_backend.py     # FunASR VAD/ASR/标点和词面标签
+├── multimodal_pipeline.py # 特征落盘、时间窗对齐和性能报告
 └── cli.py                # V1 命令行入口
 ```
 
@@ -158,10 +162,12 @@ runs/<run_id>/
 ├── source_assets.jsonl
 ├── observations.jsonl
 ├── features.jsonl
+├── multimodal_windows.jsonl
 ├── reports/
 │   ├── media_probe.json
 │   ├── sleep_field_profile.json
-│   └── ezviz_capability_snapshot.json
+│   ├── ezviz_capability_snapshot.json
+│   └── multimodal-pipeline-report.json
 ├── logs/
 │   └── events.jsonl
 └── artifacts/
@@ -235,6 +241,16 @@ kangshield-info inspect-ezviz <sanitized-json> --evidence-level E1|E2|E3
 
 后续获得确认过的接口文档后，再实现 LiveTransport；不让不确定接口固化到核心契约。
 
+### 7.4 视频 + 语言多模态回放
+
+```text
+kangshield-info run-multimodal <video> <pcm-wav>
+```
+
+首版把两路文件视为共享零时刻的流式回放：视频按可配置 FPS 抽取时间戳帧，音频转为单声道 16 kHz，经姿态跟踪和 VAD/中文 ASR 后汇入固定毫秒窗口。输出完整 ModelBinding、FeatureEvent、MultimodalWindow 以及 warm/cold 两套性能口径。
+
+实现、命令、模型决策和限制见 [V1 视频与语言多模态 Pipeline](v1-multimodal-pipeline.md)。
+
 ## 8. 模型接入路线
 
 模型按“先输入可用性，再输出精度”推进：
@@ -247,9 +263,9 @@ kangshield-info inspect-ezviz <sanitized-json> --evidence-level E1|E2|E3
 
 ### 阶段 B：基础提取器
 
-- MediaPipe Pose Landmarker。
-- YOLO26n-pose + Track。
-- FunASR FSMN-VAD + Paraformer-zh。
+- 已验证基线：YOLO26n-pose + ByteTrack。
+- 已验证基线：FunASR FSMN-VAD + Paraformer-zh + CT-Punc。
+- 待对比：MediaPipe Pose Landmarker。
 - 睡眠字段映射。
 
 ### 阶段 C：候选增强
@@ -268,6 +284,8 @@ kangshield-info inspect-ezviz <sanitized-json> --evidence-level E1|E2|E3
 - 速度、显存和许可证已记录。
 - 错误案例和限制可解释。
 - 能支撑跌倒主线或明确的增强演示。
+
+当前模型只冻结为 V1 baseline。YOLO 的 AGPL/Enterprise 路线、RTMPose 替代方案和目标设备固定样本精度必须在 V1-R1 前完成，不能把“链路跑通”当成 V2 晋级。
 
 ## 9. 时间与多模态对齐
 
@@ -330,3 +348,4 @@ kangshield-info inspect-ezviz <sanitized-json> --evidence-level E1|E2|E3
 - 萤石 [EZOpenSDK API](https://open.ys7.com/doc/zh/android/com/videogo/openapi/EZOpenSDK.html)提供 getDeviceList、getDeviceInfo、captureCamera、getAlarmList 等接口。
 - CS-EP-SDNL1 的公开硬件参数见[萤石官方商品页](https://www.ys7.com/item/994492.html)；开放 API 字段仍需真实账号验证。
 - 模型候选和指标依据见 [V1 信息采集与模型探索](v1-information-acquisition.md)。
+- 当前模型基线与官方模型卡见 [V1 视频与语言多模态 Pipeline](v1-multimodal-pipeline.md)。

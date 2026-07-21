@@ -3,13 +3,22 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from time import perf_counter
 from typing import Sequence
+
+from kangshield import __version__
 
 from .artifacts import RunArtifacts
 from .contracts import EvidenceLevel, SourceType
 from .ezviz_snapshot import inspect_ezviz_snapshot
 from .media_probe import probe_media
+from .multimodal_pipeline import (
+    MultimodalPipelineConfig,
+    run_multimodal_pipeline,
+)
+from .pose_backend import UltralyticsPoseBackend
 from .sleep_profile import profile_sleep_export
+from .speech_backend import FunASRSpeechBackend
 
 
 def _evidence(value: str) -> EvidenceLevel:
@@ -32,7 +41,11 @@ def build_parser() -> argparse.ArgumentParser:
         prog="kangshield-info",
         description="KangShield V1 information-side probes",
     )
-    parser.add_argument("--version", action="version", version="kangshield-info 0.1.0")
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"kangshield-info {__version__}",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     media = subparsers.add_parser(
@@ -65,6 +78,43 @@ def build_parser() -> argparse.ArgumentParser:
     ezviz.add_argument("--runs-dir", type=Path, default=Path("runs"))
     ezviz.add_argument("--evidence-level", type=_evidence, default=EvidenceLevel.E1)
     ezviz.add_argument("--source-type", type=_source_type, default=SourceType.FIXTURE)
+
+    multimodal = subparsers.add_parser(
+        "run-multimodal",
+        help="Replay video and speech into aligned multimodal feature windows",
+    )
+    multimodal.add_argument("video", type=Path)
+    multimodal.add_argument("audio", type=Path)
+    multimodal.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    multimodal.add_argument(
+        "--evidence-level",
+        type=_evidence,
+        default=EvidenceLevel.E1,
+    )
+    multimodal.add_argument(
+        "--source-type",
+        type=_source_type,
+        default=SourceType.LOCAL_FILE,
+    )
+    multimodal.add_argument("--device-ref")
+    multimodal.add_argument("--elder-ref")
+    multimodal.add_argument(
+        "--pose-model",
+        default="models/yolo26n-pose.pt",
+    )
+    multimodal.add_argument("--pose-device", default="auto")
+    multimodal.add_argument("--pose-image-size", type=int, default=640)
+    multimodal.add_argument("--pose-confidence", type=float, default=0.35)
+    multimodal.add_argument("--pose-sample-fps", type=float, default=5.0)
+    multimodal.add_argument("--no-track", action="store_true")
+    multimodal.add_argument("--asr-model", default="paraformer-zh")
+    multimodal.add_argument("--vad-model", default="fsmn-vad")
+    multimodal.add_argument("--punc-model", default="ct-punc")
+    multimodal.add_argument("--speech-device", default="auto")
+    multimodal.add_argument("--language", default="zh")
+    multimodal.add_argument("--offline-models", action="store_true")
+    multimodal.add_argument("--fusion-window-ms", type=int, default=2000)
+    multimodal.add_argument("--max-duration-s", type=float, default=30.0)
 
     return parser
 
@@ -184,6 +234,85 @@ def _inspect_ezviz_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_multimodal_command(args: argparse.Namespace) -> int:
+    configuration = {
+        "command": "run-multimodal",
+        "source_type": args.source_type.value,
+        "pose_model": args.pose_model,
+        "pose_device": args.pose_device,
+        "pose_image_size": args.pose_image_size,
+        "pose_confidence": args.pose_confidence,
+        "pose_sample_fps": args.pose_sample_fps,
+        "tracking": not args.no_track,
+        "asr_model": args.asr_model,
+        "vad_model": args.vad_model,
+        "punc_model": args.punc_model,
+        "speech_device": args.speech_device,
+        "language": args.language,
+        "offline_models": args.offline_models,
+        "fusion_window_ms": args.fusion_window_ms,
+        "max_duration_s": args.max_duration_s,
+    }
+    with RunArtifacts(
+        args.runs_dir,
+        stage="v1-multimodal-replay",
+        evidence_level=args.evidence_level,
+        configuration=configuration,
+    ) as run:
+        model_load_started = perf_counter()
+        with run.step("load-multimodal-models"):
+            pose_backend = UltralyticsPoseBackend(
+                model=args.pose_model,
+                device=args.pose_device,
+                image_size=args.pose_image_size,
+                confidence=args.pose_confidence,
+                track=not args.no_track,
+            )
+            speech_backend = FunASRSpeechBackend(
+                model=args.asr_model,
+                vad_model=args.vad_model,
+                punc_model=args.punc_model,
+                device=args.speech_device,
+                language=args.language,
+                offline=args.offline_models,
+            )
+        model_load_wall_ms = (perf_counter() - model_load_started) * 1000.0
+        report = run_multimodal_pipeline(
+            video_path=args.video,
+            audio_path=args.audio,
+            pose_backend=pose_backend,
+            speech_backend=speech_backend,
+            run=run,
+            config=MultimodalPipelineConfig(
+                video_sample_fps=args.pose_sample_fps,
+                fusion_window_ms=args.fusion_window_ms,
+                max_duration_s=args.max_duration_s,
+            ),
+            evidence_level=args.evidence_level,
+            source_type=args.source_type,
+            device_ref=args.device_ref,
+            elder_ref=args.elder_ref,
+            model_load_wall_ms=model_load_wall_ms,
+        )
+    _print_result(
+        run,
+        {
+            "duration_ms": report.duration_ms,
+            "sampled_video_frames": report.sampled_video_frames,
+            "pose_detection_count": report.pose_detection_count,
+            "speech_segment_count": report.speech_segment_count,
+            "multimodal_window_count": report.multimodal_window_count,
+            "processing_realtime_factor": report.realtime_factors[
+                "processing_end_to_end"
+            ],
+            "cold_start_realtime_factor": report.realtime_factors[
+                "cold_start_end_to_end"
+            ],
+        },
+    )
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "probe-media":
@@ -192,6 +321,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _profile_sleep_command(args)
     if args.command == "inspect-ezviz":
         return _inspect_ezviz_command(args)
+    if args.command == "run-multimodal":
+        return _run_multimodal_command(args)
     raise RuntimeError(f"unhandled command: {args.command}")
 
 

@@ -26,6 +26,8 @@ class EvidenceLevel(StrEnum):
 class Modality(StrEnum):
     VIDEO = "video"
     AUDIO = "audio"
+    LANGUAGE = "language"
+    MULTIMODAL = "multimodal"
     SLEEP = "sleep"
     DEVICE_SNAPSHOT = "device_snapshot"
     UNKNOWN = "unknown"
@@ -156,7 +158,56 @@ class FeatureEvent(ContractModel):
     extractor_name: str
     extractor_version: str
     model_digest: str | None = None
+    privacy_level: PrivacyLevel = PrivacyLevel.DERIVED_SENSITIVE
     source_feature_refs: list[str] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+
+
+class ModelBinding(ContractModel):
+    task: str
+    backend: str
+    model_name: str
+    model_version: str | None = None
+    model_digest: str | None = None
+    license: str
+    device: str
+    configuration: dict[str, Any] = Field(default_factory=dict)
+
+
+class MultimodalWindow(ContractModel):
+    schema_version: str = "1.0"
+    window_id: str
+    time_range: TimeRange
+    video_observation_id: str
+    audio_observation_id: str
+    source_feature_refs: list[str] = Field(default_factory=list)
+    pose_frame_count: int = Field(default=0, ge=0)
+    max_person_count: int = Field(default=0, ge=0)
+    track_ids: list[str] = Field(default_factory=list)
+    speech_segment_count: int = Field(default=0, ge=0)
+    transcript_feature_refs: list[str] = Field(default_factory=list)
+    semantic_tags: list[str] = Field(default_factory=list)
+    stream_available: dict[str, bool] = Field(default_factory=dict)
+    quality_status: QualityStatus = QualityStatus.UNKNOWN
+
+
+class MultimodalPipelineReport(ContractModel):
+    schema_version: str = "1.0"
+    pipeline_version: str
+    video_asset_id: str
+    audio_asset_id: str
+    model_bindings: list[ModelBinding]
+    duration_ms: int = Field(ge=0)
+    sampled_video_frames: int = Field(ge=0)
+    pose_frames_with_people: int = Field(ge=0)
+    pose_detection_count: int = Field(ge=0)
+    speech_segment_count: int = Field(ge=0)
+    transcript_segment_count: int = Field(ge=0)
+    multimodal_window_count: int = Field(ge=0)
+    semantic_tag_counts: dict[str, int] = Field(default_factory=dict)
+    runtime_environment: dict[str, Any] = Field(default_factory=dict)
+    timing_ms: dict[str, float] = Field(default_factory=dict)
+    realtime_factors: dict[str, float] = Field(default_factory=dict)
     limitations: list[str] = Field(default_factory=list)
 
 

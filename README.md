@@ -18,6 +18,7 @@
 - [里程碑与验收门](docs/milestones.md)
 - [Review 记录](docs/review-log.md)
 - [V1 信息采集与模型探索](docs/v1-information-acquisition.md)
+- [V1 视频与语言多模态 Pipeline](docs/v1-multimodal-pipeline.md)
 
 ## V1 初步开发
 
@@ -42,6 +43,17 @@ kangshield-info probe-media <video-or-wav>
 kangshield-info profile-sleep <json-or-csv>
 kangshield-info inspect-ezviz <sanitized-json> --evidence-level E1
 ```
+
+设备无关的视频 + 语言回放链路：
+
+```bash
+python -m pip install -e ".[dev,multimodal]"
+kangshield-info run-multimodal <video> <pcm-wav> \
+  --pose-model models/yolo26n-pose.pt \
+  --offline-models
+```
+
+该命令输出姿态/跟踪、VAD、中文转写、词面标签和固定时间窗。Slurm 环境与模型准备见 [Pipeline 文档](docs/v1-multimodal-pipeline.md)和[开发流程](docs/development-workflow.md)。
 
 输出默认写入被 Git 忽略的 runs 目录。Fixture 只能作为 E1 开发证据，不能写成真实设备已接通。
 

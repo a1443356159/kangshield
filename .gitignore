@@ -11,3 +11,4 @@ runs/
 data/raw/
 secrets/
 models/
+slurm-*.out

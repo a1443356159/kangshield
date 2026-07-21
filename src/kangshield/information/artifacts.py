@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from .contracts import (
     EvidenceLevel,
     FeatureEvent,
+    MultimodalWindow,
     Observation,
     QualityIssue,
     RunManifest,
@@ -136,6 +137,9 @@ class RunArtifacts:
 
     def record_feature(self, feature: FeatureEvent) -> None:
         append_jsonl(self.run_dir / "features.jsonl", feature)
+
+    def record_multimodal_window(self, window: MultimodalWindow) -> None:
+        append_jsonl(self.run_dir / "multimodal_windows.jsonl", window)
 
     def log_event(self, event: dict[str, Any]) -> None:
         append_jsonl(
