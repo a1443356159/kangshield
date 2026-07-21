@@ -187,6 +187,8 @@ Slurm 脚本请求 1 张 L40、8 CPU、20 分钟，并强制从本地缓存加�
 
 前六项关闭的是“设备无关链路”，后三项属于 V1 真实数据和模型对比，不得由公开 smoke 替代。
 
+固定提交上的 Slurm 结果见 [V1-M2a 初测报告](reports/v1-m2a-multimodal-smoke.md)。
+
 ## 9. 官方依据
 
 - [Ultralytics YOLO26](https://docs.ultralytics.com/models/yolo26)

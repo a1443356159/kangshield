@@ -1,10 +1,10 @@
 # V1 信息采集与多模态模型探索
 
-状态：Draft v0.1
+状态：Active v0.2
 
 更新时间：2026-07-22
 
-当前目标：确定两台萤石设备能够提供的数据、候选模型可以稳定派生的特征，以及哪些《监测方案》指标暂时不能实现。
+当前目标：并行确认两台萤石设备能够提供的数据、V1 基线模型可以稳定派生的特征，以及哪些《监测方案》指标暂时不能实现。
 
 ## 1. 指标来源与使用原则
 
@@ -188,18 +188,18 @@ AppKey、AccessToken、设备验证码和设备序列号不得提交到仓库。
 
 ## 5. 候选模型矩阵
 
-这里的“首选”只表示优先测试，不代表已经选定。
+这里区分“V1 已采用基线”和“待对比候选”。基线只用于打通链路，不代表已经晋级 V2。
 
 | 模态/任务 | 候选 | 可得到的输出 | V1 决策 |
 |---|---|---|---|
-| 单人姿态快速基线 | MediaPipe Pose Landmarker | 每人 33 个图像/世界姿态点、可见性、可选分割 | 首个基线；安装简单，先测实际机位的覆盖率 |
-| 多人/远距离姿态 | YOLO26n-pose + Track | 人体框、17 个 COCO 关键点、置信度、轨迹 | 与 MediaPipe 对比；V2 前单独审查权重和许可证 |
+| 单人姿态快速候选 | MediaPipe Pose Landmarker | 每人 33 个图像/世界姿态点、可见性、可选分割 | 待对比；需要 CPU/移动端基线时加入 |
+| 多人/远距离姿态 | YOLO26n-pose + ByteTrack | 人体框、17 个 COCO 关键点、置信度、轨迹 | V1 已采用基线；V2 前必须解决 AGPL/Enterprise 许可证门或替换 |
 | 姿态精度候选 | MMPose / RTMPose 系列 | 可配置人体检测和关键点模型 | 当前两条基线不足时再测；框架为 Apache 2.0 |
 | 跌倒时序 | 规则特征 | 髋部下降、躯干角度、宽高比、横卧与静止窗口 | V1 首选，可解释且不需要训练集 |
 | 时序动作模型 | MMAction2 PoseC3D / ST-GCN 系列 | 骨架序列动作分类 | V2 候选；只有获得足够标注片段后才启动 |
 | 人脸几何 | MediaPipe Face Landmarker | 478 个 3D 人脸点、52 个 blendshape、变换矩阵 | 只做可见性和表达变化探索，不直接当 FACS AU |
 | FACS AU | OpenFace | AU presence/intensity、头姿、眼动等 | 仅做对照实验；研究代码、老化工程栈和商业许可需审查 |
-| 中文 VAD/ASR | FunASR FSMN-VAD + Paraformer-zh | 语音段、中文转写、时间戳、标点 | 中文首选基线 |
+| 中文 VAD/ASR | FunASR FSMN-VAD + Paraformer-zh + CT-Punc | 语音段、中文转写、时间戳、标点 | V1 已采用中文基线；固定权重按 SHA-256 追溯 |
 | 多语种 ASR 对照 | OpenAI Whisper small/turbo | 多语种转写、语言和时间段信息 | 对照；单独使用 Python 3.11 环境测试 |
 | 声学特征 | openSMILE eGeMAPS | F0、HNR、Jitter、Shimmer、能量、谱特征等 | 只输出客观声学量，不直接输出疾病判断 |
 | 环境声音 | YAMNet | 521 类通用音频事件及 embedding | 低优先级；先确认跌倒撞击/呼救是否在实际音频中可分 |
@@ -299,6 +299,8 @@ V1 不在没有参考设备的情况下声称心率、呼吸或睡眠分期准�
 2. 对摄像头执行设备列表、能力集、直播、回放、抓图、告警和音频探测。
 3. 对睡眠仪获取一份真实 API/导出样例及字段说明。
 4. 使用 C6c 录制首批白天、夜视、远近距离视频与受控音频。
-5. 冻结样本清单后，再安装并运行 MediaPipe、YOLO26 pose、FunASR 等候选模型。
+5. 在冻结的真实样本上运行已打通的 YOLO26 pose/FunASR 基线，并加入 RTMPose、MediaPipe 或 Whisper 对照。
+
+设备无关基线已在 Slurm L40 上通过 E1 smoke，见 [V1-M2a 初测报告](reports/v1-m2a-multimodal-smoke.md)。该结果不改变前四项真实设备任务的证据状态。
 
 萤石通用 SDK 能力可参考[官方 SDK 说明](https://open.ys7.com/doc/zh/book/4.x/android-sdk.html)；CS-EP-SDNL1 硬件参数可参考[萤石官方商品页](https://www.ys7.com/item/994492.html)。最终判断必须以测试账号的真实能力集和接口响应为准。

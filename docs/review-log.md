@@ -164,3 +164,57 @@
 1. 萤石是否提供服务端媒体 URL，还是需要 PC/移动 SDK 导出？
 2. 睡眠仪是否属于开放平台通用设备模型或专用健康组件？
 3. 真实摄像头音轨是否能在服务端环境取得？
+
+---
+
+## REV-004 V1 视频与语言多模态基线 Review
+
+- 日期：2026-07-22
+- 状态：Accepted for V1-M2a
+- 参与人：项目组、Codex
+- 评审范围：设备无关视频/语言链路、模型基线、Slurm 运行和产物边界
+- 输入材料：[V1 多模态 Pipeline](v1-multimodal-pipeline.md)、[初测报告](reports/v1-m2a-multimodal-smoke.md)、提交 `fb39903`、Slurm job `1757`
+
+### 发现
+
+1. 不等待萤石取流权限，也可以先用回放适配器冻结姿态、语音、语言和时间窗的数据契约；后续真实流只需替换输入层。
+2. 当前 P0 需要逐帧坐标、track_id、VAD 段和中文转写时间，专用结构化模型比直接使用通用音视频大模型更适合作为可审计基线。
+3. 模型已加载后的 5 秒处理为 2.172 秒，但冷启动约 39.245 秒；只报告一个“端到端”数值会造成错误容量判断。
+4. 公开 bus 图片回放和标准普通话只能验证链路，不能验证跌倒、夜视、跟踪稳定性、老人语音或 ASR 字错率。
+5. FunASR 固定权重模型卡记录为 Apache-2.0；Ultralytics YOLO 是 AGPL-3.0/Enterprise 路线，V2 必须有显式许可证决策。
+
+### 决定
+
+1. V1 姿态基线采用 YOLO26n-pose + ByteTrack；V1 语言基线采用 FSMN-VAD + SeACo Paraformer + CT-Punc。
+2. 原始转写属于 derived_sensitive，只进入受控 FeatureEvent；汇总报告只记录计数、摘要和引用。
+3. 统一生成 ModelBinding 与 MultimodalWindow；关键词只标注词面观察，不输出诈骗、跌倒意图或健康风险结论。
+4. Slurm 计算节点只使用预取并校验摘要的离线权重；清除本地代理变量，失败运行保留 failed manifest。
+5. V1 demo 使用常驻并预热的模型进程。报告同时保留 processing 与 cold-start 口径。
+6. V1-M2a 标记 Done；V1-M1、V1-M2b 和 V1-M3 状态不因本次公开 smoke 自动提升。
+7. V2 冻结前在相同真实样本上对比 RTMPose/MMPose，或确认满足 Ultralytics 许可证要求。
+
+### 验证
+
+- 自动化：18 passed。
+- Slurm：job `1757`，`COMPLETED`，exit `0:0`，NVIDIA L40。
+- 代码：`fb39903`，运行时 `code_dirty=false`。
+- 产物：25 个姿态帧、98 个姿态实例、1 个 VAD/转写段、5 个多模态窗口。
+- 性能：processing RTF 0.434464；cold-start RTF 7.849024；峰值 CUDA allocated 2,126.966 MiB。
+- 隐私：汇总报告未复制完整转写；原始媒体和运行目录未进入 Git。
+
+### 行动项
+
+| 行动 | 负责人 | 截止日期 | 状态 |
+|---|---|---|---|
+| 录制有明确同意的 C6c 正常行走、起坐、模拟跌倒、遮挡/夜视样本 | 待指定 | 2026-07-29 | Open |
+| 验证 C6c 音视频是否同容器及 PTS/时钟偏差 | 待指定 | 2026-07-29 | Open |
+| 建立近场、远场、电视背景和目标人群语音参考转写 | 待指定 | 2026-07-31 | Open |
+| 在同一固定样本比较 YOLO26n-pose 与 RTMPose | 待指定 | 2026-08-05 | Open |
+| 形成 V2 姿态模型许可证决定 | 待指定 | 2026-08-09 | Open |
+
+### 未决问题
+
+1. C6c 实际视频分辨率、夜视码率、音频编码和音视频时间基是什么？
+2. 目标居家镜头中人体最小像素高度和典型遮挡比例是多少？
+3. 方言、电视串音和远场条件下 Paraformer 的 CER 与误触发率是否合格？
+4. 最终比赛仓库的开源/分发方式是否满足 Ultralytics AGPL，还是必须切换 RTMPose？

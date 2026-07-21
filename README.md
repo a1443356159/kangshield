@@ -19,6 +19,7 @@
 - [Review 记录](docs/review-log.md)
 - [V1 信息采集与模型探索](docs/v1-information-acquisition.md)
 - [V1 视频与语言多模态 Pipeline](docs/v1-multimodal-pipeline.md)
+- [V1-M2a 多模态 Pipeline 初测报告](docs/reports/v1-m2a-multimodal-smoke.md)
 
 ## V1 初步开发
 
