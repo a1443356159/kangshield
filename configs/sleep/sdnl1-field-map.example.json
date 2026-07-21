@@ -1,0 +1,23 @@
+{
+  "schema_version": "0.1",
+  "fixture_only": true,
+  "device_model": "CS-EP-SDNL1",
+  "note": "Source paths are synthetic examples and must be replaced after inspecting a real E2/E3 export.",
+  "mappings": {
+    "heart_rate_bpm": {
+      "source_path": "$.records[].heart_rate",
+      "unit": "bpm",
+      "status": "candidate"
+    },
+    "respiratory_rate_bpm": {
+      "source_path": "$.records[].respiratory_rate",
+      "unit": "breaths/min",
+      "status": "candidate"
+    },
+    "bed_presence": {
+      "source_path": "$.records[].in_bed",
+      "unit": "boolean",
+      "status": "candidate"
+    }
+  }
+}

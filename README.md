@@ -14,6 +14,7 @@
 - [工程架构与模块设计](docs/architecture.md)
 - [信息侧详细技术路线](docs/information-side-technical-route.md)
 - [设备能力矩阵](docs/device-capability-matrix.md)
+- [开发与证据晋级流程](docs/development-workflow.md)
 - [里程碑与验收门](docs/milestones.md)
 - [Review 记录](docs/review-log.md)
 - [V1 信息采集与模型探索](docs/v1-information-acquisition.md)
@@ -21,6 +22,28 @@
 ## V1 初步开发
 
 V1 信息侧采用“运行目录 + JSON/JSONL 产物”的离线优先实现。开发入口、命令和产物结构见[信息侧详细技术路线](docs/information-side-technical-route.md)。
+
+### 本地运行
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev,media]"
+make test
+make info-fixtures
+```
+
+不安装 media extra 时，WAV 与 JSON/CSV 探测仍可运行；视频命令会明确报告 OpenCV 不可用。
+
+三条初始命令：
+
+```bash
+kangshield-info probe-media <video-or-wav>
+kangshield-info profile-sleep <json-or-csv>
+kangshield-info inspect-ezviz <sanitized-json> --evidence-level E1
+```
+
+输出默认写入被 Git 忽略的 runs 目录。Fixture 只能作为 E1 开发证据，不能写成真实设备已接通。
 
 ## 当前硬件边界
 

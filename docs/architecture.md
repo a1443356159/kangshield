@@ -1,7 +1,9 @@
 # 康盾工程架构与模块设计
 
-状态：Draft v0.1  
-更新时间：2026-07-22  
+状态：Draft v0.1
+
+更新时间：2026-07-22
+
 适用范围：V1 探索版与 V2 比赛版的共同架构边界
 
 ## 1. 两阶段目标
@@ -74,15 +76,12 @@ V1 采用一次运行一个目录的离线流水线：
 ```text
 runs/<run_id>/
 ├── manifest.json
+├── source_assets.jsonl
 ├── observations.jsonl
-├── features/
-│   ├── video_pose.jsonl
-│   ├── video_activity.jsonl
-│   ├── audio_segments.jsonl
-│   ├── audio_features.jsonl
-│   └── sleep_features.jsonl
-├── artifacts/
-└── report.json
+├── features.jsonl
+├── reports/
+├── logs/
+└── artifacts/
 ```
 
 这样可以在没有数据库和消息队列的情况下验证：
@@ -96,11 +95,11 @@ runs/<run_id>/
 
 ### SourceAsset
 
-描述原始输入：asset_id、device_id、modality、source_type、URI、起止时间、格式、校验摘要、授权级别。
+描述原始输入：asset_id、modality、source_type、evidence_level、URI、起止时间、校验摘要、隐私等级和技术元数据。
 
 ### Observation
 
-描述标准化观测：observation_id、asset_id、elder_id、device_id、occurred_at、received_at、time_range、quality、missing_reason。
+描述标准化观测：observation_id、asset_id、elder_ref、device_ref、observed_at、time_range、quality_status、quality_metrics 和 missing_reasons。
 
 ### FeatureEvent
 
@@ -108,7 +107,7 @@ runs/<run_id>/
 
 ### RunManifest
 
-描述一次可复现实验：run_id、配置摘要、代码版本、输入摘要、模型清单、开始/结束时间、硬件信息、产物目录。
+描述一次可复现实验：run_id、stage、evidence_level、配置摘要、代码版本与 dirty 状态、输入 ID、步骤状态、开始/结束时间、问题和产物路径。模型与硬件版本先写入 configuration；V1-R1 再决定是否升级为显式契约字段。
 
 V1 暂不冻结 RiskAssessment、AlertEvent 和 FeedbackEvent；这些对象在 V1 Review 后，根据实际可获得的特征设计 V2 版本。
 
@@ -144,4 +143,3 @@ V2 是否引入独立推理服务、Redis 或任务队列，由 V1 的吞吐与�
 - 候选模型晋级为 V2 正式模型。
 - 将“探索特征”升级为风险判断依据。
 - 改变原始媒体上传、留存或访问策略。
-

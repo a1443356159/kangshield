@@ -1,7 +1,9 @@
 # V1 信息采集与多模态模型探索
 
-状态：Draft v0.1  
-更新时间：2026-07-22  
+状态：Draft v0.1
+
+更新时间：2026-07-22
+
 当前目标：确定两台萤石设备能够提供的数据、候选模型可以稳定派生的特征，以及哪些《监测方案》指标暂时不能实现。
 
 ## 1. 指标来源与使用原则
@@ -168,7 +170,7 @@ AppKey、AccessToken、设备验证码和设备序列号不得提交到仓库。
 
 输出至少包含：
 
-- asset_id、device_id、modality、source_type。
+- asset_id、modality、source_type、evidence_level，并在 Observation 中保存脱敏的 device_ref/elder_ref。
 - UTC 时间与媒体内部相对时间。
 - 视频分辨率、FPS、编码、帧数和时间戳间断。
 - 音频采样率、声道、编码、响度和静音比例。

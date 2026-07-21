@@ -1,0 +1,23 @@
+{
+  "fixture": true,
+  "accessToken": "SYNTHETIC_TOKEN_MUST_BE_REDACTED",
+  "data": [
+    {
+      "deviceSerial": "SYNTHETIC-C6C-0001",
+      "deviceName": "Synthetic living room camera",
+      "deviceType": "CS-C6c-V101-1J4WF",
+      "status": 1,
+      "cameraNum": 1,
+      "isEncrypt": 1,
+      "supportTalk": 1,
+      "capability": "synthetic-unverified"
+    },
+    {
+      "deviceSerial": "SYNTHETIC-SLEEP-0001",
+      "deviceName": "Synthetic sleep device",
+      "deviceType": "CS-EP-SDNL1",
+      "status": 1,
+      "capability": "synthetic-unverified"
+    }
+  ]
+}

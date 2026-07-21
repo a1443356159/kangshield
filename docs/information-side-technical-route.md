@@ -1,7 +1,9 @@
 # 信息侧模块详细技术路线
 
-状态：Implementation Baseline v0.1  
-更新时间：2026-07-22  
+状态：Implementation Baseline v0.1
+
+更新时间：2026-07-22
+
 适用里程碑：V1-M1～V1-R1
 
 ## 1. 目标和完成定义
@@ -64,6 +66,7 @@ flowchart LR
 src/kangshield/information/
 ├── contracts.py          # SourceAsset、Observation、FeatureEvent、RunManifest
 ├── artifacts.py          # 运行目录、原子写入、JSONL、代码版本
+├── privacy.py            # 内容摘要、稳定引用和结构脱敏
 ├── media_probe.py        # 文件、WAV、OpenCV 视频事实与质量探测
 ├── sleep_profile.py      # JSON/CSV 字段发现与映射候选
 ├── ezviz_snapshot.py     # SDK/API 脱敏快照分析与证据分级
@@ -327,4 +330,3 @@ kangshield-info inspect-ezviz <sanitized-json> --evidence-level E1|E2|E3
 - 萤石 [EZOpenSDK API](https://open.ys7.com/doc/zh/android/com/videogo/openapi/EZOpenSDK.html)提供 getDeviceList、getDeviceInfo、captureCamera、getAlarmList 等接口。
 - CS-EP-SDNL1 的公开硬件参数见[萤石官方商品页](https://www.ys7.com/item/994492.html)；开放 API 字段仍需真实账号验证。
 - 模型候选和指标依据见 [V1 信息采集与模型探索](v1-information-acquisition.md)。
-

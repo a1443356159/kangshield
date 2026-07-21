@@ -1,0 +1,160 @@
+# 开发与证据晋级流程
+
+状态：Active v0.1
+
+## 1. 开发顺序
+
+每项信息能力遵循相同流程：
+
+1. 在《监测方案》中定位目标指标。
+2. 在设备能力矩阵中确认数据来源和当前证据等级。
+3. 准备最小、脱敏、可回放输入。
+4. 先运行无模型 Probe，确认格式、时间和质量。
+5. 再接入一个最小模型基线。
+6. 固定输入、配置、模型版本和运行目录。
+7. 记录覆盖率、耗时、错误案例和限制。
+8. 通过 Review 后，才更新 V2 正式能力清单。
+
+## 2. 环境
+
+信息采集核心支持 Python 3.11 及以上。模型探索统一使用独立 Python 3.11 环境，避免 PyTorch、MediaPipe、Whisper 等模型栈受到系统 Python 3.13 兼容性影响。
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev,media]"
+```
+
+真实模型依赖不进入核心安装项；每类模型在后续 extra 或独立环境文件中固定版本。
+
+## 3. 密钥和真实数据
+
+禁止提交：
+
+- AppKey、AccessToken、验证码、设备序列号。
+- 真实姓名、手机号和量表原始记录。
+- 原始视频、音频和睡眠导出。
+- 真实运行目录和模型缓存。
+
+本机要求：
+
+```bash
+export KANGSHIELD_REF_SALT="<local-random-secret>"
+```
+
+该盐只用于把真实设备序列号转换成稳定的 device_ref，不得写入仓库或日志。
+
+## 4. 当前命令
+
+### 媒体事实探测
+
+```bash
+kangshield-info probe-media sample.wav --evidence-level E2
+kangshield-info probe-media sample.mp4 --evidence-level E2 --device-ref camera_demo_01
+```
+
+E2 只表示文件来自一次真实录制；它不证明直播接口稳定。
+
+### 睡眠字段发现
+
+```bash
+kangshield-info profile-sleep sleep-export.json \
+  --evidence-level E2 \
+  --source-type sdk_export
+```
+
+报告只保留字段路径、类型和计数，不保留字段值。自动映射只是候选，必须确认单位、时间粒度和含义。
+
+### 萤石快照分析
+
+```bash
+kangshield-info inspect-ezviz device-snapshot.json \
+  --evidence-level E2 \
+  --source-type sdk_export
+```
+
+输入可以是 SDK/API 的本地脱敏快照。即使出现 support/capability 字段，也只能说明“字段出现”；直播、回放、抓图和音频仍需功能调用才能达到 E3。
+
+## 5. 运行检查
+
+每次运行后检查：
+
+1. manifest.status 是否 completed。
+2. manifest.code_version 和 code_dirty 是否符合预期。
+3. source_assets.jsonl 中 evidence_level 是否正确。
+4. reports 中是否出现原始密钥、序列号、姓名或电话。
+5. warning/error 是否被解释，而不是静默忽略。
+6. 输入文件哈希是否与原始文件一致。
+
+快速检查：
+
+```bash
+make test
+make info-fixtures
+```
+
+## 6. 新增设备适配器
+
+新增适配器必须：
+
+- 输出 SourceAsset 和 Observation。
+- 将设备原字段保留在受控适配器内部。
+- 明确设备时间、接收时间和媒体偏移。
+- 对离线、权限不足、无数据和解析失败分别编码。
+- 提供 E1 Fixture 测试。
+- 提供至少一份 E2 脱敏结构报告后才能合并真实字段映射。
+
+睡眠仪 LiveTransport 只有在获得确认过的接口/SDK 后实现，不能根据合成 Fixture 猜测 URL 和字段。
+
+## 7. 新增模型提取器
+
+模型插件实现 FeatureExtractor，并记录：
+
+- name、version、权重摘要和许可证。
+- 输入模态和质量门。
+- 输出 FeatureEvent 与 limitations。
+- CPU/GPU、批量大小、FPS/实时系数。
+- 固定样本测试与失败样本。
+
+模型不得直接写 runs；统一由 RunArtifacts 落盘。
+
+## 8. Review 与证据晋级
+
+晋级申请至少包含：
+
+| 项目 | 要求 |
+|---|---|
+| 能力 | 明确到接口或特征，不写宽泛的“支持 AI” |
+| 当前等级 | E0～E4 |
+| 目标等级 | 本次希望晋级到的等级 |
+| 运行证据 | run_id 和报告路径 |
+| 环境 | 固件、SDK/API、代码、模型和硬件版本 |
+| 结果 | 成功率、覆盖率、延迟和错误 |
+| 限制 | 场景、权限、质量、许可证和隐私 |
+
+Review 接受后同步更新：
+
+- device-capability-matrix.md。
+- milestones.md。
+- review-log.md。
+- V2 能力清单或淘汰清单。
+
+## 9. Git 里程碑规则
+
+每个里程碑至少有一个可独立回退的提交：
+
+- D0：文档、原始设计输入与架构基线。
+- V1-M1：采集契约、探针、Fixture 与测试。
+- V1-M2：真实设备 E2/E3 证据对应的字段映射。
+- V1-M3：模型对比代码、固定样本清单和报告。
+- V1-R1：晋级/淘汰决定与 V2 输入冻结。
+
+提交前必须执行：
+
+```bash
+make test
+git diff --check
+git status --short
+```
+
+push 后在 milestones.md 记录提交哈希和远端分支。
