@@ -4,9 +4,9 @@
 
 日期：2026-07-22
 
-正式运行：`20260722T125858Z-1a8291f5`
+正式运行：`20260722T131022Z-9e3b47dc`
 
-代码：`6928ac8`，`code_dirty=false`
+代码：`6f1c02a`，`code_dirty=false`
 
 ## 1. 结论
 
@@ -36,9 +36,9 @@
 | E1 capture manifest | `d70a26f98a64f567c89ebb55dd19f46a4c40c49630a1b66c3df0a26a22608d6b` |
 | Capture policy | `6c4fa5f4aa87fe2cb250c9645afff16f983271f4907fc293175fb0b224043384` |
 | 共享 AVI bytes / SHA-256 | 66,044 / `0b3bd01c83cc138780b4f3fd809798413ba8885f5ee0770a467a3bac17f24672` |
-| 正式 manifest SHA-256 | `2a6f20962ccbd4377fd534255e89e0381be6d758c2b0473981522dcd68176523` |
-| Readiness report SHA-256 | `09dd7385dc770c6c96179079cce6530607353713149319cdd8918f6c8fd00c02` |
-| Run status | completed，E1，fixture，477 ms |
+| 正式 manifest SHA-256 | `a8f8145036984f269f469a186ec45c200fd281c757223a99030c4701a159c246` |
+| Readiness report SHA-256 | `2bd9595a4bad8b23331f1cc7ed2955fec0d5d254530e9c0548cdf274a9d5958d` |
+| Run status | completed，E1，fixture，444 ms |
 
 合成包故意把同一个确定性 AVI 复制到十个场景路径，所以 `duplicate_media_content_count=9`。`synthetic=true` 时仅用于覆盖代码分支；真实 manifest 中任何跨 clip 重复摘要都会阻断真机门。
 

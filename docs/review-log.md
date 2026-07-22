@@ -694,7 +694,7 @@
 - 状态：Accepted for E1 tooling slice；V1-M2c / V1-R1 remain In progress
 - 参与人：项目组、Codex
 - 评审范围：manifest 1.1、场景/动作标注、包内文件完整性、媒体探针编排、双同步事件、三模型 held-out 冻结、两级 readiness 与隐私
-- 输入材料：[采集包就绪门设计](v1-m2c-capture-readiness-gate.md)、[正式 E1 报告](reports/v1-m2c-capture-readiness-smoke.md)、实现提交 `8838168` / `6928ac8`、正式运行 `20260722T125858Z-1a8291f5`
+- 输入材料：[采集包就绪门设计](v1-m2c-capture-readiness-gate.md)、[正式 E1 报告](reports/v1-m2c-capture-readiness-smoke.md)、实现提交 `8838168` / `6928ac8` / `542bddf`、文档提交 `6f1c02a`、正式运行 `20260722T131022Z-9e3b47dc`
 
 ### 发现
 
@@ -718,9 +718,9 @@
 ### 验证
 
 - 自动化：70 passed；`pip check` 无 broken requirements；`git diff --check` 通过。
-- 代码：`6928ac8`，正式 run completed、E1、fixture、`code_dirty=false`，耗时 477 ms。
+- 代码：`6f1c02a`，正式 run completed、E1、fixture、`code_dirty=false`，耗时 444 ms。
 - 输入：capture manifest `d70a26f98a64f567c89ebb55dd19f46a4c40c49630a1b66c3df0a26a22608d6b`；policy `6c4fa5f4aa87fe2cb250c9645afff16f983271f4907fc293175fb0b224043384`。
-- 产物：manifest `2a6f20962ccbd4377fd534255e89e0381be6d758c2b0473981522dcd68176523`；readiness report `09dd7385dc770c6c96179079cce6530607353713149319cdd8918f6c8fd00c02`。
+- 产物：manifest `a8f8145036984f269f469a186ec45c200fd281c757223a99030c4701a159c246`；readiness report `2bd9595a4bad8b23331f1cc7ed2955fec0d5d254530e9c0548cdf274a9d5958d`。
 - 结果：10/10 结构可用、1 个双事件 clip、3/3 模型策略、1/1 睡眠文件引用、0 error / 0 warning；四个真机门 false。
 - 隐私：operator/participant ref、原始 clip 名、`data/raw`、本地绝对路径、fixture 姓名和设备序列号扫描均为 0 命中。
 
