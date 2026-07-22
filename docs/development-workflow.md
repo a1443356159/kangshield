@@ -78,6 +78,17 @@ kangshield-info probe-media \
   --require-audio-track
 ```
 
+完整采集包在任何模型复测前运行：
+
+```bash
+kangshield-info assess-m2c-capture \
+  data/raw/v1-m2c/<capture_id>/capture-manifest.json \
+  --evidence-level E2 \
+  --source-type local_file
+```
+
+该命令同时检查同意/能力快照引用、包内路径和摘要、C01～C12 场景/动作窗口、双同步事件和三姿态 held-out policy。只看子 clip 的 `structurally_usable` 不足以授权模型复测；必须读取父级 `camera_ready_for_model_retest`。Fixture 的父级门固定为 false。
+
 ### 睡眠字段发现
 
 ```bash
@@ -285,7 +296,7 @@ Review 接受后同步更新：
 - V1-M1：采集契约、探针、Fixture 与测试。
 - V1-M2a：设备无关视频/语言模型链路与 E1 性能证据。
 - V1-M2b：公开真实录制固定集、批量评测与 E1 Slurm 证据。
-- V1-M2c：E1 容器时间戳工具，以及真实设备 E2/E3 证据、字段映射与音视频对齐。
+- V1-M2c：E1 容器时间戳与采集包 readiness 工具，以及真实设备 E2/E3 证据、字段映射、held-out 复测与音视频对齐。
 - V1-M3：模型对比代码、固定样本清单和报告。
 - V1-R1：晋级/淘汰决定、G4 离线特征/fallback 契约与 V2 输入冻结。
 

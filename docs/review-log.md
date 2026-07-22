@@ -685,3 +685,58 @@
 1. 比赛是否允许运行时下载但不随包分发权重，且该方式是否满足离线演示要求？
 2. C6c 固定机位是否需要预先冻结 ROI/地面几何，还是先评测无 ROI 的域偏移？
 3. 自有训练路线优先使用姿态估计 + 事件规则，还是直接训练带时间上下文的事件模型？
+
+---
+
+## REV-014 V1-M2c 采集包、标注与 Held-out Readiness Review
+
+- 日期：2026-07-22
+- 状态：Accepted for E1 tooling slice；V1-M2c / V1-R1 remain In progress
+- 参与人：项目组、Codex
+- 评审范围：manifest 1.1、场景/动作标注、包内文件完整性、媒体探针编排、双同步事件、三模型 held-out 冻结、两级 readiness 与隐私
+- 输入材料：[采集包就绪门设计](v1-m2c-capture-readiness-gate.md)、[正式 E1 报告](reports/v1-m2c-capture-readiness-smoke.md)、实现提交 `8838168` / `6928ac8`、正式运行 `20260722T125858Z-1a8291f5`
+
+### 发现
+
+1. 原采集规程和 JSON 模板能指导人工，但不能阻止路径越界、占位摘要、场景元数据漂移、事后划分 held-out 或任意三个模型文件冒充冻结策略。
+2. 新 gate 将 C01～C12 的 scenario、光照、夜视、距离、遮挡、person-presence 和必需动作标签绑定到 digest-bound policy；person-absent 不允许人物窗口，模拟跌倒必须同时具备安全垫、保护人员和清场。
+3. 当前 E1 包的 C01～C10 均通过路径、摘要、媒体轨道、标注和策略结构检查，核心/full-matrix 缺口为 0；C02 的两个合成同步事件产生 start/end offset 0 ms 和 drift 0 ms/min。
+4. 十个场景实际复用同一段无人合成 AVI，`duplicate_media_content_count=9`。这只证明结构代码；真实 manifest 中重复媒体摘要会阻断，工具也不检查画面是否真的发生标签动作。
+5. 三个 variant 不再只按数量判断，而是分别绑定 YOLO、RTMPose 和 Keypoint R-CNN 的 ID 与当前 policy SHA-256；目标集首次推理必须晚于分区和标签冻结。
+6. 子项名称固定为 `structurally_usable`，避免 E1 clip 被误读为已授权模型复测。父级四个真机门在正式 E1 run 中全部为 false，最终决定为 `tooling_only` / `partial`。
+7. Readiness report 不复制输入路径、身份 ref、标注窗口或睡眠值；schema/路径失败也使用脱敏错误，不把 Pydantic 输入写入 failed manifest。
+
+### 决定
+
+1. 接受 manifest 1.1、`v1-m2c-capture-policy-v0.1.0`、`M2cCaptureReadinessReport` 和 `assess-m2c-capture` 作为 V1-M2c 真实采集入口。
+2. 冻结两级推进：8 个核心 E2 clip + 双同步事件 + 三模型摘要打开 `camera_ready_for_model_retest`；C01～C10 与真实 SDNL1 样本再打开 `capture_bundle_ready_for_review`。后者只验收采集输入，不替代下游报告或 M2c 里程碑门。
+3. 达到摄像头核心门后可先跑三姿态/FunASR，不等待睡眠字段医学语义；但不能把“可以复测”写成“M2c 已验收”。
+4. E1、fixture、template、synthetic、fixture-marked JSON 或 synthetic acquisition 永远不能打开真机门；设备能力等级保持 E0。
+5. 目标 held-out 集禁止按结果调现有阈值。任何阈值/模型策略变更必须形成新 policy revision，并把旧结果与新结果分开。
+6. 本次只验收工具切片；标注内容抽查、三模型/ASR 实测、事件指标和设备字段仍 Open。
+
+### 验证
+
+- 自动化：70 passed；`pip check` 无 broken requirements；`git diff --check` 通过。
+- 代码：`6928ac8`，正式 run completed、E1、fixture、`code_dirty=false`，耗时 477 ms。
+- 输入：capture manifest `d70a26f98a64f567c89ebb55dd19f46a4c40c49630a1b66c3df0a26a22608d6b`；policy `6c4fa5f4aa87fe2cb250c9645afff16f983271f4907fc293175fb0b224043384`。
+- 产物：manifest `2a6f20962ccbd4377fd534255e89e0381be6d758c2b0473981522dcd68176523`；readiness report `09dd7385dc770c6c96179079cce6530607353713149319cdd8918f6c8fd00c02`。
+- 结果：10/10 结构可用、1 个双事件 clip、3/3 模型策略、1/1 睡眠文件引用、0 error / 0 warning；四个真机门 false。
+- 隐私：operator/participant ref、原始 clip 名、`data/raw`、本地绝对路径、fixture 姓名和设备序列号扫描均为 0 命中。
+
+### 行动项
+
+| 行动 | 负责人 | 截止日期 | 状态 |
+|---|---|---|---|
+| 在首次模型推理前复制模板/策略并冻结 C6c held-out 分区 | 待指定采集人 | 2026-07-26 | Open |
+| 按 C01～C10 取得同意媒体，先完成 8 clip 核心 gate | 待指定采集人 | 2026-08-01 | Open |
+| 人工复核至少一个真实 clip 的开始/结束同步事件并形成 offset/drift | 待指定采集人 / Codex | 2026-08-01 | Open |
+| `camera_ready_for_model_retest=true` 后按冻结参数复跑三姿态与 FunASR | Codex | 2026-08-03 | Blocked on E2 capture bundle |
+| 获取真实 SDNL1 导出并依次运行 capture gate、profile 与 route gate | 待指定设备负责人 / Codex | 2026-08-01 | Open |
+| 建立标注抽查/双人一致性与事件级误触发/检出延迟口径 | 项目组 | 2026-08-03 | Open |
+
+### 未决问题
+
+1. C6c 首批采集由谁执行，受控目录、同意记录和删除责任人分别是谁？
+2. 真实容器双事件采用逐帧/波形人工标注，还是补自动峰值候选后人工确认？
+3. 多人和宠物作为 C13+ 扩展场景加入同一 manifest revision，还是独立负样本包？

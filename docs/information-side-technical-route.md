@@ -210,7 +210,18 @@ kangshield-info probe-media <file> [<file> ...] \
 
 确定性 E1 夹具、字段定义和真实 C6c 使用规则见 [V1-M2c 容器音视频时间戳探针](v1-m2c-media-timing-probe.md)。
 
-### 7.2 睡眠导出字段发现
+### 7.2 目标设备采集包就绪门
+
+```text
+kangshield-info assess-m2c-capture <capture-manifest.json> \
+  --evidence-level E2 --source-type local_file
+```
+
+该命令不复制受控原始数据，而是验证 manifest 1.1、包内相对路径、SHA-256/大小、C01～C12 场景/标注、安全控制、媒体轨道、双同步事件和三姿态 variant 策略摘要。报告把“结构可用 clip”“摄像头可开始冻结参数复测”“C01～C10 完整矩阵”“睡眠文件可 profile”和“采集包可进入 Review”分开；最后一项仍不代表下游模型报告或整个 M2c 里程碑已验收。
+
+E1 fixture、template、synthetic 或顶层 fixture marker 永远不能打开真机门。真实集至少需要 8 个核心结构可用 clip 和一个双事件音频 clip；完整 Review 还要求 C01～C10 与一份真实 SDNL1 导出。设计与 E1 结果见[采集包就绪门](v1-m2c-capture-readiness-gate.md)和[初测报告](reports/v1-m2c-capture-readiness-smoke.md)。
+
+### 7.3 睡眠导出字段发现
 
 命令目标：
 
@@ -235,7 +246,7 @@ kangshield-info assess-sleep-route <json-or-csv> \
 
 它用绑定《监测方案》摘要的 policy 将字段分成 direct-if-exposed、multi-night derived 和 not-assumed，并逐项检查 evidence、source path、单位、时间、值域及缺失语义。route report 不包含值；`ready_for_adapter` 也只授权后续单字段 adapter，不能解释为设备已验收或指标准确。
 
-### 7.3 萤石 SDK/API 快照分析
+### 7.4 萤石 SDK/API 快照分析
 
 命令目标：
 
@@ -260,7 +271,7 @@ kangshield-info inspect-ezviz <sanitized-json> --evidence-level E1|E2|E3
 
 后续获得确认过的接口文档后，再实现 LiveTransport；不让不确定接口固化到核心契约。
 
-### 7.4 视频 + 语言多模态回放
+### 7.5 视频 + 语言多模态回放
 
 ```text
 kangshield-info run-multimodal <video> <pcm-wav>
@@ -270,7 +281,7 @@ kangshield-info run-multimodal <video> <pcm-wav>
 
 实现、命令、模型决策和限制见 [V1 视频与语言多模态 Pipeline](v1-multimodal-pipeline.md)。
 
-### 7.5 公开数据固定集评测
+### 7.6 公开数据固定集评测
 
 ```text
 kangshield-info benchmark-dataset <benchmark-cases.json>
@@ -278,7 +289,7 @@ kangshield-info benchmark-dataset <benchmark-cases.json>
 
 V1-M2b 使用固定 SHA-256 的 URFD/FLEURS 子集验证多样本处理。每个 case 独立运行姿态、跟踪、VAD/ASR 和窗口 Pipeline，再按 URFD 帧阶段标签统计视频覆盖率、按 FLEURS 参考转写统计 corpus CER。两路数据不是自然同步录制，融合窗口只有工程验证含义，结果固定为 E1。数据来源、许可证、准备过程和完整指标口径见 [V1-M2b 数据集评测设计](v1-m2b-public-dataset-benchmark.md)。
 
-### 7.6 跌倒运动特征离线评测
+### 7.7 跌倒运动特征离线评测
 
 ```text
 kangshield-info benchmark-fall-features \

@@ -31,6 +31,8 @@
 - [V1-M2c 目标设备样本与时间基采集规程](docs/v1-m2c-device-sample-protocol.md)
 - [V1-M2c 容器音视频时间戳探针](docs/v1-m2c-media-timing-probe.md)
 - [V1-M2c 容器时间戳探针初测报告](docs/reports/v1-m2c-media-timing-smoke.md)
+- [V1-M2c 采集包、标注与 Held-out 就绪门](docs/v1-m2c-capture-readiness-gate.md)
+- [V1-M2c 采集包就绪门初测报告](docs/reports/v1-m2c-capture-readiness-smoke.md)
 - [V1-M3 睡眠字段路线与 Fail-Closed Gate](docs/v1-m3-sleep-field-route.md)
 - [V1-M3 睡眠字段路线评审报告](docs/reports/v1-m3-sleep-field-route.md)
 - [V1-R1 探索收敛与 V2 输入清单](docs/v1-r1-exploration-review.md)
@@ -74,6 +76,15 @@ kangshield-info probe-media \
 ```
 
 该命令检查 video/audio track、逐轨 time base 和逐包 PTS/DTS；容器首尾偏移不等于实际声画同步或漂移，真实 C6c 仍需两次可见/可听同步事件。
+
+生成并评估完整的 M2c 采集包 E1 回归夹具：
+
+```bash
+make PYTHON=.venv/bin/python prepare-m2c-capture-fixture
+make PYTHON=.venv/bin/python assess-m2c-capture-fixture
+```
+
+`assess-m2c-capture` 会检查受控包路径、摘要、媒体轨道、C01～C10 场景/标注、双同步事件和三姿态策略摘要。Fixture 只能得到 `tooling_only`；真实 E2 核心集才可能打开 `camera_ready_for_model_retest`，C01～C10 与 SDNL1 样本都完成后才可能打开 `capture_bundle_ready_for_review`。该布尔量只验收采集包，V1-M2c 里程碑仍需下游模型/语言/睡眠字段报告。详细契约见[采集包就绪门](docs/v1-m2c-capture-readiness-gate.md)。
 
 设备无关的视频 + 语言回放链路：
 

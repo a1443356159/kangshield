@@ -303,6 +303,8 @@ V1 不在没有参考设备的情况下声称心率、呼吸或睡眠分期准�
 4. 使用 C6c 录制首批白天、夜视、远近距离视频与受控音频。
 5. 在冻结的真实样本上运行 YOLO26 对照、HumanArt + RTMPose 条件参考、Keypoint R-CNN fallback 和 FunASR；REV-013 后不再无门槛横向增加姿态 checkpoint。
 
+采集开始前复制 manifest 1.1 和三模型策略到受控目录，采集后先运行 `assess-m2c-capture`。只有 `camera_ready_for_model_retest=true` 才启动第 5 项；E1 fixture 的 10/10 结构覆盖不构成真机授权。设计与 E1 证据见[采集包就绪门](v1-m2c-capture-readiness-gate.md)和[初测报告](reports/v1-m2c-capture-readiness-smoke.md)。
+
 设备无关基线已在 Slurm L40 上通过 E1 smoke，见 [V1-M2a 初测报告](reports/v1-m2a-multimodal-smoke.md)。该结果不改变前四项真实设备任务的证据状态。
 
 V1-M3 姿态同集对比已经冻结模型、摘要、阈值和报告契约，见[姿态模型对比设计](v1-m3-pose-model-comparison.md)和[历史双模型报告](reports/v1-m3-pose-model-comparison.md)。HumanArt + RTMPose 保持准确率条件参考；REV-013 的 [Keypoint R-CNN 独立候选](reports/v1-m3-torchvision-keypointrcnn-candidate.md)虽达到 lying 21/21，但横卧关键点门仅 4/21，因此只保留 fallback。两条路线最终是否进入 V2 都取决于 C6c、负样本和分发 Review。

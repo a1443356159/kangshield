@@ -1,6 +1,6 @@
 # V1-M2c 目标设备样本与时间基采集规程
 
-状态：Ready for capture v0.2；E1 timing probe accepted，真实采集待执行
+状态：Ready for capture v0.3；E1 timing/readiness tools accepted，真实采集待执行
 
 更新时间：2026-07-22
 
@@ -58,7 +58,7 @@ V1-M2c 不要求立即完成萤石全量 SDK 开发。它先取得可追溯的�
 
 ## 5. Capture manifest
 
-模板见 `configs/v1-m2c-capture-manifest.example.json`。实际文件建议保存为：
+模板见 `configs/v1-m2c-capture-manifest.example.json`，严格场景门见 `configs/v1-m2c-capture-policy.json`。实际文件建议保存为：
 
 ```text
 data/raw/v1-m2c/<capture_id>/capture-manifest.json
@@ -77,7 +77,18 @@ data/raw/v1-m2c/<capture_id>/consent/<local-reference>
 - 同意引用、执行人、保护人员和安全垫状态。
 - 失败、重试、断流、无音频和权限问题，不删除失败证据。
 
-模板中的占位符没有证据等级；只有实际文件、实际能力快照和可复查调用才能形成 E2/E3。
+manifest 1.1 还要求在首次推理前冻结 `held_out_protocol`：全部 clip 归入 held-out、分区冻结时间早于采集、标签冻结时间晚于采集，并绑定 YOLO、RTMPose 与 Keypoint R-CNN 三个 variant 的策略 SHA-256。person-absent clip 不得含人物窗口；person-present clip 必须含 `person_present` 和场景动作标签。开始/结束同步事件分别记录人工定位的 `video_ms` 与 `audio_ms`。
+
+采集结束后先运行：
+
+```bash
+kangshield-info assess-m2c-capture \
+  data/raw/v1-m2c/<capture_id>/capture-manifest.json \
+  --evidence-level E2 \
+  --source-type local_file
+```
+
+可执行契约、两级 readiness 和隐私边界见[采集包、标注与 Held-out 就绪门](v1-m2c-capture-readiness-gate.md)。模板、fixture 或 synthetic 输入只能得到 E1 `tooling_only`；只有实际文件、实际能力快照和可复查调用才能形成 E2/E3。
 
 ## 6. 睡眠仪最小样本
 
@@ -104,16 +115,18 @@ kangshield-info profile-sleep <export.json-or-csv> \
 
 - YOLO26n-pose：image size 640、confidence 0.35、ByteTrack。
 - HumanArt + RTMPose：YOLOX detector confidence 0.05、detector 640×640、pose 192×256、COCO-17。
+- TorchVision Keypoint R-CNN：detection confidence 0.5、min/max size 800/1333、COCO-17；只作 REV-013 fallback 复测，不预设晋级。
 - 抽帧：5 fps；不得按各 clip 结果临时改阈值。
 - 分组报告：光照、距离、遮挡、scenario、人物框覆盖、`>=0.3/0.5` 关键点可见率、track 碎片、P95、RTF。
 - 空场/家具/宠物 clip 报人物框误报；正常躺床/弯腰报跌倒特征误触发，不能只报跌倒 clip 召回。
 
 ## 8. M2c 验收门
 
-只有同时满足以下条件才可从 Planned/In progress 进入 Review：
+分两步执行：
 
-- 至少 8 个必做 C6c clip 可追溯，白天和夜视均有空场与人物样本。
-- 至少一段原始容器证明音轨存在/不存在，并记录音视频时间基；“设备带麦克风”不等于服务端媒体有音轨。
-- 两个姿态 variant 按冻结参数完成目标设备分组报告。
-- 至少一份真实 CS-EP-SDNL1 API/SDK/导出样例完成字段结构报告；若平台不开放，保存权限/能力证据并明确 Blocked。
-- 所有报告不含 token、验证码、序列号、姓名和原始健康值。
+1. `camera_ready_for_model_retest`：至少 8 个结构可用 C6c clip；白天/夜视均有空场与人物；覆盖远距、弯腰、床上横卧、夜视横卧和家具遮挡；至少一段原始同容器音频有两个同步事件；三姿态策略摘要匹配；输入为真实 E2 且媒体摘要不重复。达到后可先运行冻结模型，不必等待睡眠字段语义。
+2. `capture_bundle_ready_for_review`：在上一步基础上完成 C01～C10 全矩阵和至少一份真实 CS-EP-SDNL1 API/SDK/导出；若平台不开放，保存权限/能力证据并明确 Blocked。该状态只说明采集包可交给完整评测。
+
+V1-M2c 里程碑申请 Review 还必须完成三姿态目标设备分组报告、远场/噪声语言报告、睡眠字段结构/路线报告及人工标注抽查；capture gate 不读取这些下游产物，因此不会替它们背书。
+
+所有报告不含 token、验证码、序列号、姓名、原始标注窗口和原始健康值。C11/C12 安全模拟跌倒仍为条件允许项，不为凑矩阵要求老人或无保护人员执行危险动作。

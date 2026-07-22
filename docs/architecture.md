@@ -1,6 +1,6 @@
 # 康盾工程架构与模块设计
 
-状态：Draft v0.7
+状态：Draft v0.8
 
 更新时间：2026-07-22
 
@@ -81,6 +81,8 @@ V1-M3 在 M3/M7 之间增加“同一 PoseBackend 契约 → 视频-only variant
 
 V1-M2c 在 M1/M2 之间增加独立容器时间戳探针：“本地原始容器 → PyAV stream/packet 扫描 → ContainerTimingReport”。它确认同容器轨道、time base、PTS/DTS 完整性和首尾容器偏移，但固定 `drift_estimate_available=false`；只有真实录制中的两个跨模态同步事件才能形成 offset/drift 验收。E1 工具通过不会提升 C6c 的设备证据等级。
 
+V1-M2c 另在 M1/M7 之间增加“受控采集包 → strict manifest/场景 policy → 文件摘要与媒体探针 → held-out/覆盖聚合”的就绪门。子 clip 只发布 `structurally_usable`；只有非 fixture E2、同意/能力快照、8 个核心 clip、双同步事件和三模型策略摘要同时通过，父级才发布 `camera_ready_for_model_retest`。完整 C01～C10 与真实 SDNL1 导出再打开 `capture_bundle_ready_for_review`；它只验收采集输入，不替代下游模型/语言/字段报告或整个 M2c 里程碑。这样 E1 fixture 即使结构 10/10 也不能冒充真机数据。
+
 V1-R1 G4 在 M3/M7 之间增加“干净 PoseModelComparisonReport + child pose events → box/keypoint 时序特征 → phase/class 汇总”。特征提取器只读取姿态事件，不读取 URFD 阶段标签；标签只由评测器按媒体相对时间匹配。每帧必须选择 `box_plus_keypoints`、`box_only` 或 `unavailable` 并保留 fallback reason；本层固定不产生 RiskAssessment 或 Alert。
 
 G4 另设不污染 M2b 跨模态 case schema 的 CAUCAFall ADL 压力支路：“冻结官方下载清单 → 未转码视频 + dataset lock → 三姿态 variant/case child run → activity/illumination 父汇总”。原始框/关键点只留在被忽略的 child features，父报告只发布摘要。该支路只验证公开无跌倒 ADL 中的覆盖和代理混淆，不产生分类误报率。
@@ -142,6 +144,10 @@ FallMotionFrameValue 保存归一化框形状/位置、同 track 的下降/低�
 
 MediaStreamTiming 保存每条视频/音频轨的 codec、time base、声明时间、逐包 PTS/DTS 完整性、时间范围、步长与技术元数据；ContainerTimingReport 汇总轨道数、同容器状态和首尾相对偏移。报告不保存容器 metadata value 或源路径，并把扫描截断显式降级为 partial。duration delta 只是轨道时间范围差，不得解释为 drift。
 
+### M2cCaptureReadinessReport
+
+M2cClipReadiness 只保存 opaque clip/asset ref、scenario ID、摘要/大小匹配、轨道状态、标注标签集合/数量和双事件派生 offset/drift，不保存身份、路径或原始窗口。父报告把结构可用数、核心/full-matrix 缺口、三模型策略验证和睡眠文件验证分开，并独立发布摄像头复测、完整矩阵、睡眠 profile 与 M2c Review 四个布尔门。路径越界、文件漂移、fixture marker、真实 clip 重复摘要或 held-out 策略漂移均 fail closed。
+
 ### RunManifest
 
 描述一次可复现实验：run_id、stage、evidence_level、配置摘要、代码版本与 dirty 状态、输入 ID、步骤状态、开始/结束时间、问题和产物路径。多模态模型由显式 ModelBinding 记录；设备探针仍可先把硬件版本写入 configuration，V1-R1 再决定最终公共字段。
@@ -167,7 +173,7 @@ V1-R1 将架构能力分为三层：
 2. 只进入候选接口的实现：HumanArt + RTMPose、TorchVision Keypoint R-CNN fallback、FunASR 和跌倒 box/keypoint 特征；在目标设备、负样本或许可证门关闭前不能成为正式能力。
 3. 不进入当前主路径的能力：YOLO26n 默认姿态、Whisper 普通话主链路、睡眠模型、自动诈骗/认知/抑郁评分，以及无设备证据的 HRV/SpO2/AHI 等字段。
 
-V2-D1 可以在真机到位前继续设计 adapter seam；媒体 PTS 探针与 G4 跌倒运动特征的 E1 工具均已完成，但真实 G2/G4 仍未关闭。G4 当前只提供离线 feature/fallback 契约，不能进入 RiskAssessment 或告警。系统必须同时保留三种运行声明：真实平台接入、受控文件回放、能力 blocked。三者不得共享同一个“已接入”状态。
+V2-D1 可以在真机到位前继续设计 adapter seam；媒体 PTS、采集包 readiness 与 G4 跌倒运动特征的 E1 工具均已完成，但真实 G2/G3/G4 仍未关闭。G4 当前只提供离线 feature/fallback 契约，不能进入 RiskAssessment 或告警。系统必须同时保留三种运行声明：真实平台接入、受控文件回放、能力 blocked。三者不得共享同一个“已接入”状态。
 
 完整决策 ID、许可证边界和硬门见 [V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。
 

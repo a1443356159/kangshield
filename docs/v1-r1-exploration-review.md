@@ -110,7 +110,7 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 | 跌倒运动特征契约 | box-only、关键点质量门、同 track 历史、fallback reason、无风险/告警硬约束；单一横卧框或 gate-passed torso-horizontal 均不得直接告警 | REV-011 / REV-012 / REV-013 |
 | 语言候选配置 | 16 kHz、FunASR 三模型摘要、CER/静音/RTF 口径 | REV-007 |
 | 睡眠字段边界 | 19 direct、5 derived、11 not-assumed、fail-closed mapping | REV-008 |
-| 真机场景矩阵 | 白天/夜视、距离、遮挡、空场、弯腰、躺床和安全模拟跌倒 | V1-M2c 规程 |
+| 真机场景与 held-out 契约 | C01～C12 场景/动作标签；8 clip 核心复测门；C01～C10 完整 Review 门；三姿态策略摘要 | V1-M2c 规程 / REV-014 |
 | 隐私边界 | 原始媒体/健康值不入 Git，汇总不含全文、密钥、序列号和姓名 | development workflow |
 
 ## 8. V2 冻结前的硬门
@@ -119,7 +119,7 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 |---|---|---|
 | G1 C6c 能力 | 脱敏能力集、直播/回放/抓图调用和一段原始媒体 | 演示只允许受控文件回放，不声称实时萤石接入 |
 | G2 音视频时间基 | 容器 track、time_base、首尾 PTS、offset/drift | 视频与语言分开演示，不做自然融合结论 |
-| G3 C6c 模型复测 | 至少 8 个必做场景，三个姿态 variant、空场误触发和远场 ASR | 保留 E1 离线 demo，模型仍为 conditional |
+| G3 C6c 模型复测 | `camera_ready_for_model_retest=true`；至少 8 个 E2 核心 clip，三姿态 variant、空场误触发和远场 ASR；C01～C10 完成后才申请 M2c Review | 保留 E1 离线 demo，模型仍为 conditional |
 | G4 跌倒特征 | E1 feature/fallback 与 CAUCAFall ADL 压力已通过；仍需 C6c 正负样本、空房/家具/躺床/宠物/多人和事件指标 | 不生成自动风险，只展示姿态/轨迹派生特征 |
 | G5 模型/项目许可证 | 项目 LICENSE、第三方 NOTICE、最终权重使用与分发决定 | 排除未清门模型和数据；不得临近提交时口头豁免 |
 | G6 SDNL1 字段 | 至少一晚 E2 schema，或可复核的权限/不开放证据 | 保留接口和 blocked 状态，不展示合成健康值 |
@@ -127,9 +127,9 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 
 ## 9. 不等待真机的下一开发顺序
 
-1. `[E1 tool done，REV-010]` 使用 PyAV 实现容器与逐轨时间基探针；下一步把同一命令用于 C6c 原始媒体并以两个同步事件关闭 G2，而不是把 synthetic offset 当真机结论。
+1. `[E1 tools done，REV-010/014]` 使用 PyAV 实现容器与逐轨时间基探针，并把采集包、标注、双事件与三模型 held-out 冻结成可执行 gate；下一步直接把同一命令用于 C6c 原始包，而不是再临时定义口径或把 synthetic 结果当真机结论。
 2. `[E1 tool done，REV-011/012]` 已实现仅离线输出的跌倒特征层，并用 CAUCAFall 12 段拾物/坐下/跪地/行走压力复跑；保持不输出 RiskAssessment 或 Alert。
-3. 当前下一步是补人物不存在、纯家具、床上躺卧、宠物和多人负样本。CAUCAFall 已同时暴露 horizontal box-only 与 gate-passed torso-horizontal 激活，但仍不足以冻结误触发口径。
+3. 当前下一步是按 REV-014 采集 C01～C10；其中空场、家具遮挡和床上躺卧已进入硬标签契约，宠物和真实多人作为扩展负样本继续 Open。CAUCAFall 已同时暴露 horizontal box-only 与 gate-passed torso-horizontal 激活，但仍不足以冻结误触发口径。
 4. `[E1 comparison done，REV-013]` 已评测非 Human-Art 的 Keypoint R-CNN；因 lying gate 4/21 和权重分发仍 Open，只保留 fallback。下一步不再横向增加 checkpoint，而是进入 C6c held-out 与自有训练路线判断。
 5. 形成项目 LICENSE/THIRD_PARTY_NOTICES 决策草案；最终许可证由项目方确认。
 

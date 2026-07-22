@@ -1,6 +1,6 @@
 # 康盾里程碑与验收门
 
-状态：Active v0.6
+状态：Active v0.7
 
 基准日期：2026-07-22
 
@@ -22,7 +22,7 @@
 | V1-M1 设备能力探测 | 07-25～07-28 | In progress | 摄像头/睡眠仪能力矩阵、API 样例、原始样本 | 每项能力有真实调用或明确“不开放/待确认”证据 |
 | V1-M2a 设备无关多模态链路 | 07-22～07-23 | Done | 视频/语言回放、姿态、VAD/ASR、窗口、Slurm 报告 | 干净提交在 L40 上完成 E1 smoke，warm/cold 口径分离 |
 | V1-M2b 公开真实场景固定集与对齐评测 | 07-22～07-23 | Done | URFD/FLEURS 固定集、批量 Pipeline、标签/CER/覆盖率与 Slurm 报告 | 六 case 在干净提交和 L40 上可重复完成，公开数据边界固定为 E1 |
-| V1-M2c 目标设备样本与时间基 | 07-22～08-01 | In progress | 容器时间戳探针、C6c 音视频样本、睡眠样例与统一产物 | E1 工具已验收；目标设备视频、音频、睡眠样例仍须可追溯且时间语义明确 |
+| V1-M2c 目标设备样本与时间基 | 07-22～08-01 | In progress | 容器时间戳探针、采集包/标注/held-out gate、C6c 音视频样本、睡眠样例 | 两个 E1 工具切片已验收；目标设备视频、音频、睡眠样例仍须形成 E2/E3 证据 |
 | V1-M3 模型快速对比 | 08-02～08-07 | Done | 姿态、VAD/ASR、睡眠字段的对比报告 | E1 姿态、语音与睡眠路线均可重复并完成采用/候选/放弃决定；真机门仍属 M2c |
 | V1-R1 探索 Review | 08-08～08-09 | In progress | V1 结论、淘汰项、G4 离线特征/ADL 压力、V2 输入清单 | E1 决策账本、G4 feature/fallback 与 CAUCAFall 压力子门已冻结；真机、剩余负样本、许可证和负责人硬门关闭后验收 |
 | V2-D1 设计冻结 | 08-10～08-12 | Planned | V2 架构、Schema、测试矩阵、任务分工 | 跌倒主线、平台接入和演示脚本闭合 |
@@ -50,8 +50,9 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 | V1-R1 G4 跌倒运动特征 E1 工具 | `782026b` / `3defab6` | `origin/main` | 2026-07-22 已验证 | box-only 时序代理、COCO-17 质量门、fail-closed fallback、双变体正式报告和 REV-011；不代表真实 G4、跌倒判断或告警已验收 |
 | V1-R1 G4 CAUCAFall ADL 压力 | `336bbe9` / `97062d5` | `origin/main` | 2026-07-22 已验证 | CC-BY-4.0 固定 12-case、确定性准备/lock、双变体 L40 压力报告和 REV-012；只关闭公开拾物/坐下/跪地/行走子门 |
 | V1-M3/G4 Keypoint R-CNN 独立候选 | `eae5f56` / `d956203` / `5ad8053` | `origin/main` | 2026-07-22 已验证 | 三模型 M2b 与 CAUCAFall L40 对比、候选 G4 派生、权重血缘 fail-closed 和 REV-013；保留 fallback，不是最终选型 |
+| V1-M2c 采集包就绪门 E1 工具 | `8838168` / `6928ac8` | 待推送 | 2026-07-22 本地已验证 | manifest 1.1、场景/标注、文件/媒体、双同步事件、三模型 held-out 摘要、两级 readiness 与 REV-014；不代表取得真机样本 |
 
-这里的“推送验证”只证明代码已到达远端。V1-M1 仍为 In progress，必须取得 C6c 与 CS-EP-SDNL1 的 E2/E3 证据后才能进入 Review/Done。V1-M2a 和 V1-M2b 的 Done 只关闭设备无关 E1 链路及公开固定集评测，不会提升真实设备证据等级。V1-M3 的姿态、语言和睡眠字段三个 E1 切片均已验收，因此仅在 E1 探索范围标记 Done；M2c 已有采集规程和 E1 容器时间戳工具，但仍没有真实 C6c 媒体或 SDNL1 字段证据。V1-R1 G4 的离线特征与 CAUCAFall 压力也只属于 E1，不能替代 C6c 正负样本、剩余居家负样本或跌倒风险/告警验收。
+这里的“推送验证”只证明代码已到达远端。V1-M1 仍为 In progress，必须取得 C6c 与 CS-EP-SDNL1 的 E2/E3 证据后才能进入 Review/Done。V1-M2a 和 V1-M2b 的 Done 只关闭设备无关 E1 链路及公开固定集评测，不会提升真实设备证据等级。V1-M3 的姿态、语言和睡眠字段三个 E1 切片均已验收，因此仅在 E1 探索范围标记 Done；M2c 已有采集规程、容器时间戳工具和采集包 readiness gate，但仍没有真实 C6c 媒体或 SDNL1 字段证据。V1-R1 G4 的离线特征与 CAUCAFall 压力也只属于 E1，不能替代 C6c 正负样本、剩余居家负样本或跌倒风险/告警验收。
 
 ## 4. 当前阶段任务
 
@@ -127,12 +128,15 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 - [x] 冻结 C6c 白天/夜视、距离、遮挡、日常动作、横卧与空场采集规程和 manifest 模板。
 - [x] 实现 PyAV 容器轨道、逐包 PTS/DTS、required audio 和扫描截断的 fail-closed 探针。
 - [x] 在干净提交 `4a65630` 上完成确定性同容器音视频 E1 正式运行与隐私审计。
+- [x] 冻结 manifest 1.1、C01～C12 场景/动作标签、三姿态 held-out 策略和两级 readiness policy。
+- [x] 实现包内路径/摘要、媒体探针、双同步事件、fixture marker、重复媒体和隐私安全报告 gate。
+- [x] 在干净提交 `6928ac8` 上完成 10 场景 E1 正式运行：结构 10/10，最终决定 `tooling_only`，四个真机门均为 false。
 - [ ] 录制有明确同意的 C6c 正常行走、起坐、模拟跌倒、遮挡/夜视样本。
 - [ ] 证明 C6c 视频与音频是否同容器，并保存 PTS/时钟偏差。
 - [ ] 获取 CS-EP-SDNL1 真实 API/SDK/导出样例和字段时间语义。
 - [ ] 使用 M2b 相同契约形成 E2/E3 运行证据。
 
-采集规程见 [V1-M2c 目标设备样本与时间基](v1-m2c-device-sample-protocol.md)，E1 工具与证据见[容器时间戳探针设计](v1-m2c-media-timing-probe.md)和[初测报告](reports/v1-m2c-media-timing-smoke.md)。工具完成不提升设备证据等级；真实样本和接口响应仍未到位，因此 M2c 只能处于 In progress。
+采集规程见 [V1-M2c 目标设备样本与时间基](v1-m2c-device-sample-protocol.md)。E1 工具与证据包括[容器时间戳探针](v1-m2c-media-timing-probe.md)、[采集包就绪门](v1-m2c-capture-readiness-gate.md)及各自[时间戳报告](reports/v1-m2c-media-timing-smoke.md)、[readiness 报告](reports/v1-m2c-capture-readiness-smoke.md)。工具完成不提升设备证据等级；真实样本和接口响应仍未到位，因此 M2c 只能处于 In progress。
 
 ### V1-M3：模型对比
 

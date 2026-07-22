@@ -46,6 +46,8 @@
 
 V1-M2c 已完成 E1 容器轨道/PTS 探针及确定性回归夹具，见[设计](v1-m2c-media-timing-probe.md)与[报告](reports/v1-m2c-media-timing-smoke.md)。该工具没有使用 C6c 媒体，因此本矩阵的音频轨、编码和时间基状态仍为未验证，最高证据仍为 E0。
 
+REV-014 又完成了 E1 采集包/场景标注/held-out readiness gate，见[设计](v1-m2c-capture-readiness-gate.md)与[报告](reports/v1-m2c-capture-readiness-smoke.md)。正式 fixture 虽有 10/10 结构可用 clip，`camera_ready_for_model_retest`、`sleep_sample_ready_for_profiling` 和 `capture_bundle_ready_for_review` 均为 false；因此本能力矩阵仍不提升目标设备证据等级。
+
 ## 3. 睡眠仪能力
 
 官方商品页可确认的硬件事实：
