@@ -44,10 +44,19 @@ from .fall_features import (
 from .pose_backend import PoseBackend, PoseDetection, UltralyticsPoseBackend
 from .privacy import safe_local_uri, sha256_file
 from .streaming import OpenCVVideoReplay
+from .torchvision_pose_backend import (
+    TORCHVISION_KEYPOINT_RCNN_SHA256,
+    TORCHVISION_MODEL_ARTIFACT_LICENSE,
+    load_torchvision_pose_policy,
+)
 
 
 FALL_ADL_BENCHMARK_VERSION = "fall-adl-negative-benchmark-v0.1.0"
-KNOWN_VARIANTS = ("yolo26n-pose", "rtmpose-m-humanart")
+KNOWN_VARIANTS = (
+    "yolo26n-pose",
+    "rtmpose-m-humanart",
+    "torchvision-keypointrcnn",
+)
 YOLO26N_POSE_SHA256 = (
     "eb3bb8268828aeaf515cec23a4bfafd793944a86fe9af94ba7823609c14522a9"
 )
@@ -192,10 +201,22 @@ def _pose_binding(bindings: list[ModelBinding]) -> ModelBinding:
 def _validate_variant_bindings(
     variant_id: str,
     bindings: list[ModelBinding],
+    *,
+    torchvision_policy_sha256: str,
 ) -> None:
     pose = _pose_binding(bindings)
     if variant_id == "yolo26n-pose" and pose.model_digest != YOLO26N_POSE_SHA256:
         raise ValueError("YOLO26n-pose weight digest is not the frozen V1 baseline")
+    if variant_id == "torchvision-keypointrcnn":
+        if pose.model_digest != TORCHVISION_KEYPOINT_RCNN_SHA256:
+            raise ValueError("Keypoint R-CNN weight digest is not frozen")
+        if pose.license != TORCHVISION_MODEL_ARTIFACT_LICENSE:
+            raise ValueError("Keypoint R-CNN artifact license must remain fail closed")
+        if (
+            pose.configuration.get("license_policy_sha256")
+            != torchvision_policy_sha256
+        ):
+            raise ValueError("Keypoint R-CNN policy binding digest is not frozen")
 
 
 def _visible_ratio(detections: list[PoseDetection], threshold: float = 0.5) -> float | None:
@@ -313,6 +334,12 @@ def _runtime_environment() -> dict[str, Any]:
         environment["torch"] = "unavailable"
         return environment
     environment["torch"] = torch.__version__
+    try:
+        import torchvision
+
+        environment["torchvision"] = torchvision.__version__
+    except ImportError:
+        environment["torchvision"] = "unavailable"
     environment["cuda_available"] = torch.cuda.is_available()
     if torch.cuda.is_available():
         environment["cuda_device"] = torch.cuda.get_device_name(0)
@@ -352,6 +379,12 @@ def build_fall_adl_pose_backend(
     rtmpose_pose_model: Path,
     rtmpose_device: str,
     rtmpose_detection_confidence: float,
+    torchvision_model: Path,
+    torchvision_policy: Path,
+    torchvision_device: str,
+    torchvision_detection_confidence: float,
+    torchvision_min_size: int,
+    torchvision_max_size: int,
 ) -> PoseBackend:
     if variant_id == "yolo26n-pose":
         return UltralyticsPoseBackend(
@@ -369,6 +402,18 @@ def build_fall_adl_pose_backend(
             pose_model=rtmpose_pose_model,
             device=rtmpose_device,
             detection_confidence=rtmpose_detection_confidence,
+            track=True,
+        )
+    if variant_id == "torchvision-keypointrcnn":
+        from .torchvision_pose_backend import TorchvisionKeypointRCNNBackend
+
+        return TorchvisionKeypointRCNNBackend(
+            model=torchvision_model,
+            policy_path=torchvision_policy,
+            device=torchvision_device,
+            detection_confidence=torchvision_detection_confidence,
+            min_size=torchvision_min_size,
+            max_size=torchvision_max_size,
             track=True,
         )
     raise ValueError(f"unknown fall ADL pose variant: {variant_id}")
@@ -532,6 +577,13 @@ def _variant_report(
     rtmpose_pose_model: Path,
     rtmpose_device: str,
     rtmpose_detection_confidence: float,
+    torchvision_model: Path,
+    torchvision_policy: Path,
+    torchvision_policy_sha256: str,
+    torchvision_device: str,
+    torchvision_detection_confidence: float,
+    torchvision_min_size: int,
+    torchvision_max_size: int,
 ) -> FallAdlVariantReport:
     _reset_torch_peak()
     load_started = perf_counter()
@@ -546,13 +598,25 @@ def _variant_report(
             rtmpose_pose_model=rtmpose_pose_model,
             rtmpose_device=rtmpose_device,
             rtmpose_detection_confidence=rtmpose_detection_confidence,
+            torchvision_model=torchvision_model,
+            torchvision_policy=torchvision_policy,
+            torchvision_device=torchvision_device,
+            torchvision_detection_confidence=(
+                torchvision_detection_confidence
+            ),
+            torchvision_min_size=torchvision_min_size,
+            torchvision_max_size=torchvision_max_size,
         )
     model_load_ms = (perf_counter() - load_started) * 1000.0
     try:
         bindings, corrections = correct_model_bindings(
             backend.bindings, variant_id=variant_id, policy_path=policy_path
         )
-        _validate_variant_bindings(variant_id, bindings)
+        _validate_variant_bindings(
+            variant_id,
+            bindings,
+            torchvision_policy_sha256=torchvision_policy_sha256,
+        )
         binding = _pose_binding(bindings)
         runtimes: list[_CaseRuntime] = []
         for case in cases:
@@ -674,12 +738,23 @@ def run_fall_adl_benchmark(
     ),
     rtmpose_device: str = "auto",
     rtmpose_detection_confidence: float = 0.05,
+    torchvision_model: Path = Path(
+        "models/torchvision/keypointrcnn_resnet50_fpn_coco-fc266e95.pth"
+    ),
+    torchvision_policy: Path = Path(
+        "configs/v1-m3-torchvision-pose-model.json"
+    ),
+    torchvision_device: str = "auto",
+    torchvision_detection_confidence: float = 0.5,
+    torchvision_min_size: int = 800,
+    torchvision_max_size: int = 1333,
     sample_fps: float = 5.0,
     max_duration_s: float = 30.0,
 ) -> tuple[RunArtifacts, FallAdlBenchmarkReport]:
     fall_adl_cases_path = Path(fall_adl_cases_path).resolve()
     config_path = Path(config_path).resolve()
     model_binding_policy_path = Path(model_binding_policy_path).resolve()
+    torchvision_policy = Path(torchvision_policy).resolve()
     suite, cases = load_fall_adl_cases(fall_adl_cases_path)
     load_fall_feature_config(config_path)
     if not variants or len(variants) != len(set(variants)):
@@ -693,6 +768,13 @@ def run_fall_adl_benchmark(
         raise ValueError("YOLO image size or confidence is invalid")
     if not 0.0 <= rtmpose_detection_confidence <= 1.0:
         raise ValueError("RTMPose detection confidence is invalid")
+    if not 0.0 <= torchvision_detection_confidence <= 1.0:
+        raise ValueError("TorchVision detection confidence is invalid")
+    if torchvision_min_size <= 0 or torchvision_max_size < torchvision_min_size:
+        raise ValueError("TorchVision image size bounds are invalid")
+    uses_torchvision = "torchvision-keypointrcnn" in variants
+    if uses_torchvision:
+        load_torchvision_pose_policy(torchvision_policy)
 
     video_paths = {
         case.case_id: _verify_case_video(fall_adl_cases_path, case) for case in cases
@@ -700,6 +782,18 @@ def run_fall_adl_benchmark(
     suite_digest = sha256_file(fall_adl_cases_path)
     config_digest = sha256_file(config_path)
     policy_digest = sha256_file(model_binding_policy_path)
+    torchvision_policy_digest = (
+        sha256_file(torchvision_policy) if uses_torchvision else ""
+    )
+    pose_model_policy_sha256s = {
+        "rtmpose-m-humanart": policy_digest,
+        "torchvision-keypointrcnn": torchvision_policy_digest,
+    }
+    pose_model_policy_sha256s = {
+        variant: digest
+        for variant, digest in pose_model_policy_sha256s.items()
+        if variant in variants
+    }
     configuration = {
         "command": "benchmark-fall-adl",
         "suite_id": suite["suite_id"],
@@ -708,11 +802,15 @@ def run_fall_adl_benchmark(
         "feature_version": load_fall_feature_config(config_path).feature_version,
         "configuration_sha256": config_digest,
         "model_binding_policy_sha256": policy_digest,
+        "pose_model_policy_sha256s": pose_model_policy_sha256s,
         "sample_fps": sample_fps,
         "max_duration_s": max_duration_s,
         "yolo_image_size": yolo_image_size,
         "yolo_confidence": yolo_confidence,
         "rtmpose_detection_confidence": rtmpose_detection_confidence,
+        "torchvision_detection_confidence": torchvision_detection_confidence,
+        "torchvision_min_size": torchvision_min_size,
+        "torchvision_max_size": torchvision_max_size,
         "risk_assessment_emitted": False,
         "alert_emitted": False,
     }
@@ -723,7 +821,7 @@ def run_fall_adl_benchmark(
         configuration=configuration,
     ) as run:
         with run.step("record-fall-adl-benchmark-inputs") as step:
-            for path, kind, modality in (
+            input_assets = [
                 (fall_adl_cases_path, "fall_adl_cases", Modality.VIDEO),
                 (config_path, "fall_feature_config", Modality.UNKNOWN),
                 (
@@ -731,7 +829,16 @@ def run_fall_adl_benchmark(
                     "pose_model_binding_policy",
                     Modality.UNKNOWN,
                 ),
-            ):
+            ]
+            if uses_torchvision:
+                input_assets.append(
+                    (
+                        torchvision_policy,
+                        "torchvision_pose_model_policy",
+                        Modality.UNKNOWN,
+                    )
+                )
+            for path, kind, modality in input_assets:
                 run.record_asset(
                     _source_asset(
                         path,
@@ -761,6 +868,15 @@ def run_fall_adl_benchmark(
                 rtmpose_pose_model=Path(rtmpose_pose_model),
                 rtmpose_device=rtmpose_device,
                 rtmpose_detection_confidence=rtmpose_detection_confidence,
+                torchvision_model=Path(torchvision_model),
+                torchvision_policy=torchvision_policy,
+                torchvision_policy_sha256=torchvision_policy_digest,
+                torchvision_device=torchvision_device,
+                torchvision_detection_confidence=(
+                    torchvision_detection_confidence
+                ),
+                torchvision_min_size=torchvision_min_size,
+                torchvision_max_size=torchvision_max_size,
             )
             for variant in variants
         ]
@@ -772,6 +888,7 @@ def run_fall_adl_benchmark(
             suite_manifest_sha256=suite_digest,
             configuration_sha256=config_digest,
             model_binding_policy_sha256=policy_digest,
+            pose_model_policy_sha256s=pose_model_policy_sha256s,
             dataset_id=dataset["dataset_id"],
             dataset_version=dataset["version"],
             dataset_doi=dataset["doi"],

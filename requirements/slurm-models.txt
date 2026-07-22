@@ -1,4 +1,5 @@
-# The cluster supplies its CUDA-enabled torch build through system site packages.
+# The cluster supplies matching CUDA-enabled torch/torchvision builds through
+# system site packages; the job records and verifies their runtime versions.
 # Verify torchaudio's CUDA suffix against torch after installation.
 funasr==1.3.22
 lapx==0.9.4

@@ -686,6 +686,7 @@ class FallAdlBenchmarkReport(ContractModel):
     suite_manifest_sha256: str = Field(min_length=64, max_length=64)
     configuration_sha256: str = Field(min_length=64, max_length=64)
     model_binding_policy_sha256: str = Field(min_length=64, max_length=64)
+    pose_model_policy_sha256s: dict[str, str] = Field(default_factory=dict)
     dataset_id: str
     dataset_version: int = Field(ge=1)
     dataset_doi: str
@@ -706,6 +707,11 @@ class FallAdlBenchmarkReport(ContractModel):
             self.variants
         ):
             raise ValueError("fall ADL report variant ids must be unique")
+        if any(
+            len(digest) != 64
+            for digest in self.pose_model_policy_sha256s.values()
+        ):
+            raise ValueError("fall ADL pose model policy digest is invalid")
         return self
 
 

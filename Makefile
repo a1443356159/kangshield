@@ -37,10 +37,12 @@ submit-m2b-benchmark:
 
 prepare-m3-pose-models:
 	$(PYTHON) scripts/prepare_v1_m3_pose_models.py
+	PYTHONPATH=src $(PYTHON) scripts/prepare_v1_m3_torchvision_pose_model.py
 
 submit-m3-pose-comparison:
 	test -f "$(KANG_M2B_CASES)"
 	$(PYTHON) scripts/prepare_v1_m3_pose_models.py --offline
+	PYTHONPATH=src $(PYTHON) scripts/prepare_v1_m3_torchvision_pose_model.py --offline
 	sbatch --export=ALL,KANG_DATASET_CASES="$(KANG_M2B_CASES)" scripts/slurm/v1_m3_pose_comparison.sbatch
 
 prepare-m3-speech-models:
@@ -57,4 +59,5 @@ prepare-g4-caucafall:
 submit-g4-adl-benchmark:
 	test -f "$(KANG_G4_ADL_CASES)"
 	$(PYTHON) scripts/prepare_v1_m3_pose_models.py --offline
+	PYTHONPATH=src $(PYTHON) scripts/prepare_v1_m3_torchvision_pose_model.py --offline
 	sbatch --export=ALL,KANG_FALL_ADL_CASES="$(KANG_G4_ADL_CASES)" scripts/slurm/v1_g4_fall_adl_benchmark.sbatch

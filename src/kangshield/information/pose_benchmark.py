@@ -34,7 +34,11 @@ from .streaming import OpenCVVideoReplay
 
 
 POSE_BENCHMARK_VERSION = "pose-model-comparison-v0.1.0"
-KNOWN_VARIANTS = ("yolo26n-pose", "rtmpose-m-humanart")
+KNOWN_VARIANTS = (
+    "yolo26n-pose",
+    "rtmpose-m-humanart",
+    "torchvision-keypointrcnn",
+)
 
 
 @dataclass(frozen=True)
@@ -459,6 +463,12 @@ def _runtime_environment() -> dict[str, Any]:
         environment["torch"] = "unavailable"
         return environment
     environment["torch"] = torch.__version__
+    try:
+        import torchvision
+
+        environment["torchvision"] = torchvision.__version__
+    except ImportError:
+        environment["torchvision"] = "unavailable"
     environment["cuda_available"] = torch.cuda.is_available()
     if torch.cuda.is_available():
         environment["cuda_device"] = torch.cuda.get_device_name(0)
@@ -528,6 +538,12 @@ def _backend_factory(
     rtmpose_pose_model: Path,
     rtmpose_device: str,
     rtmpose_detection_confidence: float,
+    torchvision_model: Path,
+    torchvision_policy: Path,
+    torchvision_device: str,
+    torchvision_detection_confidence: float,
+    torchvision_min_size: int,
+    torchvision_max_size: int,
 ) -> Callable[[], PoseBackend]:
     if variant_id == "yolo26n-pose":
         return lambda: UltralyticsPoseBackend(
@@ -545,6 +561,18 @@ def _backend_factory(
             pose_model=rtmpose_pose_model,
             device=rtmpose_device,
             detection_confidence=rtmpose_detection_confidence,
+            track=True,
+        )
+    if variant_id == "torchvision-keypointrcnn":
+        from .torchvision_pose_backend import TorchvisionKeypointRCNNBackend
+
+        return lambda: TorchvisionKeypointRCNNBackend(
+            model=torchvision_model,
+            policy_path=torchvision_policy,
+            device=torchvision_device,
+            detection_confidence=torchvision_detection_confidence,
+            min_size=torchvision_min_size,
+            max_size=torchvision_max_size,
             track=True,
         )
     raise ValueError(f"unknown pose benchmark variant: {variant_id}")
@@ -681,18 +709,20 @@ def _comparison(
     variants: list[PoseBenchmarkVariantReport],
 ) -> dict[str, dict[str, float | int | str | None]]:
     by_id = {variant.variant_id: variant for variant in variants}
-    if "yolo26n-pose" not in by_id or "rtmpose-m-humanart" not in by_id:
+    baseline = by_id.get("yolo26n-pose")
+    if baseline is None:
         return {}
-    baseline = by_id["yolo26n-pose"]
-    candidate = by_id["rtmpose-m-humanart"]
     baseline_lying = float(
         baseline.by_posture_phase["lying"]["pose_frame_coverage"]
     )
-    candidate_lying = float(
-        candidate.by_posture_phase["lying"]["pose_frame_coverage"]
-    )
-    return {
-        "rtmpose-m-humanart_vs_yolo26n-pose": {
+
+    def compare(
+        candidate: PoseBenchmarkVariantReport,
+    ) -> dict[str, float | int | str | None]:
+        candidate_lying = float(
+            candidate.by_posture_phase["lying"]["pose_frame_coverage"]
+        )
+        return {
             "baseline_variant": baseline.variant_id,
             "candidate_variant": candidate.variant_id,
             "overall_coverage_delta_percentage_points": round(
@@ -716,7 +746,16 @@ def _comparison(
                 baseline.quality_metrics.get("mean_keypoint_visible_ratio_30")
             ),
         }
-    }
+
+    result: dict[str, dict[str, float | int | str | None]] = {}
+    for candidate_id in (
+        "rtmpose-m-humanart",
+        "torchvision-keypointrcnn",
+    ):
+        candidate = by_id.get(candidate_id)
+        if candidate is not None:
+            result[f"{candidate_id}_vs_yolo26n-pose"] = compare(candidate)
+    return result
 
 
 def run_pose_model_comparison(
@@ -732,6 +771,12 @@ def run_pose_model_comparison(
     rtmpose_pose_model: Path,
     rtmpose_device: str,
     rtmpose_detection_confidence: float,
+    torchvision_model: Path,
+    torchvision_policy: Path,
+    torchvision_device: str,
+    torchvision_detection_confidence: float,
+    torchvision_min_size: int,
+    torchvision_max_size: int,
     sample_fps: float,
     max_duration_s: float,
 ) -> tuple[RunArtifacts, PoseModelComparisonReport]:
@@ -746,6 +791,10 @@ def run_pose_model_comparison(
         raise ValueError(f"unknown pose variants: {', '.join(unknown)}")
     if sample_fps <= 0 or max_duration_s <= 0:
         raise ValueError("sample_fps and max_duration_s must be positive")
+    if not 0.0 <= torchvision_detection_confidence <= 1.0:
+        raise ValueError("TorchVision detection confidence is invalid")
+    if torchvision_min_size <= 0 or torchvision_max_size < torchvision_min_size:
+        raise ValueError("TorchVision image size bounds are invalid")
 
     configuration = {
         "command": "benchmark-pose-models",
@@ -760,6 +809,12 @@ def run_pose_model_comparison(
         "rtmpose_pose_model": str(rtmpose_pose_model),
         "rtmpose_device": rtmpose_device,
         "rtmpose_detection_confidence": rtmpose_detection_confidence,
+        "torchvision_model": str(torchvision_model),
+        "torchvision_policy": str(torchvision_policy),
+        "torchvision_device": torchvision_device,
+        "torchvision_detection_confidence": torchvision_detection_confidence,
+        "torchvision_min_size": torchvision_min_size,
+        "torchvision_max_size": torchvision_max_size,
         "sample_fps": sample_fps,
         "max_duration_s": max_duration_s,
     }
@@ -781,6 +836,14 @@ def run_pose_model_comparison(
                 rtmpose_pose_model=Path(rtmpose_pose_model),
                 rtmpose_device=rtmpose_device,
                 rtmpose_detection_confidence=rtmpose_detection_confidence,
+                torchvision_model=Path(torchvision_model),
+                torchvision_policy=Path(torchvision_policy),
+                torchvision_device=torchvision_device,
+                torchvision_detection_confidence=(
+                    torchvision_detection_confidence
+                ),
+                torchvision_min_size=torchvision_min_size,
+                torchvision_max_size=torchvision_max_size,
             )
             report = _run_variant(
                 variant_id=variant_id,

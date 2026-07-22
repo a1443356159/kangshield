@@ -37,13 +37,18 @@ def test_profile_sleep_cli_creates_completed_run(tmp_path, capsys):
     assert (manifest_path.parent / "reports" / "sleep-field-profile.json").is_file()
 
 
-def test_pose_benchmark_parser_defaults_to_both_variants():
+def test_pose_benchmark_parser_freezes_three_variant_defaults():
     args = build_parser().parse_args(
         ["benchmark-pose-models", "benchmark-cases.json"]
     )
     assert args.command == "benchmark-pose-models"
     assert args.variant is None
     assert args.rtmpose_detection_confidence == 0.05
+    assert args.torchvision_model.name.endswith("fc266e95.pth")
+    assert args.torchvision_policy.name == "v1-m3-torchvision-pose-model.json"
+    assert args.torchvision_detection_confidence == 0.5
+    assert args.torchvision_min_size == 800
+    assert args.torchvision_max_size == 1333
 
 
 def test_speech_benchmark_parser_freezes_candidate_decoding_defaults():
@@ -90,7 +95,7 @@ def test_fall_feature_parser_defaults_to_candidate_and_clean_source():
     assert args.allow_dirty_source is False
 
 
-def test_fall_adl_parser_defaults_to_fixed_two_variant_stress_run():
+def test_fall_adl_parser_defaults_to_fixed_three_variant_stress_run():
     args = build_parser().parse_args(
         ["benchmark-fall-adl", "fall-adl-cases.json"]
     )
@@ -100,3 +105,6 @@ def test_fall_adl_parser_defaults_to_fixed_two_variant_stress_run():
     assert args.model_binding_policy.name == "v1-m3-pose-models.json"
     assert args.pose_sample_fps == 5.0
     assert args.max_duration_s == 30.0
+    assert args.torchvision_detection_confidence == 0.5
+    assert args.torchvision_min_size == 800
+    assert args.torchvision_max_size == 1333

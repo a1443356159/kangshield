@@ -164,6 +164,7 @@ def test_fall_adl_benchmark_keeps_parent_report_aggregate_only(
     variant = report.variants[0]
     metrics = variant.overall.fall_feature_metrics
     assert report.case_count == 12
+    assert report.pose_model_policy_sha256s == {}
     assert report.risk_assessment_emitted is False
     assert report.alert_emitted is False
     assert variant.overall.sampled_frames == 120

@@ -176,15 +176,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     pose_benchmark = subparsers.add_parser(
         "benchmark-pose-models",
-        help="Compare the YOLO pose baseline and Human-Art RTMPose on V1-M2b video",
+        help="Compare the three frozen V1 pose variants on V1-M2b video",
     )
     pose_benchmark.add_argument("benchmark_cases", type=Path)
     pose_benchmark.add_argument("--runs-dir", type=Path, default=Path("runs"))
     pose_benchmark.add_argument(
         "--variant",
         action="append",
-        choices=("yolo26n-pose", "rtmpose-m-humanart"),
-        help="Repeat to select variants; defaults to both in this order",
+        choices=(
+            "yolo26n-pose",
+            "rtmpose-m-humanart",
+            "torchvision-keypointrcnn",
+        ),
+        help="Repeat to select variants; defaults to all three in this order",
     )
     pose_benchmark.add_argument(
         "--yolo-model", type=Path, default=Path("models/yolo26n-pose.pt")
@@ -210,6 +214,25 @@ def build_parser() -> argparse.ArgumentParser:
     pose_benchmark.add_argument(
         "--rtmpose-detection-confidence", type=float, default=0.05
     )
+    pose_benchmark.add_argument(
+        "--torchvision-model",
+        type=Path,
+        default=Path(
+            "models/torchvision/"
+            "keypointrcnn_resnet50_fpn_coco-fc266e95.pth"
+        ),
+    )
+    pose_benchmark.add_argument(
+        "--torchvision-policy",
+        type=Path,
+        default=Path("configs/v1-m3-torchvision-pose-model.json"),
+    )
+    pose_benchmark.add_argument("--torchvision-device", default="auto")
+    pose_benchmark.add_argument(
+        "--torchvision-detection-confidence", type=float, default=0.5
+    )
+    pose_benchmark.add_argument("--torchvision-min-size", type=int, default=800)
+    pose_benchmark.add_argument("--torchvision-max-size", type=int, default=1333)
     pose_benchmark.add_argument("--pose-sample-fps", type=float, default=5.0)
     pose_benchmark.add_argument("--max-duration-s", type=float, default=30.0)
 
@@ -250,8 +273,12 @@ def build_parser() -> argparse.ArgumentParser:
     fall_adl.add_argument(
         "--variant",
         action="append",
-        choices=("yolo26n-pose", "rtmpose-m-humanart"),
-        help="Repeat to select variants; defaults to both in this order",
+        choices=(
+            "yolo26n-pose",
+            "rtmpose-m-humanart",
+            "torchvision-keypointrcnn",
+        ),
+        help="Repeat to select variants; defaults to all three in this order",
     )
     fall_adl.add_argument(
         "--config",
@@ -287,6 +314,25 @@ def build_parser() -> argparse.ArgumentParser:
     fall_adl.add_argument(
         "--rtmpose-detection-confidence", type=float, default=0.05
     )
+    fall_adl.add_argument(
+        "--torchvision-model",
+        type=Path,
+        default=Path(
+            "models/torchvision/"
+            "keypointrcnn_resnet50_fpn_coco-fc266e95.pth"
+        ),
+    )
+    fall_adl.add_argument(
+        "--torchvision-policy",
+        type=Path,
+        default=Path("configs/v1-m3-torchvision-pose-model.json"),
+    )
+    fall_adl.add_argument("--torchvision-device", default="auto")
+    fall_adl.add_argument(
+        "--torchvision-detection-confidence", type=float, default=0.5
+    )
+    fall_adl.add_argument("--torchvision-min-size", type=int, default=800)
+    fall_adl.add_argument("--torchvision-max-size", type=int, default=1333)
     fall_adl.add_argument("--pose-sample-fps", type=float, default=5.0)
     fall_adl.add_argument("--max-duration-s", type=float, default=30.0)
 
@@ -638,7 +684,11 @@ def _benchmark_dataset_command(args: argparse.Namespace) -> int:
 def _benchmark_pose_models_command(args: argparse.Namespace) -> int:
     from .pose_benchmark import run_pose_model_comparison
 
-    variants = args.variant or ["yolo26n-pose", "rtmpose-m-humanart"]
+    variants = args.variant or [
+        "yolo26n-pose",
+        "rtmpose-m-humanart",
+        "torchvision-keypointrcnn",
+    ]
     run, report = run_pose_model_comparison(
         benchmark_cases_path=args.benchmark_cases,
         runs_dir=args.runs_dir,
@@ -651,6 +701,14 @@ def _benchmark_pose_models_command(args: argparse.Namespace) -> int:
         rtmpose_pose_model=args.rtmpose_pose_model,
         rtmpose_device=args.rtmpose_device,
         rtmpose_detection_confidence=args.rtmpose_detection_confidence,
+        torchvision_model=args.torchvision_model,
+        torchvision_policy=args.torchvision_policy,
+        torchvision_device=args.torchvision_device,
+        torchvision_detection_confidence=(
+            args.torchvision_detection_confidence
+        ),
+        torchvision_min_size=args.torchvision_min_size,
+        torchvision_max_size=args.torchvision_max_size,
         sample_fps=args.pose_sample_fps,
         max_duration_s=args.max_duration_s,
     )
@@ -765,7 +823,11 @@ def _benchmark_fall_features_command(args: argparse.Namespace) -> int:
 def _benchmark_fall_adl_command(args: argparse.Namespace) -> int:
     from .fall_adl_benchmark import run_fall_adl_benchmark
 
-    variants = args.variant or ["yolo26n-pose", "rtmpose-m-humanart"]
+    variants = args.variant or [
+        "yolo26n-pose",
+        "rtmpose-m-humanart",
+        "torchvision-keypointrcnn",
+    ]
     run, report = run_fall_adl_benchmark(
         fall_adl_cases_path=args.fall_adl_cases,
         runs_dir=args.runs_dir,
@@ -780,6 +842,14 @@ def _benchmark_fall_adl_command(args: argparse.Namespace) -> int:
         rtmpose_pose_model=args.rtmpose_pose_model,
         rtmpose_device=args.rtmpose_device,
         rtmpose_detection_confidence=args.rtmpose_detection_confidence,
+        torchvision_model=args.torchvision_model,
+        torchvision_policy=args.torchvision_policy,
+        torchvision_device=args.torchvision_device,
+        torchvision_detection_confidence=(
+            args.torchvision_detection_confidence
+        ),
+        torchvision_min_size=args.torchvision_min_size,
+        torchvision_max_size=args.torchvision_max_size,
         sample_fps=args.pose_sample_fps,
         max_duration_s=args.max_duration_s,
     )
