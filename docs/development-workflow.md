@@ -156,6 +156,8 @@ sacct -j <job_id> --format=JobID,State,ExitCode,Elapsed,NodeList
 
 确定性同容器 GPU smoke 使用 `make submit-mm-container-smoke`。Slurm 脚本通过 `KANG_AUDIO_FROM_VIDEO=1` 选择容器音轨，并拒绝同时传入非空 `KANG_AUDIO_INPUT`。
 
+首次运行前执行 `make prepare-mm-container-smoke`。该准备器消费已下载的公开 video/WAV，以 bitexact Matroska 固定 250 ms 音轨 PTS 偏移；它不会把工程构造的对齐升级成自然同步证据。
+
 脚本会清除指向 `127.0.0.1` 的代理变量，避免计算节点尝试连接登录节点本地代理。权重和运行目录不进入 Git；报告必须保存权重摘要和 Slurm job_id。
 
 ### V1-M2b 公开固定集
