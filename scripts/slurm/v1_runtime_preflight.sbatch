@@ -21,6 +21,7 @@ kang_slurm_verify_onnxruntime_cuda
 nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader
 "${kang_python}" - <<'PY'
 import json
+import os
 
 import torch
 
@@ -30,7 +31,10 @@ print(
         {
             "cuda_available": torch.cuda.is_available(),
             "cuda_device": torch.cuda.get_device_name(0),
+            "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES"),
             "cuda_probe_sum": probe.sum().item(),
+            "slurm_job_gpus": os.environ.get("SLURM_JOB_GPUS"),
+            "torch_cuda_device_count": torch.cuda.device_count(),
             "torch_version": torch.__version__,
             "risk_assessment_emitted": False,
             "alert_emitted": False,
