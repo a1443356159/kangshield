@@ -22,6 +22,7 @@
 - [V1-M2a 多模态 Pipeline 初测报告](docs/reports/v1-m2a-multimodal-smoke.md)
 - [V1-M2b 公开真实场景固定集与对齐评测](docs/v1-m2b-public-dataset-benchmark.md)
 - [V1-M2b 公开固定集初测报告](docs/reports/v1-m2b-public-dataset-benchmark.md)
+- [V1-M3 姿态模型对比设计](docs/v1-m3-pose-model-comparison.md)
 
 ## V1 初步开发
 
@@ -68,6 +69,17 @@ kangshield-info benchmark-dataset data/processed/v1-m2b/benchmark-cases.json \
 ```
 
 URFD 与 FLEURS 的固定版本、许可证和 SHA-256 见[数据集评测设计](docs/v1-m2b-public-dataset-benchmark.md)。公开视频与语音是跨数据集配对，只用于 E1 工程和分模态精度基线，不能替代萤石目标设备验证。
+
+运行 V1-M3 同集姿态对比：
+
+```bash
+python -m pip install -e ".[dev,rtmpose-gpu]"
+python scripts/prepare_v1_m3_pose_models.py
+kangshield-info benchmark-pose-models \
+  data/processed/v1-m2b/benchmark-cases.json
+```
+
+该命令只重放六段视频，对比 YOLO26n-pose 与 YOLOX-m HumanArt + RTMPose-m HumanArt；不会重复运行语言模型。模型固定信息、阈值偏差和评测边界见[V1-M3 设计](docs/v1-m3-pose-model-comparison.md)。
 
 输出默认写入被 Git 忽略的 runs 目录。Fixture 只能作为 E1 开发证据，不能写成真实设备已接通。
 

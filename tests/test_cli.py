@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from kangshield.information.cli import main
+from kangshield.information.cli import build_parser
 
 
 SLEEP_FIXTURE = (
@@ -34,3 +35,12 @@ def test_profile_sleep_cli_creates_completed_run(tmp_path, capsys):
     assert manifest["status"] == "completed"
     assert manifest["evidence_level"] == "E1"
     assert (manifest_path.parent / "reports" / "sleep-field-profile.json").is_file()
+
+
+def test_pose_benchmark_parser_defaults_to_both_variants():
+    args = build_parser().parse_args(
+        ["benchmark-pose-models", "benchmark-cases.json"]
+    )
+    assert args.command == "benchmark-pose-models"
+    assert args.variant is None
+    assert args.rtmpose_detection_confidence == 0.05

@@ -295,6 +295,77 @@ class DatasetBenchmarkReport(ContractModel):
     limitations: list[str] = Field(default_factory=list)
 
 
+class PoseBenchmarkCaseEvaluation(ContractModel):
+    schema_version: str = "1.0"
+    case_id: str
+    variant_id: str
+    run_id: str
+    video_sequence: str
+    video_class: str
+    sampled_frames: int = Field(ge=0)
+    frames_with_people: int = Field(ge=0)
+    pose_frame_coverage: float = Field(ge=0.0, le=1.0)
+    tracked_frames: int = Field(ge=0)
+    tracking_coverage: float = Field(ge=0.0, le=1.0)
+    unique_track_count: int = Field(ge=0)
+    mean_detection_confidence: float | None = Field(
+        default=None, ge=0.0, le=1.0
+    )
+    mean_keypoint_confidence: float | None = Field(
+        default=None, ge=0.0, le=1.0
+    )
+    mean_keypoint_visible_ratio_30: float | None = Field(
+        default=None, ge=0.0, le=1.0
+    )
+    mean_keypoint_visible_ratio_50: float | None = Field(
+        default=None, ge=0.0, le=1.0
+    )
+    phase_metrics: dict[str, DatasetPhaseMetrics] = Field(default_factory=dict)
+    maximum_annotation_match_error_ms: int = Field(ge=0)
+    evaluated_media_duration_ms: int = Field(ge=0)
+    timing_ms: dict[str, float] = Field(default_factory=dict)
+    realtime_factors: dict[str, float] = Field(default_factory=dict)
+    limitations: list[str] = Field(default_factory=list)
+
+
+class PoseBenchmarkVariantReport(ContractModel):
+    schema_version: str = "1.0"
+    variant_id: str
+    model_bindings: list[ModelBinding]
+    case_count: int = Field(ge=0)
+    cases: list[PoseBenchmarkCaseEvaluation]
+    sampled_frames: int = Field(ge=0)
+    frames_with_people: int = Field(ge=0)
+    pose_frame_coverage: float = Field(ge=0.0, le=1.0)
+    tracked_frames: int = Field(ge=0)
+    tracking_coverage: float = Field(ge=0.0, le=1.0)
+    by_video_class: dict[str, dict[str, float | int]] = Field(default_factory=dict)
+    by_posture_phase: dict[str, dict[str, float | int]] = Field(
+        default_factory=dict
+    )
+    quality_metrics: dict[str, float | int | None] = Field(default_factory=dict)
+    runtime_environment: dict[str, Any] = Field(default_factory=dict)
+    timing_ms: dict[str, float] = Field(default_factory=dict)
+    realtime_factors: dict[str, float] = Field(default_factory=dict)
+    limitations: list[str] = Field(default_factory=list)
+
+
+class PoseModelComparisonReport(ContractModel):
+    schema_version: str = "1.0"
+    benchmark_id: str
+    benchmark_version: str
+    evidence_level: EvidenceLevel = EvidenceLevel.E1
+    source_manifest_sha256: str = Field(min_length=64, max_length=64)
+    benchmark_cases_sha256: str = Field(min_length=64, max_length=64)
+    case_count: int = Field(ge=0)
+    primary_metric: str
+    variants: list[PoseBenchmarkVariantReport]
+    comparisons: dict[str, dict[str, float | int | str | None]] = Field(
+        default_factory=dict
+    )
+    limitations: list[str] = Field(default_factory=list)
+
+
 class RunStep(ContractModel):
     name: str
     status: StepStatus = StepStatus.RUNNING

@@ -83,6 +83,18 @@ class UltralyticsPoseBackend:
     def bindings(self) -> list[ModelBinding]:
         return list(self._bindings)
 
+    def reset(self) -> None:
+        """Reset tracker state before replaying an independent video."""
+        predictor = getattr(self._model, "predictor", None)
+        trackers = getattr(predictor, "trackers", None)
+        if trackers:
+            for tracker in trackers:
+                reset = getattr(tracker, "reset", None)
+                if reset is not None:
+                    reset()
+        if predictor is not None and hasattr(predictor, "vid_path"):
+            predictor.vid_path = [None] * len(predictor.vid_path or [None])
+
     def infer(self, frame: Any) -> list[PoseDetection]:
         arguments = {
             "source": frame,

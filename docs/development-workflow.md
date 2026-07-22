@@ -125,6 +125,19 @@ kangshield-info benchmark-dataset \
 
 下载清单固定 URL/revision、大小和 SHA-256；原始/派生媒体均被 Git 忽略。视频与音频是跨数据集配对，只有各自模态的标签有效。详细边界和指标见 [V1-M2b 数据集评测设计](v1-m2b-public-dataset-benchmark.md)。
 
+### V1-M3 姿态同集对比
+
+Python 3.13 的当前 Slurm 环境不安装完整 MMCV/MMPose 栈；候选使用官方 ONNX 导出和 ONNXRuntime GPU：
+
+```bash
+python -m pip install -r requirements/slurm-rtmpose.txt
+python scripts/prepare_v1_m3_pose_models.py
+python scripts/prepare_v1_m3_pose_models.py --offline
+make submit-m3-pose-comparison
+```
+
+计算节点不得下载权重。父报告记录两个 variant 的模型摘要、阶段覆盖、关键点质量、耗时和显存口径；详细设计见 [V1-M3 姿态模型对比](v1-m3-pose-model-comparison.md)。
+
 ## 5. 运行检查
 
 每次运行后检查：

@@ -73,6 +73,8 @@ flowchart LR
 
 M7 在 V1-M2b 增加“固定数据源清单 → 数据准备 → 单 case run → 套件汇总”子链路。数据准备器只生成可回放媒体、标签 sidecar 和 lock；模型 Pipeline 仍只消费标准媒体，评测器只读取 FeatureEvent、sidecar 和 PipelineReport，不把数据集专用标签渗入在线提取器。
 
+V1-M3 在 M3/M7 之间增加“同一 PoseBackend 契约 → 视频-only variant runner → 阶段/质量/性能对比”。在线姿态事件不读取 URFD 标签；标签只在评测器中按媒体相对时间匹配。RTMPose 采用独立人物检测、top-down 关键点和短时 IoU ID，但仍输出既有 PoseDetection，避免候选框架反向改变公共数据契约。
+
 ## 5. V1 运行形态
 
 V1 采用一次运行一个目录的离线流水线：
@@ -117,6 +119,10 @@ ModelBinding 冻结模型仓库、框架版本、权重摘要、许可证、设�
 ### DatasetBenchmarkCase 与 DatasetBenchmarkReport
 
 DatasetBenchmarkCase 只用于离线评测，冻结公开来源、配对类型、标签 sidecar 和参考转写。DatasetCaseEvaluation 分别记录视频覆盖率/阶段指标和语音 CER；DatasetBenchmarkReport 做加权汇总但不复制参考或识别全文。跨数据集 case 必须声明 `cross_dataset_synthetic_common_zero`，证据等级固定 E1。
+
+### PoseModelComparisonReport
+
+PoseBenchmarkCaseEvaluation 复用相同视频和 sidecar，分别保存人物框覆盖、关键点质量、轨迹字段和帧耗时。PoseBenchmarkVariantReport 对 class/phase 加权汇总；PoseModelComparisonReport 只计算预先指定的 variant 差值。模型框覆盖、关键点质量和 tracker 字段必须分开解释，不允许用“返回了框”替代“关键点足以支持跌倒特征”。
 
 ### RunManifest
 

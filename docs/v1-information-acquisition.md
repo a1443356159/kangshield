@@ -194,7 +194,7 @@ AppKey、AccessToken、设备验证码和设备序列号不得提交到仓库。
 |---|---|---|---|
 | 单人姿态快速候选 | MediaPipe Pose Landmarker | 每人 33 个图像/世界姿态点、可见性、可选分割 | 待对比；需要 CPU/移动端基线时加入 |
 | 多人/远距离姿态 | YOLO26n-pose + ByteTrack | 人体框、17 个 COCO 关键点、置信度、轨迹 | V1 已采用基线；V2 前必须解决 AGPL/Enterprise 许可证门或替换 |
-| 姿态精度候选 | MMPose / RTMPose 系列 | 可配置人体检测和关键点模型 | 当前两条基线不足时再测；框架为 Apache 2.0 |
+| 姿态精度候选 | YOLOX-m HumanArt + RTMPose-m HumanArt | 人体框、COCO-17 关键点、置信度、短时轨迹 | V1-M3 对比进行中；采用 ONNXRuntime，重点检查 lying 覆盖与 fall-01 关键点质量 |
 | 跌倒时序 | 规则特征 | 髋部下降、躯干角度、宽高比、横卧与静止窗口 | V1 首选，可解释且不需要训练集 |
 | 时序动作模型 | MMAction2 PoseC3D / ST-GCN 系列 | 骨架序列动作分类 | V2 候选；只有获得足够标注片段后才启动 |
 | 人脸几何 | MediaPipe Face Landmarker | 478 个 3D 人脸点、52 个 blendshape、变换矩阵 | 只做可见性和表达变化探索，不直接当 FACS AU |
@@ -302,5 +302,7 @@ V1 不在没有参考设备的情况下声称心率、呼吸或睡眠分期准�
 5. 在冻结的真实样本上运行已打通的 YOLO26 pose/FunASR 基线，并加入 RTMPose、MediaPipe 或 Whisper 对照。
 
 设备无关基线已在 Slurm L40 上通过 E1 smoke，见 [V1-M2a 初测报告](reports/v1-m2a-multimodal-smoke.md)。该结果不改变前四项真实设备任务的证据状态。
+
+V1-M3 姿态同集对比已经冻结模型、摘要、阈值和报告契约，见 [姿态模型对比设计](v1-m3-pose-model-comparison.md)。它只复用公开 URFD 视频；最终是否进入 V2 仍取决于 L40 结果、C6c V1-M2c 复测和许可证 Review。
 
 萤石通用 SDK 能力可参考[官方 SDK 说明](https://open.ys7.com/doc/zh/book/4.x/android-sdk.html)；CS-EP-SDNL1 硬件参数可参考[萤石官方商品页](https://www.ys7.com/item/994492.html)。最终判断必须以测试账号的真实能力集和接口响应为准。

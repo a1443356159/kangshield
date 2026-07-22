@@ -138,6 +138,45 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark.add_argument("--fusion-window-ms", type=int, default=1000)
     benchmark.add_argument("--max-duration-s", type=float, default=30.0)
 
+    pose_benchmark = subparsers.add_parser(
+        "benchmark-pose-models",
+        help="Compare the YOLO pose baseline and Human-Art RTMPose on V1-M2b video",
+    )
+    pose_benchmark.add_argument("benchmark_cases", type=Path)
+    pose_benchmark.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    pose_benchmark.add_argument(
+        "--variant",
+        action="append",
+        choices=("yolo26n-pose", "rtmpose-m-humanart"),
+        help="Repeat to select variants; defaults to both in this order",
+    )
+    pose_benchmark.add_argument(
+        "--yolo-model", type=Path, default=Path("models/yolo26n-pose.pt")
+    )
+    pose_benchmark.add_argument("--yolo-device", default="auto")
+    pose_benchmark.add_argument("--yolo-image-size", type=int, default=640)
+    pose_benchmark.add_argument("--yolo-confidence", type=float, default=0.35)
+    pose_benchmark.add_argument(
+        "--rtmpose-detector-model",
+        type=Path,
+        default=Path(
+            "models/rtmpose/yolox_m_humanart/yolox_m_humanart.onnx"
+        ),
+    )
+    pose_benchmark.add_argument(
+        "--rtmpose-pose-model",
+        type=Path,
+        default=Path(
+            "models/rtmpose/rtmpose_m_humanart/rtmpose_m_humanart.onnx"
+        ),
+    )
+    pose_benchmark.add_argument("--rtmpose-device", default="auto")
+    pose_benchmark.add_argument(
+        "--rtmpose-detection-confidence", type=float, default=0.05
+    )
+    pose_benchmark.add_argument("--pose-sample-fps", type=float, default=5.0)
+    pose_benchmark.add_argument("--max-duration-s", type=float, default=30.0)
+
     return parser
 
 
@@ -368,6 +407,50 @@ def _benchmark_dataset_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def _benchmark_pose_models_command(args: argparse.Namespace) -> int:
+    from .pose_benchmark import run_pose_model_comparison
+
+    variants = args.variant or ["yolo26n-pose", "rtmpose-m-humanart"]
+    run, report = run_pose_model_comparison(
+        benchmark_cases_path=args.benchmark_cases,
+        runs_dir=args.runs_dir,
+        variants=variants,
+        yolo_model=args.yolo_model,
+        yolo_device=args.yolo_device,
+        yolo_image_size=args.yolo_image_size,
+        yolo_confidence=args.yolo_confidence,
+        rtmpose_detector_model=args.rtmpose_detector_model,
+        rtmpose_pose_model=args.rtmpose_pose_model,
+        rtmpose_device=args.rtmpose_device,
+        rtmpose_detection_confidence=args.rtmpose_detection_confidence,
+        sample_fps=args.pose_sample_fps,
+        max_duration_s=args.max_duration_s,
+    )
+    summaries = [
+        {
+            "variant_id": variant.variant_id,
+            "pose_frame_coverage": variant.pose_frame_coverage,
+            "lying_pose_frame_coverage": variant.by_posture_phase["lying"][
+                "pose_frame_coverage"
+            ],
+            "pose_inference_realtime_factor": variant.realtime_factors[
+                "pose_inference"
+            ],
+        }
+        for variant in report.variants
+    ]
+    _print_result(
+        run,
+        {
+            "benchmark_id": report.benchmark_id,
+            "case_count": report.case_count,
+            "variants": summaries,
+            "comparisons": report.comparisons,
+        },
+    )
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "probe-media":
@@ -380,6 +463,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_multimodal_command(args)
     if args.command == "benchmark-dataset":
         return _benchmark_dataset_command(args)
+    if args.command == "benchmark-pose-models":
+        return _benchmark_pose_models_command(args)
     raise RuntimeError(f"unhandled command: {args.command}")
 
 
