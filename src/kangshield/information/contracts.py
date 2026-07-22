@@ -35,6 +35,7 @@ class Modality(StrEnum):
 
 class SourceType(StrEnum):
     LOCAL_FILE = "local_file"
+    NETWORK_STREAM = "network_stream"
     SDK_EXPORT = "sdk_export"
     API_RESPONSE = "api_response"
     FIXTURE = "fixture"
@@ -52,6 +53,7 @@ EVIDENCE_RANK = {
 MAX_EVIDENCE_BY_SOURCE = {
     SourceType.FIXTURE: EvidenceLevel.E1,
     SourceType.LOCAL_FILE: EvidenceLevel.E2,
+    SourceType.NETWORK_STREAM: EvidenceLevel.E2,
     SourceType.SDK_EXPORT: EvidenceLevel.E2,
     SourceType.API_RESPONSE: EvidenceLevel.E3,
     SourceType.RUNTIME_SNAPSHOT: EvidenceLevel.E1,
@@ -1758,6 +1760,56 @@ class MediaProbeReport(ContractModel):
     technical_metadata: dict[str, Any] = Field(default_factory=dict)
     container_timing: ContainerTimingReport | None = None
     issues: list[QualityIssue] = Field(default_factory=list)
+
+
+class StreamCaptureTrack(ContractModel):
+    stream_type: Literal["video", "audio"]
+    source_stream_index: int = Field(ge=0)
+    codec_name: str | None = None
+    copied_packet_count: int = Field(ge=0)
+    missing_timestamp_count: int = Field(ge=0)
+
+
+class StreamCaptureReport(ContractModel):
+    """Privacy-safe receipt for one bounded network/file stream remux."""
+
+    schema_version: str = "1.0"
+    capture_version: str
+    evidence_level: EvidenceLevel
+    source_type: SourceType
+    endpoint_scheme: Literal["rtsp", "rtsps", "http", "https", "file", "local"]
+    endpoint_supplied_via_environment: Literal[True] = True
+    endpoint_value_persisted: Literal[False] = False
+    endpoint_digest_persisted: Literal[False] = False
+    endpoint_log_messages_persisted: Literal[False] = False
+    transport: Literal["auto", "tcp", "udp"]
+    requested_duration_ms: int = Field(gt=0)
+    minimum_duration_ms: int = Field(gt=0)
+    captured_media_span_ms: int = Field(ge=0)
+    open_timeout_ms: int = Field(gt=0)
+    read_timeout_ms: int = Field(gt=0)
+    packet_limit: int = Field(gt=0)
+    inspected_packet_count: int = Field(ge=0)
+    copied_packet_count: int = Field(ge=0)
+    termination_reason: Literal[
+        "duration_limit",
+        "end_of_stream",
+        "packet_limit",
+        "wall_time_limit",
+    ]
+    audio_required: bool
+    first_video_packet_keyframe: bool
+    tracks: list[StreamCaptureTrack] = Field(default_factory=list)
+    output_artifact: str
+    raw_media_persisted: Literal[True] = True
+    received_time_is_device_time: Literal[False] = False
+    media_probe: MediaProbeReport
+    capture_artifact_ready: bool
+    same_container_multimodal_ready: bool
+    device_platform_integration_proven: Literal[False] = False
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
+    limitations: list[str] = Field(default_factory=list)
 
 
 class M2cClipReadiness(ContractModel):

@@ -49,6 +49,56 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
+    stream_capture = subparsers.add_parser(
+        "capture-stream",
+        help=(
+            "Record one bounded RTSP/HTTP audio-video stream to an owner-only "
+            "Matroska artifact"
+        ),
+    )
+    stream_capture.add_argument(
+        "--endpoint-env",
+        default="KANG_STREAM_ENDPOINT",
+        help="Environment variable containing the endpoint; its value is never persisted",
+    )
+    stream_capture.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    stream_capture.add_argument(
+        "--evidence-level", type=_evidence, default=EvidenceLevel.E1
+    )
+    stream_capture.add_argument(
+        "--source-type",
+        type=_source_type,
+        default=SourceType.NETWORK_STREAM,
+    )
+    stream_capture.add_argument("--device-ref")
+    stream_capture.add_argument("--elder-ref")
+    stream_capture.add_argument("--duration-s", type=float, default=10.0)
+    stream_capture.add_argument(
+        "--minimum-duration-s", type=float, default=1.0
+    )
+    stream_capture.add_argument("--open-timeout-s", type=float, default=10.0)
+    stream_capture.add_argument("--read-timeout-s", type=float, default=5.0)
+    stream_capture.add_argument("--max-packets", type=int, default=200_000)
+    stream_capture.add_argument(
+        "--max-packets-per-stream",
+        type=int,
+        default=200_000,
+        help="Maximum packets scanned per output stream during the timing probe",
+    )
+    stream_capture.add_argument(
+        "--transport", choices=("auto", "tcp", "udp"), default="auto"
+    )
+    stream_capture.add_argument(
+        "--allow-video-only",
+        action="store_true",
+        help="Allow capture without audio; same-container multimodal readiness remains false",
+    )
+    stream_capture.add_argument(
+        "--require-ready",
+        action="store_true",
+        help="Exit 2 after writing the report unless the requested capture is replay-ready",
+    )
+
     media = subparsers.add_parser(
         "probe-media",
         help="Inspect file facts and WAV/video metadata",
@@ -748,6 +798,103 @@ def _print_result(run: RunArtifacts, details: dict) -> None:
             indent=2,
         )
     )
+
+
+def _capture_stream_command(args: argparse.Namespace) -> int:
+    from .stream_capture import (
+        StreamCaptureConfig,
+        capture_stream,
+        endpoint_from_environment,
+    )
+
+    endpoint = endpoint_from_environment(args.endpoint_env)
+    audio_required = not args.allow_video_only
+    configuration = {
+        "command": "capture-stream",
+        "source_type": args.source_type.value,
+        "endpoint_supplied_via_environment": True,
+        "endpoint_variable_persisted": False,
+        "endpoint_value_persisted": False,
+        "endpoint_digest_persisted": False,
+        "endpoint_log_messages_persisted": False,
+        "duration_s": args.duration_s,
+        "minimum_duration_s": args.minimum_duration_s,
+        "open_timeout_s": args.open_timeout_s,
+        "read_timeout_s": args.read_timeout_s,
+        "max_packets": args.max_packets,
+        "max_packets_per_stream": args.max_packets_per_stream,
+        "transport": args.transport,
+        "audio_required": audio_required,
+    }
+    with RunArtifacts(
+        args.runs_dir,
+        stage="v1-stream-capture",
+        evidence_level=args.evidence_level,
+        configuration=configuration,
+    ) as run:
+        output = run.artifacts_dir / "stream-capture.mkv"
+        with run.step("capture-stream") as step:
+            report = capture_stream(
+                endpoint=endpoint,
+                output_path=output,
+                output_artifact="artifacts/stream-capture.mkv",
+                evidence_level=args.evidence_level,
+                source_type=args.source_type,
+                device_ref=args.device_ref,
+                elder_ref=args.elder_ref,
+                config=StreamCaptureConfig(
+                    duration_s=args.duration_s,
+                    minimum_duration_s=args.minimum_duration_s,
+                    open_timeout_s=args.open_timeout_s,
+                    read_timeout_s=args.read_timeout_s,
+                    max_packets=args.max_packets,
+                    packet_scan_limit_per_stream=args.max_packets_per_stream,
+                    transport=args.transport,
+                    require_audio=audio_required,
+                ),
+            )
+            run.record_asset(report.media_probe.asset)
+            run.record_observation(report.media_probe.observation)
+            raw_relative = run.relative(output)
+            if raw_relative not in run.manifest.artifacts:
+                run.manifest.artifacts.append(raw_relative)
+                run.save_manifest()
+            report_path = run.write_report("stream-capture.json", report)
+            step.outputs.extend([raw_relative, run.relative(report_path)])
+    ready = (
+        report.same_container_multimodal_ready
+        if report.audio_required
+        else report.capture_artifact_ready
+    )
+    _print_result(
+        run,
+        {
+            "endpoint_scheme": report.endpoint_scheme,
+            "termination_reason": report.termination_reason,
+            "captured_media_span_ms": report.captured_media_span_ms,
+            "video_packet_count": sum(
+                track.copied_packet_count
+                for track in report.tracks
+                if track.stream_type == "video"
+            ),
+            "audio_packet_count": sum(
+                track.copied_packet_count
+                for track in report.tracks
+                if track.stream_type == "audio"
+            ),
+            "capture_artifact": report.output_artifact,
+            "capture_artifact_ready": report.capture_artifact_ready,
+            "same_container_multimodal_ready": (
+                report.same_container_multimodal_ready
+            ),
+            "device_platform_integration_proven": (
+                report.device_platform_integration_proven
+            ),
+        },
+    )
+    if args.require_ready and not ready:
+        return 2
+    return 0
 
 
 def _probe_media_command(args: argparse.Namespace) -> int:
@@ -1821,6 +1968,8 @@ def _benchmark_static_home_command(args: argparse.Namespace) -> int:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.command == "capture-stream":
+        return _capture_stream_command(args)
     if args.command == "probe-media":
         return _probe_media_command(args)
     if args.command == "assess-m2c-capture":

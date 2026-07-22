@@ -81,6 +81,19 @@ def test_media_probe_parser_freezes_packet_scan_and_audio_gate_defaults():
     assert args.max_packets_per_stream == 200_000
 
 
+def test_stream_capture_parser_defaults_to_env_only_bounded_multimodal_gate():
+    args = build_parser().parse_args(["capture-stream"])
+    assert args.command == "capture-stream"
+    assert args.endpoint_env == "KANG_STREAM_ENDPOINT"
+    assert args.source_type.value == "network_stream"
+    assert args.evidence_level.value == "E1"
+    assert args.duration_s == 10.0
+    assert args.minimum_duration_s == 1.0
+    assert args.transport == "auto"
+    assert args.allow_video_only is False
+    assert args.require_ready is False
+
+
 def test_multimodal_parser_supports_legacy_wav_and_same_container_audio():
     legacy = build_parser().parse_args(
         ["run-multimodal", "capture.avi", "speech.wav"]
