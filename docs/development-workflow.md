@@ -1,6 +1,6 @@
 # 开发与证据晋级流程
 
-状态：Active v1.0
+状态：Active v1.1
 
 ## 1. 开发顺序
 
@@ -284,6 +284,20 @@ kangshield-info assess-distribution-readiness --require-ready
 
 普通审计的 blocked 是有效评估结果，会生成 owner-only 报告并返回 `0`；`--require-ready` 会在报告落盘后返回 `2`。修改 `pyproject.toml`、模型/数据配置、bundle disposition、项目许可证、最终权重或打包方式时，必须先复核资产清单，再更新 policy 摘要和 Review。`LICENSE`、`THIRD_PARTY_NOTICES.md`、`requirements/competition.lock` 只有在非空、人工审查且 SHA-256 已绑定后才算就绪。详细契约见[比赛提交分发就绪门](v1-r1-distribution-readiness.md)。
 
+生成 competition lock 前，先盘点候选 Python 闭包：
+
+```bash
+make PYTHON=.venv/bin/python assess-runtime-closure
+```
+
+该 Make 入口为开发便利显式使用 `PYTHONPATH=src`，所以不能构成正式安装来源证明。候选/RC 环境必须安装非 editable 构建产物、不设置 `PYTHONPATH`，再从安装入口执行：
+
+```bash
+kangshield-info assess-runtime-closure --require-ready
+```
+
+只有 target/source/direct/dependency/prohibited/provenance/isolation/license metadata 八门全部通过，候选 snapshot 才能进入人工 lock/NOTICE Review；它本身不会生成最终文件或提供法律结论。依赖、extras、Python/平台、安装方式或 native runtime 变化时必须新增/升级 profile 并复跑。详细契约见[候选 Runtime 依赖闭包门](v1-r1-runtime-closure.md)。
+
 ## 5. 运行检查
 
 每次运行后检查：
@@ -314,7 +328,8 @@ kangshield-info assess-distribution-readiness --require-ready
 24. Export summary 是否不含时间、窗口、candidate/track/observation ID 或本地路径，Risk/Alert 是否仍为 false。
 25. 正式 runs 根/run/子目录、JSON/JSONL 与 Slurm stdout 是否分别保持 `0700`、`0600` 与 `0600`；任一权限漂移时是否拒绝旧 run 并用新路径重跑，而非手工改权限后冒充原始证据。
 26. 正式 sbatch 是否经统一提交器冻结完整 commit，并通过 `slurm-runtime-v0.2.0` 的 submit/execution commit 一致性、Git 根、clean checkout、checkout import 与 CUDA runtime 门；stdout override 是否显式绑定，RTMPose 是否同时通过 cuDNN/ORT loadability，而非只检查 provider 名称。
-27. 比赛提交 profile 的七个 source binding 是否全部 matched，所有 included/undecided 资产是否已清门，五个 owner decision 是否有可审计引用，三个 required release file 是否内容非空且摘要已绑定；RC 是否以 `--require-ready` 执行，而不是把普通 blocked 审计误写成可发布。
+27. 比赛提交 profile 的八个 source binding 是否全部 matched，所有 included/undecided 资产是否已清门，五个 owner decision 是否有可审计引用，三个 required release file 是否内容非空且摘要已绑定；RC 是否以 `assess-distribution-readiness --require-ready` 执行，而不是把普通 blocked 审计误写成可发布。
+28. 候选 runtime 是否从非 editable、无 `PYTHONPATH` 的已安装入口审计，根 extras/目标 marker 是否进入实际闭包，八个 closure gate 是否全部通过；是否在此之前误生成 final lock/NOTICE 或把共享开发环境冒充比赛环境。
 
 快速检查：
 

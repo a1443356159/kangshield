@@ -1,6 +1,6 @@
 # 康盾工程架构与模块设计
 
-状态：Draft v1.1
+状态：Draft v1.2
 
 更新时间：2026-07-23
 
@@ -101,7 +101,9 @@ G4 capture export bridge 把开发状态机接到真实事件 evaluator，而不
 
 G4 event-bundle assembler 将 capture/readiness、双标注/裁决、冻结 candidate policy 与三路 prediction/source manifest 复制到 owner-only staging，调用原 evaluator 完成 strict preflight 后才原子发布。bundle 只使用相对路径、大小和 SHA-256，不复制 capture 原媒体；失败会删除 staging 且不覆盖既有输出。“组装成功”与 `event_metrics_ready_for_review` 分离，fixture、camera、数据或 provenance 门仍由 evaluator 如实关闭。
 
-V1-R1 在 M0/M7 之间增加比赛提交分发就绪链：“七个仓库事实来源及摘要 → 十三个资产 disposition → 五个人工决定 + 三个发布文件 → 五个 readiness gate”。该链只判断当前 profile 的证据是否完备，不给出法律意见，也不自动选择项目许可证。`exclude` 资产不得进入提交包；`include` 或 `undecided` 资产只要未清门、来源漂移，或 required file 没有非空内容和冻结摘要，最终 `submission_bundle_ready` 就保持 false。
+V1-R1 在 M0/M7 之间增加比赛提交分发就绪链：“八个仓库事实来源及摘要 → 十三个资产 disposition → 五个人工决定 + 三个发布文件 → 五个 readiness gate”。第八个来源是候选 runtime profile。该链只判断当前 profile 的证据是否完备，不给出法律意见，也不自动选择项目许可证。`exclude` 资产不得进入提交包；`include` 或 `undecided` 资产只要未清门、来源漂移，或 required file 没有非空内容和冻结摘要，最终 `submission_bundle_ready` 就保持 false。
+
+依赖资产在生成最终 lock 前还要经过独立 runtime closure 链：“候选 profile + 脱敏 `pip inspect` → 根 extras/目标 marker 传播 → 实际传递闭包 → 版本、禁入包、安装来源、环境纯净度和许可证 metadata 八门”。该链只产生 candidate snapshot，不自动安装包、不生成最终 lock/NOTICE，也不把当前共享开发环境解释成比赛环境。
 
 ## 5. V1 运行形态
 
@@ -184,6 +186,10 @@ FallEventAnnotationAgreement 只保存 pair 序号、窗口计数、interval F1 
 
 DistributionReadinessReport 把项目代码、依赖闭包、模型 artifact 与评测数据分别记录为 `include`、`exclude` 或 `undecided`，并逐项保存 clearance、官方来源和未决要求。报告同时核对事实来源摘要、人工决定和 `LICENSE` / NOTICE / competition lock 的内容摘要；任一非排除资产未清门或来源漂移时 fail closed。它固定 `legal_advice_provided=false`、`risk_assessment_emitted=false` 和 `alert_emitted=false`，只作为人工 Release Review 的工程前置门。
 
+### RuntimeClosureReport
+
+RuntimeClosureReport 从候选 profile 和脱敏 inventory 计算直接依赖与传递闭包，显式传播根 extras 并按 profile 目标环境解释 PEP 508 marker。报告分别发布 target、repository source、direct requirements、dependency closure、prohibited closure、installation provenance、isolation 和 license metadata 八个 gate；本地路径、URL 值、`PYTHONPATH` 内容和许可证正文不落盘。它固定 `candidate_only=true`，且不产生 competition lock、NOTICE、法律意见、RiskAssessment 或 Alert。
+
 ### RunManifest
 
 描述一次可复现实验：run_id、stage、evidence_level、配置摘要、代码版本与 dirty 状态、输入 ID、步骤状态、开始/结束时间、问题和产物路径。多模态模型由显式 ModelBinding 记录；设备探针仍可先把硬件版本写入 configuration，V1-R1 再决定最终公共字段。
@@ -209,7 +215,7 @@ V1-R1 将架构能力分为三层：
 2. 只进入候选接口的实现：HumanArt + RTMPose、TorchVision Keypoint R-CNN fallback、FunASR 和跌倒 box/keypoint 特征；在目标设备、负样本或许可证门关闭前不能成为正式能力。
 3. 不进入当前主路径的能力：YOLO26n 默认姿态、Whisper 普通话主链路、睡眠模型、自动诈骗/认知/抑郁评分，以及无设备证据的 HRV/SpO2/AHI 等字段。
 
-V2-D1 可以在真机到位前继续设计 adapter seam；媒体 PTS、采集包 readiness、G4 跌倒运动特征、首版 label-blind candidate、静态人物检测压力、事件评估工具和 G5 分发门禁均已完成，但真实 G2/G3/G4 以及提交包 G5 决策仍未关闭。G4 当前只提供离线 feature/candidate/fallback、静态 person-detection 与 E1 scorer 契约证据，不能进入 RiskAssessment 或告警；G5 工具通过也不等于提交包就绪。系统必须同时保留三种运行声明：真实平台接入、受控文件回放、能力 blocked。三者不得共享同一个“已接入”状态。
+V2-D1 可以在真机到位前继续设计 adapter seam；媒体 PTS、采集包 readiness、G4 跌倒运动特征、首版 label-blind candidate、静态人物检测压力、事件评估工具，以及 G5 分发/候选 runtime closure 工具均已完成，但真实 G2/G3/G4、提交包 G5 决策和最终运行环境仍未关闭。当前共享环境的 closure 仅 3/8 ready，只能作为构建隔离候选环境的缺口清单。G4 当前只提供离线 feature/candidate/fallback、静态 person-detection 与 E1 scorer 契约证据，不能进入 RiskAssessment 或告警；G5 工具通过也不等于提交包就绪。系统必须同时保留三种运行声明：真实平台接入、受控文件回放、能力 blocked。三者不得共享同一个“已接入”状态。
 
 完整决策 ID、许可证边界和硬门见 [V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。
 

@@ -1,6 +1,6 @@
 # 信息侧模块详细技术路线
 
-状态：Implementation Baseline v1.2
+状态：Implementation Baseline v1.3
 
 更新时间：2026-07-23
 
@@ -80,6 +80,7 @@ src/kangshield/information/
 ├── fall_candidate_export.py # capture-bound G4 特征到 evaluator prediction
 ├── event_bundle.py       # 三路 prediction 与标注的原子 bundle 组装/preflight
 ├── distribution_readiness.py # 比赛包资产、决定、文件与分发 gate
+├── runtime_closure.py    # 候选 Python runtime 的 extras/marker 依赖闭包 gate
 ├── speech_backend.py     # FunASR VAD/ASR/标点和词面标签
 ├── multimodal_pipeline.py # 特征落盘、时间窗对齐和性能报告
 ├── dataset_preparation.py # 公开固定源校验、媒体转换、case/lock
@@ -365,9 +366,22 @@ kangshield-info assess-distribution-readiness \
   --runs-dir runs
 ```
 
-该命令不读取或复制模型权重和公开数据，只核对七个仓库事实来源摘要、十三项资产 disposition、五个人工决定、三个发布文件和五个 readiness gate。`include` 与 `undecided` 资产未清门、来源配置漂移、required file 缺失/过小/未绑定/摘要不符或 required decision 未确认时，报告均保持 `submission_bundle_ready=false`。`exclude` 只表示资产不进入当前提交包，不代表获得再分发许可。
+该命令不读取或复制模型权重和公开数据，只核对八个仓库事实来源摘要、十三项资产 disposition、五个人工决定、三个发布文件和五个 readiness gate。第八个来源是候选 runtime profile。`include` 与 `undecided` 资产未清门、来源配置漂移、required file 缺失/过小/未绑定/摘要不符或 required decision 未确认时，报告均保持 `submission_bundle_ready=false`。`exclude` 只表示资产不进入当前提交包，不代表获得再分发许可。
 
 普通审计在正确产出 blocked 报告时返回成功；Release Candidate 使用 `--require-ready`，报告落盘后仍未就绪则返回 `2`。policy 和 repository root 的本地路径不写入 manifest，owner-only `0700/0600` 规则不变。该门禁固定 `legal_advice_provided=false`，项目许可证、最终权重和打包方式必须由具名 owner 决定。设计与基线分别见[分发就绪门设计](v1-r1-distribution-readiness.md)和[正式 E1 报告](reports/v1-r1-distribution-readiness.md)。
+
+### 7.9 候选 Runtime 依赖闭包门
+
+```text
+kangshield-info assess-runtime-closure \
+  --profile configs/v1-r1-runtime-profile-rtmpose-funasr.json \
+  --repository-root . \
+  --runs-dir runs
+```
+
+该命令在内存中读取 `pip inspect`，先移除 metadata path、URL 值、editable path、`PYTHONPATH` 内容和许可证正文，再按候选 profile 的八个直接根、extras 与目标环境 marker 计算实际传递闭包。它把直接版本、可选依赖、禁入包、安装来源、闭包外包和许可证 metadata 分成八门；即使 `pip check` 没有报错，缺失的根 extras 依赖仍会 fail closed。
+
+开发盘点可运行 `make PYTHON=.venv/bin/python assess-runtime-closure`，但 Make 入口使用 `PYTHONPATH=src`，installation-provenance gate 必然如实关闭。候选/RC 证据必须来自非 editable、无 `PYTHONPATH` 的已安装入口，并以 `--require-ready` 作为硬门。当前共享环境仅 3/8 ready；工具不安装/卸载包，不生成 competition lock 或 NOTICE。详细契约与证据见[候选 Runtime 依赖闭包门](v1-r1-runtime-closure.md)和[正式 E1 报告](reports/v1-r1-runtime-closure.md)。
 
 ## 8. 模型接入路线
 
@@ -402,7 +416,7 @@ kangshield-info assess-distribution-readiness \
 - 错误案例和限制可解释。
 - 能支撑跌倒主线或明确的增强演示。
 
-V1-R1 已完成 E1 决策收敛和可执行分发门禁：YOLO26n 为 V1 对照，HumanArt + RTMPose 为准确率条件参考，Keypoint R-CNN 为未选 fallback，FunASR 为普通话有条件候选，Whisper small 不晋级普通话主链路。HumanArt artifact 不能继承 MMPose Apache-2.0，Keypoint R-CNN 权重也不能继承 TorchVision BSD-3-Clause；目标设备、负样本和分发门关闭前均不得晋级。当前 G5 报告为 0/5 gate ready，表示工具已完成但项目/权重/依赖分发决定尚未完成。完整账本见 [V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。
+V1-R1 已完成 E1 决策收敛和可执行分发门禁：YOLO26n 为 V1 对照，HumanArt + RTMPose 为准确率条件参考，Keypoint R-CNN 为未选 fallback，FunASR 为普通话有条件候选，Whisper small 不晋级普通话主链路。HumanArt artifact 不能继承 MMPose Apache-2.0，Keypoint R-CNN 权重也不能继承 TorchVision BSD-3-Clause；目标设备、负样本和分发门关闭前均不得晋级。当前 G5 分发报告为 0/5 gate ready，候选 runtime closure 为 3/8 ready，表示工具已完成但项目/权重/依赖环境与分发决定尚未完成。完整账本见 [V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。
 
 ## 9. 时间与多模态对齐
 

@@ -1228,3 +1228,58 @@
 2. 最终姿态和语言权重是随包携带、镜像构建时取得、部署时取得，还是由比赛环境预置？四种模式不能共享同一 clearance 结论。
 3. V2 是否继续依赖当前 Python extras 全集，还是建立最小 competition runtime profile；只有后者冻结后才能生成有意义的传递依赖清单。
 4. 最终许可证/NOTICE/lock 的审查人和 Release Candidate 签字责任尚未指定到具体姓名。
+
+---
+
+## REV-024 V1-R1 候选 Runtime 依赖闭包 Review
+
+- 日期：2026-07-23
+- 状态：Accepted for E1 pre-lock tooling；current candidate environment remains Blocked
+- 参与人：项目组、Codex
+- 评审范围：候选直接依赖、PEP 508 extras/marker 传递闭包、目标平台、禁入包、安装 provenance、环境纯净度、许可证 metadata、脱敏快照、CLI/CI 语义及与分发门的边界
+- 输入材料：[候选 Runtime 依赖闭包门](v1-r1-runtime-closure.md)、[正式 E1 报告](reports/v1-r1-runtime-closure.md)、实现提交 `876ce07`、runtime run `20260722T222305Z-2b36b79b`、distribution follow-up run `20260722T222307Z-254cb0ca`
+
+### 发现
+
+1. 当前共享 `.venv` 能完成既有 L40 功能 smoke，但混合了开发工具、多个模型候选、Conda/Python 包与本地安装来源，不能直接解释成最小比赛环境。
+2. 候选 `v1-r1-l40-rtmpose-funasr-candidate` profile 固定 8 个直接根。现有环境只有 7/8 匹配，缺 `opencv-python-headless==4.13.0.92`；已安装 GUI OpenCV 不能用相同 import 名冒充 profile 满足。
+3. 根 requirement 显式请求 `onnxruntime-gpu[cuda,cudnn]==1.27.0`。传播 extras 后缺 4 个 `*-cu13` Python distributions；此前 CUDA 动态库 loadability 证据不等于 metadata 依赖闭包完整。
+4. 5 个禁入包均未进入计算闭包，`prohibited-closure-absent=true`；但它们连同其他开发包形成 76 个 extraneous distribution，因此 isolation gate 仍关闭。
+5. 安装来源有 26 个阻断：KangShield editable 与 25 个未批准 direct URL 记录。许可证 metadata 另有 3 个缺口：KangShield、CUDA toolkit、KaldiIO。
+6. 脱敏 inventory 不保存 metadata location、URL/editable path、`PYTHONPATH` 内容或许可证正文；报告中的 metadata present 只提供 NOTICE 复核线索，不等于分发 clearance。
+7. runtime 八门仅 target environment、repository source、prohibited closure 三门通过，正确得到 `blocked_runtime_closure_review`。接入 runtime profile 后，distribution follow-up 的八个 source binding 全部匹配，但其 owner/file/asset 阻断不变，仍为 0/5。
+
+### 决定
+
+1. 接受 `configs/v1-r1-runtime-profile-rtmpose-funasr.json` + `runtime-closure-v0.1.0` 作为 G5 生成 competition lock/NOTICE 前的机器可读工程门。
+2. 当前 profile 只代表 RTMPose + FunASR 的 L40 候选路线，不代表最终模型或比赛平台。切换 Keypoint R-CNN、CPU fallback、Python/平台或 native-runtime 提供方式时必须新建/升级 profile。
+3. 根 extras 必须传播到实际闭包，不能只凭 `pip check` 或模型功能 smoke 跳过可选 metadata 依赖。
+4. 正式候选环境必须安装非 editable KangShield 构建产物、不设置 `PYTHONPATH`，并从已安装 `kangshield-info` 入口运行；Make 的 `PYTHONPATH=src` 入口只用于开发盘点。
+5. closure 8/8 只允许进入人工 lock/NOTICE Review；工具不自动生成最终文件、不选择许可证、不提供法律意见，也不改变 HumanArt/FunASR clearance。
+
+### 验证
+
+- 自动化：147 passed；runtime closure 新增 10 项测试，覆盖完整正向门、八类故障、extras/marker、隐私、live/replay CLI、权限和 `--require-ready` 退出码。
+- 静态检查：`compileall`、全部 shell/sbatch `bash -n`、`pip check`、`git diff --check` 通过。
+- 正式 runtime run：clean `876ce07`、completed、E1、0 issue；profile/inventory/report SHA-256 分别为 `a1ef8ef46caf5002cd9e5fdaf461c7aeb09e0ac4b55cb0fc36f5ec7f69d10823` / `95feddb3e64c35da30578c616c78745676203d462849fda26af3aefb63119322` / `e683bb64e33cac573bed040065585ed1c732bfc77e9e7116845151a8da5f2f34`。
+- Runtime 结果：installed 189、closure 111、direct 7/8、dependency issue 4、prohibited-in-closure 0、provenance violation 26、extraneous 76、license metadata missing 3、gate 3/8。
+- Distribution follow-up：clean `876ce07`、8/8 source matched、0/3 file、0/5 decision、6/13 blocking asset、0/5 gate；policy/report SHA-256 分别为 `e5916a8c6f55209c40bb97f0872c5dddd2db33f0ec8a903e7d29990f3c723b32` / `3a22916af9b981cd2acf99b1e907a647c4237471253506bfd6d8d4e62a836651`。
+- 两个 run 的目录/JSON/JSONL 均为 `0700/0600`；本地 home path、用户名和 Risk/Alert true 扫描 0 命中。
+
+### 行动项
+
+| 行动 | 负责人 | 截止日期 | 状态 |
+|---|---|---|---|
+| 实现候选 profile、闭包 assessor、CLI、测试与正式 E1 报告 | Codex | 2026-07-23 | Closed；`876ce07` / REV-024 |
+| 确认最终姿态/语言模型、artifact 获取方式和目标比赛平台 | 模型负责人 / 项目负责人 | 2026-08-03 | Open |
+| 按最终选择创建非 editable、无 `PYTHONPATH` 的隔离候选环境并关闭八门 | 工程负责人 | 2026-08-05 | Blocked on model/platform decision |
+| 决定 ORT CUDA extras 使用 Python distributions 还是平台 native receipt，并冻结对应 profile | 工程负责人 | 2026-08-05 | Open |
+| 人工复核全部闭包包许可证证据，补齐 KangShield/CUDA toolkit/KaldiIO 缺口 | NOTICE owner / 项目负责人 | 2026-08-07 | Blocked on owner assignment |
+| closure 8/8 后生成并复核 competition lock 与 NOTICE，再运行 distribution `--require-ready` | 工程负责人 / NOTICE owner | 2026-08-15 | Blocked on preceding actions |
+
+### 未决问题
+
+1. 最终比赛运行平台是否与当前 Linux x86_64 / CPython 3.13.13 / L40 候选一致？
+2. ONNX Runtime 的 CUDA/CUDNN 依赖由 Python distributions、基础镜像还是比赛平台提供；其可审计 receipt 如何进入 profile？
+3. 最终是否采用 RTMPose + FunASR 主路径；若模型选择变化，哪个 profile 取代当前候选？
+4. 项目许可证、NOTICE 和依赖闭包的签字责任人尚未指定到具体姓名。

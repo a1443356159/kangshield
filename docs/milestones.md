@@ -1,6 +1,6 @@
 # 康盾里程碑与验收门
 
-状态：Active v1.3
+状态：Active v1.4
 
 基准日期：2026-07-23
 
@@ -213,12 +213,13 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 - [x] 实现 event evaluation bundle assembler 的 `0700/0600` staging、strict preflight 与原子发布，并由独立 scorer 验证 report 逐字节一致。
 - [x] 将 `--runs-dir` 根、run/子目录固定为 `0700`，JSON/JSONL 固定为 `0600`；全部八个正式 Slurm 入口的 stdout 固定为 `0600`，统一提交器冻结完整 submit commit，`slurm-runtime-v0.2.0` 复核 execution commit、checkout import 和 CUDA runtime，L40 job `1780` 已通过。
 - [x] 实现 `distribution-readiness-v0.1.0`：冻结 7 个来源摘要、13 项资产 disposition、5 项 owner decision、3 个发布文件与 5 个 fail-closed gate；clean run `20260722T214700Z-958cd4fb` 验证工具通过且当前提交包正确保持 0/5 ready（REV-023）。
+- [x] 实现 `runtime-closure-v0.1.0`：冻结 RTMPose + FunASR 候选 profile、脱敏 `pip inspect`、extras/marker 传递闭包与八个 fail-closed gate；clean run `20260722T222305Z-2b36b79b` 验证工具通过且共享环境正确保持 3/8 ready（REV-024）。
 - [ ] 使用 C6c 正负视频继续补空场持续、床上躺卧、宠物移动和真实多人 tracking，按已冻结 policy 生成真实候选并复用事件评估口径。
 - [ ] 用 E2/E3 证据把 C6c 与 SDNL1 从 Unknown 归类为 available、limited 或 blocked。
-- [ ] 由项目/模型 owner 关闭分发门：决定 V2 最终姿态权重、模型 artifact 打包方式和项目许可证，生成 competition dependency lock 与第三方 NOTICE，并在最终 profile 上通过 `--require-ready`；当前 HumanArt、Keypoint R-CNN、FunASR 与项目依赖均未关闭。
+- [ ] 由项目/模型 owner 关闭分发门：决定 V2 最终姿态权重、模型 artifact 打包方式和项目许可证，按决定建立隔离候选环境并将 runtime closure 从 3/8 关闭到 8/8，再生成 competition dependency lock 与第三方 NOTICE，并在最终分发 profile 上通过 `--require-ready`；当前 HumanArt、Keypoint R-CNN、FunASR 与项目依赖均未关闭。
 - [ ] 为硬门指定负责人和截止日期，并删除无法完成的 V2 能力声明。
 
-预 Review 见 [V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。G4 基础设计与证据见[跌倒运动特征设计](v1-g4-fall-motion-features.md)和[正式报告](reports/v1-g4-fall-motion-features.md)，扩展 ADL 子门见 [CAUCAFall 设计](v1-g4-caucafall-adl-stress.md)和[压力报告](reports/v1-g4-caucafall-adl-stress.md)，静态人物检测子门见 [Open Images 设计](v1-g4-openimages-static-home-stress.md)与[正式报告](reports/v1-g4-openimages-static-home-stress.md)，候选生成子门见[episode 设计](v1-g4-fall-event-candidates.md)与[公开压力报告](reports/v1-g4-fall-candidate-public-stress.md)，生产链见 [Capture Feature Producer](v1-g4-fall-feature-capture.md)、[Candidate 导出](v1-g4-candidate-export-bridge.md)和 [Event Bundle Assembler](v1-g4-event-bundle-assembly.md)，事件工具子门见[事件评估设计](v1-g4-event-evaluation-readiness.md)与[初测报告](reports/v1-g4-event-evaluation-smoke.md)，G5 工具见[比赛提交分发就绪门](v1-r1-distribution-readiness.md)与[正式报告](reports/v1-r1-distribution-readiness.md)。E1 工具与公开压力集完成不等于 V1-R1 Done；真机视频、真实候选/事件指标、床上躺卧/时序多人、最终姿态分发路线和责任人仍是验收门。
+预 Review 见 [V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。G4 基础设计与证据见[跌倒运动特征设计](v1-g4-fall-motion-features.md)和[正式报告](reports/v1-g4-fall-motion-features.md)，扩展 ADL 子门见 [CAUCAFall 设计](v1-g4-caucafall-adl-stress.md)和[压力报告](reports/v1-g4-caucafall-adl-stress.md)，静态人物检测子门见 [Open Images 设计](v1-g4-openimages-static-home-stress.md)与[正式报告](reports/v1-g4-openimages-static-home-stress.md)，候选生成子门见[episode 设计](v1-g4-fall-event-candidates.md)与[公开压力报告](reports/v1-g4-fall-candidate-public-stress.md)，生产链见 [Capture Feature Producer](v1-g4-fall-feature-capture.md)、[Candidate 导出](v1-g4-candidate-export-bridge.md)和 [Event Bundle Assembler](v1-g4-event-bundle-assembly.md)，事件工具子门见[事件评估设计](v1-g4-event-evaluation-readiness.md)与[初测报告](reports/v1-g4-event-evaluation-smoke.md)，G5 工具见[比赛提交分发就绪门](v1-r1-distribution-readiness.md)、[分发报告](reports/v1-r1-distribution-readiness.md)、[候选 Runtime Closure](v1-r1-runtime-closure.md)与[闭包报告](reports/v1-r1-runtime-closure.md)。E1 工具与公开压力集完成不等于 V1-R1 Done；真机视频、真实候选/事件指标、床上躺卧/时序多人、最终姿态分发路线、隔离比赛环境和责任人仍是验收门。
 
 ## 5. 里程碑决策优先级
 

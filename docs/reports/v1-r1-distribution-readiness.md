@@ -93,3 +93,9 @@ manifest 不保存 policy 或 repository root 的本地路径；输入通过 pol
 - 以 `--require-ready` 在干净 Release Candidate 上重跑。
 
 设计与使用方法见 [V1-R1 比赛提交分发就绪门](../v1-r1-distribution-readiness.md)，Review 决议见 [REV-023](../review-log.md#rev-023-v1-r1-比赛提交分发就绪-review)。
+
+## 7. Runtime profile 接入后的跟进
+
+本报告的 7/7 是实现提交 `6c32364` 的历史 E1 快照，不回写为新结果。候选 runtime profile 在 `876ce07` 成为第八个 source binding 后，clean follow-up run `20260722T222307Z-254cb0ca` 已验证 8/8 source matched；其他结论不变，required file 仍为 0/3、decision 0/5、blocking asset 6/13、distribution gate 0/5。当前 profile SHA-256 为 `e5916a8c6f55209c40bb97f0872c5dddd2db33f0ec8a903e7d29990f3c723b32`，follow-up report SHA-256 为 `3a22916af9b981cd2acf99b1e907a647c4237471253506bfd6d8d4e62a836651`。
+
+依赖闭包的独立 3/8 结果见[候选 Runtime Closure E1 报告](v1-r1-runtime-closure.md)；该结果没有生成 competition lock 或 NOTICE。
