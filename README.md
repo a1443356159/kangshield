@@ -18,6 +18,8 @@
 - [里程碑与验收门](docs/milestones.md)
 - [Review 记录](docs/review-log.md)
 - [V1 信息采集与模型探索](docs/v1-information-acquisition.md)
+- [V1-M1 有界音视频流采集适配器](docs/v1-m1-bounded-stream-capture.md)
+- [V1-M1 有界音视频流采集 E1 初测报告](docs/reports/v1-m1-bounded-stream-capture-smoke.md)
 - [V1 视频与语言多模态 Pipeline](docs/v1-multimodal-pipeline.md)
 - [V1-M2a 多模态 Pipeline 初测报告](docs/reports/v1-m2a-multimodal-smoke.md)
 - [V1-M2a 同容器音轨 PTS 对齐初测报告](docs/reports/v1-m2a-same-container-audio-smoke.md)
@@ -86,6 +88,23 @@ kangshield-info probe-media <video-or-wav>
 kangshield-info profile-sleep <json-or-csv>
 kangshield-info inspect-ezviz <sanitized-json> --evidence-level E1
 ```
+
+从 RTSP/HTTP(S) 音视频流生成有界、owner-only 的同容器采集物时，端点只能经环境变量传入：
+
+```bash
+read -rsp 'Stream endpoint: ' KANG_STREAM_ENDPOINT
+printf '\n'
+export KANG_STREAM_ENDPOINT
+kangshield-info capture-stream \
+  --evidence-level E2 \
+  --source-type network_stream \
+  --device-ref c6c_demo_01 \
+  --duration-s 30 \
+  --require-ready
+unset KANG_STREAM_ENDPOINT
+```
+
+不要把含账号、密码、token 或签名的 URL 写入命令历史。一次 E2 网络流采集只证明收到一段真实来源媒体，仍不证明萤石平台接入、长稳或断线重连；设计与当前 E1 证据见[有界流采集适配器](docs/v1-m1-bounded-stream-capture.md)和[初测报告](docs/reports/v1-m1-bounded-stream-capture-smoke.md)。
 
 生成并验证确定性同容器音视频时间戳夹具：
 

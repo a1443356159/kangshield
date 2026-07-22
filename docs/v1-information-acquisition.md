@@ -1,8 +1,8 @@
 # V1 信息采集与多模态模型探索
 
-状态：Active v0.4
+状态：Active v0.5
 
-更新时间：2026-07-22
+更新时间：2026-07-23
 
 当前目标：并行确认两台萤石设备能够提供的数据、V1 基线模型可以稳定派生的特征，以及哪些《监测方案》指标暂时不能实现。
 
@@ -166,6 +166,8 @@ AppKey、AccessToken、设备验证码和设备序列号不得提交到仓库。
 3. 同接口格式的脱敏 Fixture。
 4. 公开数据仅用于模型基线，不代替真实设备验证。
 
+设备无关的网络入口已实现为 `capture-stream`：端点仅从进程环境读取，经 open/read timeout、媒体时长、wall time 和 packet 上限约束，从首个视频关键帧开始 codec-copy 到 owner-only Matroska，再执行同一容器 timing gate。HTTP loopback E1 已进一步在 L40 上完成真实姿态与语言 Pipeline；这只关闭“网络输入到同容器回放”的 adapter seam，不证明 C6c RTSP、萤石平台权限、音轨、重连或真实 drift。原始采集物会被持久化，必须先落实同意、受控存储、留存和删除责任。
+
 ### 4.3 Normalizer
 
 输出至少包含：
@@ -305,7 +307,7 @@ V1 不在没有参考设备的情况下声称心率、呼吸或睡眠分期准�
 
 采集开始前复制 manifest 1.1 和三模型策略到受控目录，采集后先运行 `assess-m2c-capture`。只有 `camera_ready_for_model_retest=true` 才启动第 5 项；E1 fixture 的 10/10 结构覆盖不构成真机授权。设计与 E1 证据见[采集包就绪门](v1-m2c-capture-readiness-gate.md)和[初测报告](reports/v1-m2c-capture-readiness-smoke.md)。
 
-设备无关基线已在 Slurm L40 上通过 E1 smoke，见 [V1-M2a 初测报告](reports/v1-m2a-multimodal-smoke.md)。该结果不改变前四项真实设备任务的证据状态。
+设备无关基线已在 Slurm L40 上通过 E1 smoke，见 [V1-M2a 初测报告](reports/v1-m2a-multimodal-smoke.md)。有界 HTTP 流采集也已生成 owner-only 同容器 artifact，并由 job `1782` 完成真实姿态/语言消费，见[采集设计](v1-m1-bounded-stream-capture.md)与[正式报告](reports/v1-m1-bounded-stream-capture-smoke.md)。两项 E1 结果都不改变前四项真实设备任务的证据状态。
 
 V1-M3 姿态同集对比已经冻结模型、摘要、阈值和报告契约，见[姿态模型对比设计](v1-m3-pose-model-comparison.md)和[历史双模型报告](reports/v1-m3-pose-model-comparison.md)。HumanArt + RTMPose 保持准确率条件参考；REV-013 的 [Keypoint R-CNN 独立候选](reports/v1-m3-torchvision-keypointrcnn-candidate.md)虽达到 lying 21/21，但横卧关键点门仅 4/21，因此只保留 fallback。两条路线最终是否进入 V2 都取决于 C6c、负样本和分发 Review。
 

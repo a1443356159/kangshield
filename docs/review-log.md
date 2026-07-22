@@ -1283,3 +1283,56 @@
 2. ONNX Runtime 的 CUDA/CUDNN 依赖由 Python distributions、基础镜像还是比赛平台提供；其可审计 receipt 如何进入 profile？
 3. 最终是否采用 RTMPose + FunASR 主路径；若模型选择变化，哪个 profile 取代当前候选？
 4. 项目许可证、NOTICE 和依赖闭包的签字责任人尚未指定到具体姓名。
+
+---
+
+## REV-025 V1-M1 有界网络音视频流采集接缝 Review
+
+- 日期：2026-07-23
+- 状态：Accepted for E1 adapter seam；C6c / RTSP / platform verification remains Open
+- 参与人：项目组、Codex
+- 评审范围：端点凭据边界、RTSP/HTTP 有界采集、轨道/关键帧/timeout/packet gate、owner-only 原始媒体、输出容器探针、失败清理、下游多模态消费与证据晋级边界
+- 输入材料：[有界流采集设计](v1-m1-bounded-stream-capture.md)、[正式 E1 报告](reports/v1-m1-bounded-stream-capture-smoke.md)、实现提交 `8cbd91f`、capture run `20260722T225832Z-cfed1858`、Pipeline run `20260722T225924Z-c98c3772`、Slurm job `1782`
+
+### 发现
+
+1. 既有系统已能导入本地同容器媒体，但网络 endpoint 到“可控同容器 raw artifact”之间没有正式 adapter；操作者只能在系统外录制，无法审计 timeout、termination、权限和失败清理。
+2. endpoint 常含账号、密码、token 或签名。新入口只从环境读取值，manifest/report 固定不保存 endpoint value/digest、环境变量名或 PyAV/FFmpeg 原生日志；进程环境本身仍须作为敏感边界管理。
+3. 采集器要求恰好一条视频、默认恰好一条音频，从首个视频关键帧开始 codec-copy，并由 open/read timeout、媒体时长、wall time 和 packet cap 共同限制。输出重新经过逐包 PTS gate；partial、raw 和 post-probe 失败产物会删除。
+4. 首轮测试实际触发 PyAV native segfault：输入 container 关闭后仍读取 `Stream.codec_context`。实现已改为在 container 存活期间复制 stream type/codec 的纯 Python 值，关闭后不再访问 FFmpeg-backed 对象。
+5. 正式 E1 capture 在 clean `8cbd91f` 上 completed、0 issue：4050 ms，79 inspected / 78 copied，40 video + 38 audio packets，首包关键帧，两个 readiness 均 true。audio start/end offset 为 +250/+50 ms、duration delta -200 ms；这些是 packet span，不是 drift。
+6. raw SHA-256 为 `53ae54598f6ded0bfba5a59b3c14d0a9d2ca5bf77a2a3eda3b781bb7082bb0ed`。job `1782` 以完全相同输入摘要完成真实 YOLO/FunASR：20/20 sampled/people pose frames、80 detections、1 speech segment、4 windows，warm 2295.910 ms / RTF 0.573977；cold RTF 9.886770 包含 37251.170 ms 模型加载。
+7. E1 输入是 loopback HTTP fixture。它没有覆盖 RTSP TCP/UDP、真实鉴权、C6c 麦克风音轨、长稳/重连、丢包抖动、设备 clock、双同步事件或萤石平台调用，因此不能提升 G1/G2 或 C6c evidence。
+
+### 决定
+
+1. 接受 `stream-capture-v0.1.0` 作为网络输入到现有同容器 Pipeline 的 E1 adapter seam；它可以直接进入 V2-D1 输入契约。
+2. 新增 `network_stream` source type，最高证据为 E2；E2 必须携带 opaque `device_ref`。无论 clip 是否成功，`device_platform_integration_proven` 固定为 false，平台 E3 另行评审。
+3. endpoint 继续只允许通过环境变量输入，不保存值、摘要、变量名或底层日志。若未来接入 secret manager，应替换值注入机制，不放宽报告边界。
+4. raw artifact 必须位于 run 的 `artifacts/`、以 `0600` 原子发布；运行前必须有同意、访问、留存和删除约束，失败时清理未登记媒体。
+5. 下一次真机实验先做短时 C6c RTSP/E2 与音轨检查，再做故障/长稳矩阵，最后按 M2c C01～C12 和双同步事件规程采集；不得直接从 E1 跳到“实时萤石接入”。
+
+### 验证
+
+- 自动化：154 passed；覆盖真实 loopback HTTP/PyAV remux、下游 fake backend、CLI owner-only、短流 exit 2、缺音频、证据伪造、凭据不落盘、post-probe 清理与 parser 默认值。
+- 静态检查：`compileall`、全部 shell/sbatch `bash -n`、`pip check`、`git diff --check` 通过。
+- Capture：clean `8cbd91f`，run `20260722T225832Z-cfed1858`，artifact/report SHA-256 分别为 `53ae54598f6ded0bfba5a59b3c14d0a9d2ca5bf77a2a3eda3b781bb7082bb0ed` / `dd958f4352706bcc9fb78dad6ef0507d9df124ac8d6c8dd4ceaa1f5b2779848e`。
+- Pipeline：job `1782` completed `0:0`，clean `8cbd91f`，run `20260722T225924Z-c98c3772`，report SHA-256 `e68d1ab2ada07f01e51fba7bed3e63bb7454bb6890f2d24c6aa83b8b05418484`。
+- 两个 run 的目录/文件及 Slurm stdout 分别为 `0700/0600/0600`；endpoint、源名、本地 home、用户名、secret 和 Risk/Alert true 扫描均 0 命中。
+
+### 行动项
+
+| 行动 | 负责人 | 截止日期 | 状态 |
+|---|---|---|---|
+| 实现有界采集器、契约、CLI、故障测试与 E1 → L40 正式证据 | Codex | 2026-07-23 | Closed；`8cbd91f` / REV-025 |
+| 获取 C6c 脱敏 RTSP/平台取流方式并确认麦克风音轨 | 设备负责人 | 2026-07-28 | Open |
+| 运行短时 E2，复核鉴权不落盘、轨道、PTS、权限和 raw 删除流程 | 工程负责人 / 数据负责人 | 2026-07-29 | Blocked on endpoint/device access |
+| 执行 RTSP TCP/UDP、鉴权失败、timeout、短流、断流、重连、丢包/抖动和长稳矩阵 | 工程负责人 | 2026-07-31 | Blocked on E2 stream |
+| 按 C01～C12 与双同步事件规程完成采集包并进入三模型 held-out | 数据负责人 / 模型负责人 | 2026-08-01 | Blocked on consent and E2 stream |
+
+### 未决问题
+
+1. C6c 的可复核取流入口来自萤石 SDK、平台 API、RTSP 还是本地回放；凭据刷新周期如何管理？
+2. 目标流是否稳定包含单音轨，codec/time base 是否随清晰度、夜视或回放模式改变？
+3. 断流后由 adapter 内重连还是由外部 supervisor 新建 run；跨连接是否允许合成同一 artifact？
+4. 真实人物音视频的同意、30 日暂定留存、访问人与可审计删除责任由谁签字？

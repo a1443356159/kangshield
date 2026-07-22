@@ -1,6 +1,6 @@
 # 康盾里程碑与验收门
 
-状态：Active v1.4
+状态：Active v1.5
 
 基准日期：2026-07-23
 
@@ -19,7 +19,7 @@
 | 里程碑 | 日期 | 状态 | 主要产物 | 验收门 |
 |---|---|---|---|---|
 | D0 文档基线 | 07-22～07-24 | Done | 架构、模块、里程碑、Review、采集探索文档 | 三份原始资料与硬件边界没有冲突口径 |
-| V1-M1 设备能力探测 | 07-25～07-28 | In progress | 摄像头/睡眠仪能力矩阵、API 样例、原始样本 | 每项能力有真实调用或明确“不开放/待确认”证据 |
+| V1-M1 设备能力探测 | 07-25～07-28 | In progress | 摄像头/睡眠仪能力矩阵、有界流采集器、API 样例、原始样本 | 采集接缝 E1 已关闭；每项目标设备能力仍须有真实调用或明确“不开放/待确认”证据 |
 | V1-M2a 设备无关多模态链路 | 07-22～07-23 | Done | 视频/语言回放、姿态、VAD/ASR、窗口、Slurm 报告 | 干净提交在 L40 上完成 E1 smoke，warm/cold 口径分离 |
 | V1-M2b 公开真实场景固定集与对齐评测 | 07-22～07-23 | Done | URFD/FLEURS 固定集、批量 Pipeline、标签/CER/覆盖率与 Slurm 报告 | 六 case 在干净提交和 L40 上可重复完成，公开数据边界固定为 E1 |
 | V1-M2c 目标设备样本与时间基 | 07-22～08-01 | In progress | 容器时间戳探针、采集包/标注/held-out gate、C6c 音视频样本、睡眠样例 | 两个 E1 工具切片已验收；目标设备视频、音频、睡眠样例仍须形成 E2/E3 证据 |
@@ -62,7 +62,7 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 | V1-R1 比赛提交分发就绪门 | `6c32364` / `c23c5be` | `origin/main` | 2026-07-23 已验证 | 7 个来源摘要、13 项资产 disposition、5 项 owner decision、3 个发布文件、5 个 fail-closed gate 与 REV-023；工程门禁通过，当前提交包保持 0/5 ready，不代表获得法律许可或可以分发 |
 | V1-R1 候选 Runtime 依赖闭包门 | `876ce07` / `f93a41a` | `origin/main` | 2026-07-23 已验证 | RTMPose + FunASR 候选 profile、脱敏 inventory、extras/marker 闭包、八个 fail-closed gate 与 REV-024；工程工具通过，共享环境保持 3/8 ready，不代表 final lock、NOTICE 或比赛环境已冻结 |
 
-这里的“推送验证”只证明代码已到达远端。V1-M1 仍为 In progress，必须取得 C6c 与 CS-EP-SDNL1 的 E2/E3 证据后才能进入 Review/Done。V1-M2a 和 V1-M2b 的 Done 只关闭设备无关 E1 链路及公开固定集评测，不会提升真实设备证据等级。V1-M3 的姿态、语言和睡眠字段三个 E1 切片均已验收，因此仅在 E1 探索范围标记 Done；M2c 已有采集规程、容器时间戳工具和采集包 readiness gate，但仍没有真实 C6c 媒体或 SDNL1 字段证据。V1-R1 G4 的离线特征、首版候选状态机、公开压力与双标注/裁决/事件 scorer 也都只属于 E1，不能替代 C6c 正负视频、冻结策略的真实候选/事件指标、床上躺卧、多人 tracking 或跌倒风险/告警验收。
+这里的“推送验证”只证明代码已到达远端。V1-M1 的有界 HTTP 流采集接缝已在 E1 关闭，但里程碑仍为 In progress，必须取得 C6c 与 CS-EP-SDNL1 的 E2/E3 证据后才能进入 Review/Done。V1-M2a 和 V1-M2b 的 Done 只关闭设备无关 E1 链路及公开固定集评测，不会提升真实设备证据等级。V1-M3 的姿态、语言和睡眠字段三个 E1 切片均已验收，因此仅在 E1 探索范围标记 Done；M2c 已有采集规程、容器时间戳工具、采集包 readiness gate 和可复用的流采集器，但仍没有真实 C6c 媒体或 SDNL1 字段证据。V1-R1 G4 的离线特征、首版候选状态机、公开压力与双标注/裁决/事件 scorer 也都只属于 E1，不能替代 C6c 正负视频、冻结策略的真实候选/事件指标、床上躺卧、多人 tracking 或跌倒风险/告警验收。
 
 ## 4. 当前阶段任务
 
@@ -103,10 +103,11 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 - [x] 萤石 SDK/API 快照脱敏分析。
 - [x] E0～E3 证据与输入来源的上限校验。
 - [x] Synthetic Fixture 与自动化测试。
+- [x] 有界 RTSP/HTTP 采集 adapter、环境端点边界、首关键帧/timeout/packet gate、owner-only Matroska 与输出 timing probe；HTTP E1 → L40 Pipeline job `1782` 已通过。
 - [ ] C6c 真实 E2/E3 证据。
 - [ ] CS-EP-SDNL1 真实 E2/E3 证据。
 
-当前实现验证见 [V1-M1 初步开发报告](reports/v1-m1-initial-development.md)。
+当前实现验证见 [V1-M1 初步开发报告](reports/v1-m1-initial-development.md)、[有界流采集设计](v1-m1-bounded-stream-capture.md)与[正式 E1 报告](reports/v1-m1-bounded-stream-capture-smoke.md)。
 
 ### V1-M2a：设备无关多模态链路
 
@@ -143,6 +144,7 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 - [x] 冻结 manifest 1.1、C01～C12 场景/动作标签、三姿态 held-out 策略和两级 readiness policy。
 - [x] 实现包内路径/摘要、媒体探针、双同步事件、fixture marker、重复媒体和隐私安全报告 gate。
 - [x] 在干净提交 `6f1c02a` 上完成 10 场景 E1 正式运行：结构 10/10，最终决定 `tooling_only`，四个真机门均为 false。
+- [x] 在干净提交 `8cbd91f` 上完成有界 HTTP A/V 采集，并以相同 artifact SHA-256 进入 L40 job `1782`；只关闭网络输入到同容器 Pipeline 的 E1 接缝。
 - [ ] 录制有明确同意的 C6c 正常行走、起坐、模拟跌倒、遮挡/夜视样本。
 - [ ] 证明 C6c 视频与音频是否同容器，并保存 PTS/时钟偏差。
 - [ ] 获取 CS-EP-SDNL1 真实 API/SDK/导出样例和字段时间语义。
@@ -215,6 +217,7 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 - [x] 将 `--runs-dir` 根、run/子目录固定为 `0700`，JSON/JSONL 固定为 `0600`；全部八个正式 Slurm 入口的 stdout 固定为 `0600`，统一提交器冻结完整 submit commit，`slurm-runtime-v0.2.0` 复核 execution commit、checkout import 和 CUDA runtime，L40 job `1780` 已通过。
 - [x] 实现 `distribution-readiness-v0.1.0`：冻结 7 个来源摘要、13 项资产 disposition、5 项 owner decision、3 个发布文件与 5 个 fail-closed gate；clean run `20260722T214700Z-958cd4fb` 验证工具通过且当前提交包正确保持 0/5 ready（REV-023）。
 - [x] 实现 `runtime-closure-v0.1.0`：冻结 RTMPose + FunASR 候选 profile、脱敏 `pip inspect`、extras/marker 传递闭包与八个 fail-closed gate；clean run `20260722T222305Z-2b36b79b` 验证工具通过且共享环境正确保持 3/8 ready（REV-024）。
+- [x] 实现 `stream-capture-v0.1.0`：环境端点、有界 codec-copy、首关键帧、owner-only raw、输出 timing probe 与 fail-cleanup；HTTP E1 run `20260722T225832Z-cfed1858` 和 L40 job `1782` 关闭采集 adapter seam（REV-025），不提升 C6c 证据。
 - [ ] 使用 C6c 正负视频继续补空场持续、床上躺卧、宠物移动和真实多人 tracking，按已冻结 policy 生成真实候选并复用事件评估口径。
 - [ ] 用 E2/E3 证据把 C6c 与 SDNL1 从 Unknown 归类为 available、limited 或 blocked。
 - [ ] 由项目/模型 owner 关闭分发门：决定 V2 最终姿态权重、模型 artifact 打包方式和项目许可证，按决定建立隔离候选环境并将 runtime closure 从 3/8 关闭到 8/8，再生成 competition dependency lock 与第三方 NOTICE，并在最终分发 profile 上通过 `--require-ready`；当前 HumanArt、Keypoint R-CNN、FunASR 与项目依赖均未关闭。
