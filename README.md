@@ -37,6 +37,8 @@
 - [V1-M3 睡眠字段路线与 Fail-Closed Gate](docs/v1-m3-sleep-field-route.md)
 - [V1-M3 睡眠字段路线评审报告](docs/reports/v1-m3-sleep-field-route.md)
 - [V1-R1 探索收敛与 V2 输入清单](docs/v1-r1-exploration-review.md)
+- [V1-R1 比赛提交分发就绪门](docs/v1-r1-distribution-readiness.md)
+- [V1-R1 比赛提交分发就绪门 E1 报告](docs/reports/v1-r1-distribution-readiness.md)
 - [V1-R1 G4 跌倒运动特征与关键点质量门](docs/v1-g4-fall-motion-features.md)
 - [V1-R1 G4 跌倒运动特征 E1 报告](docs/reports/v1-g4-fall-motion-features.md)
 - [V1-R1 G4 CAUCAFall ADL 压力集](docs/v1-g4-caucafall-adl-stress.md)
@@ -70,6 +72,8 @@ make info-fixtures
 ```
 
 正式 Slurm 作业在 clean commit 上统一通过提交器运行；首次使用新 checkout、计算节点或 CUDA 环境时先执行 `make submit-runtime-preflight`。契约与 L40 证据见 [Slurm Runtime Preflight 报告](docs/reports/v1-slurm-runtime-preflight.md)。
+
+V1-R1 比赛包分发状态使用 `make PYTHON=.venv/bin/python assess-distribution-readiness` 审计；Release Candidate 必须使用 `kangshield-info assess-distribution-readiness --require-ready`。当前工具已完成，但 draft profile 仍被许可证、最终模型/打包决定、依赖 lock 和 NOTICE 正确阻断，详见[设计](docs/v1-r1-distribution-readiness.md)与[报告](docs/reports/v1-r1-distribution-readiness.md)。
 
 不安装 media extra 时，WAV 与 JSON/CSV 探测仍可运行；视频命令会明确报告 OpenCV 不可用。
 

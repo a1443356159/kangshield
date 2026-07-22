@@ -1171,3 +1171,60 @@
 1. 比赛部署是否继续使用单用户文件系统，还是切换服务账户与对象存储？
 2. Slurm stdout 是否保留到 V1-R1 结束，还是验收摘要完成后删除；需要数据保留责任人决定。
 3. 是否为所有下游 source-run validator 增加 POSIX mode gate，还是由统一 artifact registry/receipt 负责；V2-D1 前必须选定单一责任层。
+
+---
+
+## REV-023 V1-R1 比赛提交分发就绪 Review
+
+- 日期：2026-07-23
+- 状态：Accepted for E1 release-gate tooling；submission bundle remains Blocked
+- 参与人：项目组、Codex
+- 评审范围：项目代码、Python 依赖、姿态/语言模型 artifact、公开评测数据、比赛包 disposition、owner decision、发布文件、fail-closed gate、CLI/CI 语义、provenance 与隐私
+- 输入材料：[分发就绪门设计](v1-r1-distribution-readiness.md)、[正式 E1 报告](reports/v1-r1-distribution-readiness.md)、实现提交 `6c32364`、run `20260722T214700Z-958cd4fb`
+
+### 发现
+
+1. 许可证事实此前分散在 `pyproject.toml`、姿态/语言模型配置、公开数据集配置与 R1 Review 中。只依赖文字清单时，模型替换、依赖升级或打包方式变化可能不触发同一套检查。
+2. 当前比赛 draft profile 共 13 项资产：项目代码和依赖闭包计划 include；HumanArt detector/pose、Keypoint R-CNN 和 FunASR 共 4 项 undecided；Ultralytics/YOLO、Whisper 与 4 个公开评测数据源共 7 项 exclude。
+3. 当前 6 个阻断资产是项目代码、依赖闭包、三个姿态 artifact 和 FunASR 模型栈。excluded 资产不阻断只因为当前包明确不携带它们，不能解释为允许重新分发。
+4. 框架实现许可证、预训练权重、训练/评测数据和提交包是四个不同判断对象。MMPose Apache-2.0 不能自动清除 HumanArt artifact；TorchVision 实现许可也不能自动清除预训练权重及关联数据条款。
+5. 仓库仍没有顶层 `LICENSE`、`THIRD_PARTY_NOTICES.md` 和 `requirements/competition.lock`。即使随后创建，未在 policy 中绑定最终 SHA-256 也必须保持 fail closed。
+6. 项目许可证、源码分发方式、最终姿态 variant、模型 artifact 打包方式和 NOTICE owner 都需要人工责任人确认。工具不能根据技术偏好或比赛非商业语境自动填入答案。
+7. 七个冻结事实来源在 clean run 中全部 matched；五个人工决定全部 Open，三个 required file 全部 missing，五个 readiness gate 全部 false。`blocked_pending_distribution_review` 是正确评估结果，不是 assessor 失败。
+8. 普通审计需要返回 `0` 以持续生成状态报告；Release Candidate 的 `--require-ready` 必须先落盘报告再返回 `2`，防止 CI 只看到失败而丢失阻断证据。
+
+### 决定
+
+1. 接受 `configs/v1-r1-distribution-readiness.json` + `distribution-readiness-v0.1.0` 作为 V1-R1 G5 的机器可读工程门；事实来源仍由七个仓库配置承担，并以 SHA-256 防漂移。
+2. 冻结 `include`、`exclude`、`undecided` 三态：excluded 不进入当前提交包；undecided 始终阻断；非排除资产只有 clearance 和来源证据同时通过才可打开 gate。
+3. 不由工程工具选择项目许可证、解释比赛规则或给出法律意见。所有 confirmed decision 必须包含值、具名 owner role 和非本机路径的审计引用。
+4. `LICENSE`、NOTICE 和 competition lock 只有在非空、人工审查并绑定摘要后才算 ready。只创建占位文件、修改 expected digest 或口头豁免都不能替代 Review。
+5. V1 开发/评测可以继续使用 policy 中的 excluded 资产，但 V2 提交包和演示分发不得携带；重新引入任何一项必须修改 disposition、重审上游条款并重新运行 gate。
+6. V2 Release Candidate 必须在干净提交、最终依赖/模型 profile 上运行 `assess-distribution-readiness --require-ready`。G5 工具通过不提升设备、模型、RiskAssessment 或 Alert 的证据等级。
+
+### 验证
+
+- 自动化：137 passed；distribution/CLI 定向 24 passed。
+- 静态检查：`compileall`、全部 shell/sbatch `bash -n`、`pip check`、`git diff --check` 通过。
+- 正式 run：`20260722T214700Z-958cd4fb`，clean `6c32364`、completed、E1、0 issue；policy SHA-256 `456b18d3b571682b36bfe2681c5559e0232c933ef471df1869c451dc50a7d7eb`。
+- 结果：source 7/7 matched；required file 0/3；decision 0/5；blocking asset 6/13；gate 0/5；`submission_bundle_ready=false`。
+- 产物：manifest/report SHA-256 分别为 `6a789be873900e2d1f074ddd89a221dfe4b87e56a5f851793e42dcc6b4889771` / `6dbb82849a28a73f08f059cc564a00f47549c678bba5a9b02fdf6daa4ecaab8b`；目录/JSON 权限为 `0700/0600`，本地路径、Risk/Alert true 扫描 0 命中。
+- 故障/正向门：来源漂移、路径/symlink 越界、文件 missing/too-small/unbound/mismatch、非法 decision 和 action/clearance 不一致均被拒绝；完整 confirmed fixture 能打开全部 gate，证明结果不是硬编码 blocked。
+
+### 行动项
+
+| 行动 | 负责人 | 截止日期 | 状态 |
+|---|---|---|---|
+| 实现机器可读资产清单、五级 gate、CLI、测试与 E1 报告 | Codex | 2026-07-23 | Closed；`6c32364` / REV-023 |
+| 确认项目许可证、源码分发方式和 NOTICE owner | 项目负责人 | 2026-08-02 | Open |
+| 确认最终姿态 variant 与所有模型 artifact 的取得/携带方式 | 模型负责人 / 项目负责人 | 2026-08-03 | Open |
+| 生成最终 competition lock，盘点直接/传递依赖和 native runtime | 工程负责人 | 2026-08-05 | Blocked on final runtime profile |
+| 生成并复核 `THIRD_PARTY_NOTICES.md`，绑定三个发布文件摘要 | NOTICE owner / 项目负责人 | 2026-08-07 | Blocked on owner/model/dependency decisions |
+| 在最终 RC 上复查上游条款和比赛规则，并通过 `--require-ready` | 项目组 | 2026-08-15 | Blocked on preceding actions |
+
+### 未决问题
+
+1. 比赛提交是否包含项目源码、仅包含容器/可执行物，还是两者都包含；该选择直接影响项目许可证与 NOTICE 边界。
+2. 最终姿态和语言权重是随包携带、镜像构建时取得、部署时取得，还是由比赛环境预置？四种模式不能共享同一 clearance 结论。
+3. V2 是否继续依赖当前 Python extras 全集，还是建立最小 competition runtime profile；只有后者冻结后才能生成有意义的传递依赖清单。
+4. 最终许可证/NOTICE/lock 的审查人和 Release Candidate 签字责任尚未指定到具体姓名。

@@ -4,7 +4,7 @@
 
 基准日期：2026-07-23
 
-证据快照：截至 `f5bb761` 的 V1-M1～V1-M3 报告、许可证 fail-closed 修正 `f4aa1c5`、G4 离线特征实现 `782026b`、CAUCAFall ADL 压力实现 `336bbe9`、Keypoint R-CNN 候选实现 `eae5f56` / G4 派生接入 `d956203`、Open Images 静态人物检测实现 `40359c1` / 标注审计修正 `fad9491`、双标注/裁决/事件评估工具 `b0b2e97`、首版 candidate episode 生成器 `dc6cace`、capture producer `7a8dc23` / tracker 修复与加固 `b233abe` / `b4b72f7`、event bundle assembler `7b64719`，同容器音轨 adapter `8c6df2d` / bitexact smoke `eca6231` / 路径脱敏 `195c966`、owner-only artifact 修复 `d1d4b5a` / `8b4b52d`，以及正式 Slurm runtime/submit 契约 `673560d` / `667ad8d` / `b54d8b8`
+证据快照：截至 `f5bb761` 的 V1-M1～V1-M3 报告、许可证 fail-closed 修正 `f4aa1c5`、G4 离线特征实现 `782026b`、CAUCAFall ADL 压力实现 `336bbe9`、Keypoint R-CNN 候选实现 `eae5f56` / G4 派生接入 `d956203`、Open Images 静态人物检测实现 `40359c1` / 标注审计修正 `fad9491`、双标注/裁决/事件评估工具 `b0b2e97`、首版 candidate episode 生成器 `dc6cace`、capture producer `7a8dc23` / tracker 修复与加固 `b233abe` / `b4b72f7`、event bundle assembler `7b64719`，同容器音轨 adapter `8c6df2d` / bitexact smoke `eca6231` / 路径脱敏 `195c966`、owner-only artifact 修复 `d1d4b5a` / `8b4b52d`，正式 Slurm runtime/submit 契约 `673560d` / `667ad8d` / `b54d8b8`，以及比赛提交分发就绪门 `6c32364`
 
 ## 1. Review 目标与状态语义
 
@@ -54,6 +54,7 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 | R1-D11 | 同容器音轨 PTS → 16 kHz SpeechBackend adapter | Adopt as offline adapter seam | +250 ms bitexact E1 A/V 上完成真实 YOLO/FunASR、事件平移、单来源 ledger 与 fail-closed timing gate | 真实录制必须保留容器 PTS；单一 start offset 不表达 drift，也不证明平台开放音轨 |
 | R1-D12 | V1 run artifact owner-only 权限 | Adopt | `d1d4b5a` 将 run/子目录固定为 `0700`、JSON/JSONL 与两条正式 Slurm stdout 固定为 `0600`；`8b4b52d` 继续将 `--runs-dir` 根固定为 `0700`；权限漂移的早期 run 被拒绝并用新路径重跑 | V2 对象存储/数据库必须提供同等或更强的访问控制、审计与留存，不得依赖宿主默认 umask |
 | R1-D13 | 正式 Slurm 提交与运行时契约 | Adopt | 全部正式入口复用 `slurm-runtime-v0.2.0`；统一提交器要求 clean checkout、冻结完整 submit commit，计算节点复核 execution commit、实际 import、owner-only stdout/runs 与所需 CUDA 动态库 | V2 批处理或部署系统必须保留不可变版本绑定和 fail-closed runtime preflight；裸 `sbatch` 不构成正式证据 |
+| R1-D14 | 比赛提交分发就绪门 | Adopt as release-gate tooling | `6c32364` 将 7 个事实来源、13 项资产、5 项 owner decision、3 个发布文件和 5 个 gate 冻结为 `distribution-readiness-v0.1.0`；正向/故障测试均通过，当前报告正确保持 0/5 ready | V2-RC 必须在最终 profile 上以 `--require-ready` 通过；工程工具不选择许可证、不提供法律意见，也不允许 excluded 资产静默进入提交包 |
 
 ## 4. 模型与提取器决策账本
 
@@ -95,6 +96,7 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 6. [OpenAI Whisper 官方仓库](https://github.com/openai/whisper)明确代码和模型权重均为 MIT；它的淘汰原因是当前普通话准确率，不是许可证。
 7. URFD/FLEURS 只作为 E1 回归输入；默认不进入比赛提交包、演示媒体或训练资产。任何再分发必须另做署名、非商业/相同方式共享和比赛规则审查。
 8. Open Images 静态 suite 的 annotations 记录 Google LLC / CC BY 4.0，12 张图片逐图记录 CC BY 2.0 作者、标题和 landing page；官方不保证逐图许可证状态，因此当前检查只支持 E1 回归，比赛展示或再分发前必须重新审计并生成最终 attribution / NOTICE。
+9. `distribution-readiness-v0.1.0` 已将上述边界变成机器可执行的 G5 门。当前 13 项资产为 include 2、exclude 7、undecided 4；5 项 owner decision 与 3 个 release file 均未关闭，因此提交包保持 blocked。该结果是工程证据状态，不是法律结论。
 
 ### 6.2 冻结的 FunASR 模型卡证据
 
@@ -113,6 +115,7 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 | 证据与运行契约 | E0～E4、SourceAsset、Observation、FeatureEvent、RunManifest | V1-M1/M2a |
 | 本地运行权限 | `--runs-dir` 根、run/子目录 `0700`，JSON/JSONL `0600`，Slurm stdout `0600`；同容器 run 的模型本地目录不入 manifest | R1-D12 |
 | 正式批处理 provenance | clean submit checkout、完整 submit/execution commit 一致、checkout-bound import、owner-only stdout/runs、按 backend 验证 CUDA runtime | R1-D13 / REV-022 |
+| 比赛分发门禁 | 来源配置摘要、资产 include/exclude/undecided、owner decision、LICENSE/NOTICE/competition lock 与五级 fail-closed gate | R1-D14 / REV-023 |
 | 离线回放与评测边界 | PoseBackend、SpeechBackend、固定 case、隐私安全汇总 | V1-M2b/M3 |
 | 同容器音轨 adapter | 单 A/V asset、严格 track/PTS gate、16 kHz PCM、signed start offset 与 Pipeline 统一时间平移 | REV-010 / REV-021 |
 | 姿态候选配置 | 5 fps、RTMPose detector conf 0.05；Keypoint R-CNN conf 0.5 / resize 800～1333；COCO-17 与分数语义分开记录 | REV-006 / REV-013 |
@@ -132,7 +135,7 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 | G2 音视频时间基 | 容器 track、time_base、首尾 PTS、offset/drift | 视频与语言分开演示，不做自然融合结论 |
 | G3 C6c 模型复测 | `camera_ready_for_model_retest=true`；至少 8 个 E2 核心 clip，三姿态 variant、空场误触发和远场 ASR；C01～C10 完成后才申请 M2c Review | 保留 E1 离线 demo，模型仍为 conditional |
 | G4 跌倒特征/候选/事件 | E1 feature/fallback、首版 candidate policy、公开压力与双标注/裁决/event scorer 已通过；仍需 C6c 正负视频、空场持续、躺床、宠物移动、多人 tracking 和冻结策略的真实事件指标 | 不生成自动风险，只展示姿态/轨迹派生特征、candidate 与 tooling-only scorer |
-| G5 模型/项目许可证 | 项目 LICENSE、第三方 NOTICE、最终权重使用与分发决定 | 排除未清门模型和数据；不得临近提交时口头豁免 |
+| G5 模型/项目许可证 | 以 `distribution-readiness-v0.1.0` 核对项目 LICENSE、第三方 NOTICE、competition lock、最终权重/打包决定和来源摘要；当前 0/5 gate ready | `--require-ready` 不通过即排除未清门模型/数据或停止 RC；不得临近提交时口头豁免 |
 | G6 SDNL1 字段 | 至少一晚 E2 schema，或可复核的权限/不开放证据 | 保留接口和 blocked 状态，不展示合成健康值 |
 | G7 数据治理 | 同意、受控存储、留存期、访问人和删除流程 | 不使用真实人物/健康数据 |
 
@@ -142,7 +145,7 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 2. `[E1 tools done，REV-011/012/015/016/017]` 已实现仅离线输出的跌倒特征层、首版 label-blind candidate episode、CAUCAFall/Open Images 压力支路，以及双标注/裁决/事件 scorer；保持不输出 RiskAssessment 或 Alert。
 3. 当前下一步是按 REV-014 采集 C01～C12；空场、家具遮挡、床上躺卧和安全模拟跌倒已进入标签契约，宠物移动和真实多人 tracking 作为扩展视频负样本继续 Open。C6c 首轮必须原样使用 REV-017 policy，再复用 REV-016 口径生成事件指标。
 4. `[E1 comparison done，REV-013]` 已评测非 Human-Art 的 Keypoint R-CNN；因 lying gate 4/21 和权重分发仍 Open，只保留 fallback。下一步不再横向增加 checkpoint，而是进入 C6c held-out 与自有训练路线判断。
-5. 形成项目 LICENSE/THIRD_PARTY_NOTICES 决策草案；最终许可证由项目方确认。
+5. `[E1 gate tooling done，REV-023]` 分发门禁已实现并正确阻断当前 draft profile；下一步由项目方确认项目许可证/源码分发方式/NOTICE 负责人，由模型负责人确认最终姿态 variant，再生成 competition lock 与 NOTICE、绑定摘要并以 `--require-ready` 复跑。
 
 ## 10. V1-R1 完成门
 

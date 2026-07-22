@@ -1,6 +1,6 @@
 # 信息侧模块详细技术路线
 
-状态：Implementation Baseline v1.1
+状态：Implementation Baseline v1.2
 
 更新时间：2026-07-23
 
@@ -79,6 +79,7 @@ src/kangshield/information/
 ├── fall_candidates.py    # 无标签候选状态机、来源门与公开压力汇总
 ├── fall_candidate_export.py # capture-bound G4 特征到 evaluator prediction
 ├── event_bundle.py       # 三路 prediction 与标注的原子 bundle 组装/preflight
+├── distribution_readiness.py # 比赛包资产、决定、文件与分发 gate
 ├── speech_backend.py     # FunASR VAD/ASR/标点和词面标签
 ├── multimodal_pipeline.py # 特征落盘、时间窗对齐和性能报告
 ├── dataset_preparation.py # 公开固定源校验、媒体转换、case/lock
@@ -355,6 +356,19 @@ kangshield-info assemble-event-evaluation-bundle \
 
 组装器不修改标签/候选，不复制原媒体，也不覆盖目录；它在 `0700` staging 中以 `0600` 复制敏感 JSON，生成相对路径/大小/摘要引用，调用同一 evaluator preflight 后才原子 rename。正式可评审状态仍由 evaluator gates 决定。设计见 [G4 Event Bundle 组装](v1-g4-event-bundle-assembly.md)。
 
+### 7.8 比赛提交分发就绪门
+
+```text
+kangshield-info assess-distribution-readiness \
+  --policy configs/v1-r1-distribution-readiness.json \
+  --repository-root . \
+  --runs-dir runs
+```
+
+该命令不读取或复制模型权重和公开数据，只核对七个仓库事实来源摘要、十三项资产 disposition、五个人工决定、三个发布文件和五个 readiness gate。`include` 与 `undecided` 资产未清门、来源配置漂移、required file 缺失/过小/未绑定/摘要不符或 required decision 未确认时，报告均保持 `submission_bundle_ready=false`。`exclude` 只表示资产不进入当前提交包，不代表获得再分发许可。
+
+普通审计在正确产出 blocked 报告时返回成功；Release Candidate 使用 `--require-ready`，报告落盘后仍未就绪则返回 `2`。policy 和 repository root 的本地路径不写入 manifest，owner-only `0700/0600` 规则不变。该门禁固定 `legal_advice_provided=false`，项目许可证、最终权重和打包方式必须由具名 owner 决定。设计与基线分别见[分发就绪门设计](v1-r1-distribution-readiness.md)和[正式 E1 报告](reports/v1-r1-distribution-readiness.md)。
+
 ## 8. 模型接入路线
 
 模型按“先输入可用性，再输出精度”推进：
@@ -388,7 +402,7 @@ kangshield-info assemble-event-evaluation-bundle \
 - 错误案例和限制可解释。
 - 能支撑跌倒主线或明确的增强演示。
 
-V1-R1 已完成 E1 决策收敛：YOLO26n 为 V1 对照，HumanArt + RTMPose 为准确率条件参考，Keypoint R-CNN 为未选 fallback，FunASR 为普通话有条件候选，Whisper small 不晋级普通话主链路。HumanArt artifact 不能继承 MMPose Apache-2.0，Keypoint R-CNN 权重也不能继承 TorchVision BSD-3-Clause；目标设备、负样本和分发门关闭前均不得晋级。完整账本见 [V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。
+V1-R1 已完成 E1 决策收敛和可执行分发门禁：YOLO26n 为 V1 对照，HumanArt + RTMPose 为准确率条件参考，Keypoint R-CNN 为未选 fallback，FunASR 为普通话有条件候选，Whisper small 不晋级普通话主链路。HumanArt artifact 不能继承 MMPose Apache-2.0，Keypoint R-CNN 权重也不能继承 TorchVision BSD-3-Clause；目标设备、负样本和分发门关闭前均不得晋级。当前 G5 报告为 0/5 gate ready，表示工具已完成但项目/权重/依赖分发决定尚未完成。完整账本见 [V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。
 
 ## 9. 时间与多模态对齐
 

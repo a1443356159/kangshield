@@ -1,6 +1,6 @@
 # 开发与证据晋级流程
 
-状态：Active v0.9
+状态：Active v1.0
 
 ## 1. 开发顺序
 
@@ -270,6 +270,20 @@ make submit-m3-speech-comparison
 
 V1-R1 的当前采用/候选/放弃状态见 [探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。框架许可证、预训练权重、训练数据和比赛提交物必须分别记录；HumanArt + RTMPose 与 Keypoint R-CNN 的 ModelBinding 均为 `model-artifact-license-review-required`，不能分别因 MMPose Apache-2.0 或 TorchVision BSD-3-Clause 自动解锁权重分发。
 
+当前比赛包 profile 的日常审计：
+
+```bash
+make PYTHON=.venv/bin/python assess-distribution-readiness
+```
+
+Release Candidate 硬门：
+
+```bash
+kangshield-info assess-distribution-readiness --require-ready
+```
+
+普通审计的 blocked 是有效评估结果，会生成 owner-only 报告并返回 `0`；`--require-ready` 会在报告落盘后返回 `2`。修改 `pyproject.toml`、模型/数据配置、bundle disposition、项目许可证、最终权重或打包方式时，必须先复核资产清单，再更新 policy 摘要和 Review。`LICENSE`、`THIRD_PARTY_NOTICES.md`、`requirements/competition.lock` 只有在非空、人工审查且 SHA-256 已绑定后才算就绪。详细契约见[比赛提交分发就绪门](v1-r1-distribution-readiness.md)。
+
 ## 5. 运行检查
 
 每次运行后检查：
@@ -300,6 +314,7 @@ V1-R1 的当前采用/候选/放弃状态见 [探索收敛与 V2 输入清单](v
 24. Export summary 是否不含时间、窗口、candidate/track/observation ID 或本地路径，Risk/Alert 是否仍为 false。
 25. 正式 runs 根/run/子目录、JSON/JSONL 与 Slurm stdout 是否分别保持 `0700`、`0600` 与 `0600`；任一权限漂移时是否拒绝旧 run 并用新路径重跑，而非手工改权限后冒充原始证据。
 26. 正式 sbatch 是否经统一提交器冻结完整 commit，并通过 `slurm-runtime-v0.2.0` 的 submit/execution commit 一致性、Git 根、clean checkout、checkout import 与 CUDA runtime 门；stdout override 是否显式绑定，RTMPose 是否同时通过 cuDNN/ORT loadability，而非只检查 provider 名称。
+27. 比赛提交 profile 的七个 source binding 是否全部 matched，所有 included/undecided 资产是否已清门，五个 owner decision 是否有可审计引用，三个 required release file 是否内容非空且摘要已绑定；RC 是否以 `--require-ready` 执行，而不是把普通 blocked 审计误写成可发布。
 
 快速检查：
 
