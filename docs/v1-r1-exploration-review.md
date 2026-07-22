@@ -4,7 +4,7 @@
 
 基准日期：2026-07-22
 
-证据快照：截至 `f5bb761` 的 V1-M1～V1-M3 报告、许可证 fail-closed 修正 `f4aa1c5`，以及 G4 离线特征实现 `782026b`
+证据快照：截至 `f5bb761` 的 V1-M1～V1-M3 报告、许可证 fail-closed 修正 `f4aa1c5`、G4 离线特征实现 `782026b`，以及 CAUCAFall ADL 压力实现 `336bbe9`
 
 ## 1. Review 目标与状态语义
 
@@ -35,7 +35,7 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 | V1-M3 姿态 | E1 public | HumanArt + RTMPose 为准确率有条件候选 | C6c 场景、困难横卧关键点、许可证/分发终审 |
 | V1-M3 语音 | E1 public | FunASR 保留普通话候选；Whisper small 不晋级主链路 | C6c 远场、方言、电视/噪声和人工 VAD 指标 |
 | V1-M3 睡眠 | E1 fixture | 不选模型；采用无值 profiler + fail-closed route gate | SDNL1 真实字段、单位、时间、缺失与准确率 |
-| V1-R1 G4 跌倒运动特征 | E1 public | box-only、COCO-17 质量门、时间历史和 fallback 契约可重复；不生成风险/告警 | C6c 正负样本、居家躺卧/弯腰/空场、多人策略、阈值与事件指标 |
+| V1-R1 G4 跌倒运动特征 | E1 public | box-only、COCO-17 质量门、时间历史和 fallback 契约可重复；CAUCAFall 已补拾物/坐下/跪地/行走与三档光照；不生成风险/告警 | C6c 正负样本、空房/家具/床上躺卧/宠物/多人、阈值与事件指标 |
 
 ## 3. 工程与数据路线决策账本
 
@@ -55,8 +55,8 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 | ID | 模型/路线 | 决定 | 当前证据 | 解锁或重开条件 |
 |---|---|---|---|---|
 | R1-M01 | YOLO26n-pose + ByteTrack | Reject-primary；保留 V1 对照 | lying 9/21 = 42.86%；Ultralytics 为 AGPL-3.0/Enterprise 路线 | 只有项目选择完整 AGPL 开源或取得 Enterprise，且 C6c held-out 反超候选才重开 |
-| R1-M02 | YOLOX-m HumanArt + RTMPose-m HumanArt | Conditional accuracy candidate | overall 163/170 = 95.88%；lying 20/21 = 95.24%；RTF 0.123668 | C6c 场景门、fall-01 质量门、负样本门和 Human-Art 权重/训练数据分发门全部通过 |
-| R1-M03 | box-only 横卧/下降/静止 + keypoint quality gate | Conditional implementation input | G4 E1 两个变体各派生 170 帧；candidate lying 为 20 bbox、17 horizontal、11 keypoint-pass、9 box-only，且 fall-01 仍 0/7 keypoint-pass | 在 C6c 弯腰/躺床/跌倒正负样本和扩展居家负样本上冻结阈值、多人策略与事件指标 |
+| R1-M02 | YOLOX-m HumanArt + RTMPose-m HumanArt | Conditional accuracy candidate | URFD overall 163/170 = 95.88%、lying 20/21；CAUCAFall person-box 602/661 = 91.07%，但 keypoint gate 仅 298/602 | C6c 场景门、fall-01 质量门、剩余负样本门和 Human-Art 权重/训练数据分发门全部通过 |
+| R1-M03 | box-only 横卧/下降/静止 + keypoint quality gate | Conditional implementation input | URFD candidate lying 为 17 horizontal；CAUCAFall no-fall ADL 又出现 17 horizontal，全部 box-only，最长 1000 ms，证明单一宽高比不可触发告警 | 在 C6c 跌倒正负样本和空房/家具/躺床/宠物/多人 held-out 集上冻结组合规则、多人策略与事件指标 |
 | R1-M04 | FunASR FSMN-VAD + SeACo Paraformer + CT-Punc | Conditional default Mandarin candidate | 9/137，CER 6.57%，静音通过，推理 RTF 0.037648 | C6c 远场/噪声/老人或年龄相近说话人、人工 VAD 和许可证打包门 |
 | R1-M05 | OpenAI Whisper small | Reject-primary；保留实验 adapter | 32/137，CER 23.36%，6/6 case 编辑数更差 | 仅在新的方言、多语种或噪声 held-out 集上重开 |
 | R1-M06 | 睡眠分期/生命体征模型 | Reject | 当前问题是设备字段是否开放，不是缺少推理模型 | 先取得 E2/E3 schema；不得从雷达参数猜字段或训练目标 |
@@ -105,7 +105,7 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 | 证据与运行契约 | E0～E4、SourceAsset、Observation、FeatureEvent、RunManifest | V1-M1/M2a |
 | 离线回放与评测边界 | PoseBackend、SpeechBackend、固定 case、隐私安全汇总 | V1-M2b/M3 |
 | 姿态候选配置 | 5 fps、RTMPose detector conf 0.05、COCO-17、质量阈值报告 | REV-006 |
-| 跌倒运动特征契约 | box-only、关键点质量门、同 track 历史、fallback reason、无风险/告警硬约束 | REV-011 |
+| 跌倒运动特征契约 | box-only、关键点质量门、同 track 历史、fallback reason、无风险/告警硬约束；单一横卧框不得告警 | REV-011 / REV-012 |
 | 语言候选配置 | 16 kHz、FunASR 三模型摘要、CER/静音/RTF 口径 | REV-007 |
 | 睡眠字段边界 | 19 direct、5 derived、11 not-assumed、fail-closed mapping | REV-008 |
 | 真机场景矩阵 | 白天/夜视、距离、遮挡、空场、弯腰、躺床和安全模拟跌倒 | V1-M2c 规程 |
@@ -118,7 +118,7 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 | G1 C6c 能力 | 脱敏能力集、直播/回放/抓图调用和一段原始媒体 | 演示只允许受控文件回放，不声称实时萤石接入 |
 | G2 音视频时间基 | 容器 track、time_base、首尾 PTS、offset/drift | 视频与语言分开演示，不做自然融合结论 |
 | G3 C6c 模型复测 | 至少 8 个必做场景，两个姿态 variant、空场误报和远场 ASR | 保留 E1 离线 demo，模型仍为 conditional |
-| G4 跌倒特征 | E1 feature/fallback 工具已通过；仍需 C6c 正负样本、扩展居家 ADL/空场、多人策略和事件指标 | 不生成自动风险，只展示姿态/轨迹派生特征 |
+| G4 跌倒特征 | E1 feature/fallback 与 CAUCAFall ADL 压力已通过；仍需 C6c 正负样本、空房/家具/躺床/宠物/多人和事件指标 | 不生成自动风险，只展示姿态/轨迹派生特征 |
 | G5 模型/项目许可证 | 项目 LICENSE、第三方 NOTICE、最终权重使用与分发决定 | 排除未清门模型和数据；不得临近提交时口头豁免 |
 | G6 SDNL1 字段 | 至少一晚 E2 schema，或可复核的权限/不开放证据 | 保留接口和 blocked 状态，不展示合成健康值 |
 | G7 数据治理 | 同意、受控存储、留存期、访问人和删除流程 | 不使用真实人物/健康数据 |
@@ -126,8 +126,8 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 ## 9. 不等待真机的下一开发顺序
 
 1. `[E1 tool done，REV-010]` 使用 PyAV 实现容器与逐轨时间基探针；下一步把同一命令用于 C6c 原始媒体并以两个同步事件关闭 G2，而不是把 synthetic offset 当真机结论。
-2. `[E1 tool done，REV-011]` 已实现仅离线输出的跌倒特征层：box 横卧、中心下降、持续/静止、关键点质量门与 fallback reason；保持不输出 RiskAssessment 或 Alert。
-3. 当前下一步是在独立数据来源中补人物不存在、家具、弯腰、坐下、床上躺卧和多人负样本。现有三段 ADL 的 82 个有框帧虽未激活横卧代理，但不足以冻结误触发口径。
+2. `[E1 tool done，REV-011/012]` 已实现仅离线输出的跌倒特征层，并用 CAUCAFall 12 段拾物/坐下/跪地/行走压力复跑；保持不输出 RiskAssessment 或 Alert。
+3. 当前下一步是补人物不存在、纯家具、床上躺卧、宠物和多人负样本。CAUCAFall 已暴露 no-fall horizontal box-only 激活，但仍不足以冻结误触发口径。
 4. 评测一个许可证更清晰、非 Human-Art 训练的姿态候选，避免 V2 只剩两个都带分发硬门的选择。
 5. 形成项目 LICENSE/THIRD_PARTY_NOTICES 决策草案；最终许可证由项目方确认。
 

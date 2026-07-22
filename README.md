@@ -34,6 +34,8 @@
 - [V1-R1 探索收敛与 V2 输入清单](docs/v1-r1-exploration-review.md)
 - [V1-R1 G4 跌倒运动特征与关键点质量门](docs/v1-g4-fall-motion-features.md)
 - [V1-R1 G4 跌倒运动特征 E1 报告](docs/reports/v1-g4-fall-motion-features.md)
+- [V1-R1 G4 CAUCAFall ADL 压力集](docs/v1-g4-caucafall-adl-stress.md)
+- [V1-R1 G4 CAUCAFall ADL 压力报告](docs/reports/v1-g4-caucafall-adl-stress.md)
 
 ## V1 初步开发
 
@@ -114,6 +116,16 @@ kangshield-info benchmark-fall-features \
 ```
 
 该命令输出 box-only 横卧/下降/低运动代理、关键点质量门和 fallback reason，并强制保持 `risk_assessment_emitted=false`、`alert_emitted=false`。它只属于 E1 特征链路，不代表已实现跌倒判定或报警；设计与结果见 [G4 设计](docs/v1-g4-fall-motion-features.md)和[正式报告](docs/reports/v1-g4-fall-motion-features.md)。
+
+准备并运行独立 CAUCAFall ADL 压力集：
+
+```bash
+make prepare-g4-caucafall
+kangshield-info benchmark-fall-adl \
+  data/processed/v1-g4-caucafall/fall-adl-cases.json
+```
+
+该命令对 12 段 clip-level no-fall ADL 顺序运行两个姿态变体，并按动作/光照汇总代理激活。它不训练或评测跌倒分类器；正式 E1 结果见 [压力集设计](docs/v1-g4-caucafall-adl-stress.md)和[压力报告](docs/reports/v1-g4-caucafall-adl-stress.md)。
 
 运行 V1-M3 同集语音对比：
 

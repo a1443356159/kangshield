@@ -176,6 +176,15 @@ kangshield-info benchmark-fall-features \
 
 runner 会校验 parent/child 代码版本、输入摘要、模型 digest、case order、annotation 和当前模型许可证 policy。默认拒绝 dirty、未完成或来源漂移的运行。输出只包含 box/keypoint 运动代理、质量门和 fallback reason；`risk_assessment_emitted` 与 `alert_emitted` 必须为 false。设计和正式 E1 证据见 [G4 设计](v1-g4-fall-motion-features.md)与[正式报告](reports/v1-g4-fall-motion-features.md)。
 
+扩展公开 ADL 压力集保持独立 schema，先在联网节点准备并校验 12 个 CAUCAFall AVI，再提交双变体 L40 job：
+
+```bash
+make prepare-g4-caucafall
+make submit-g4-adl-benchmark
+```
+
+准备器冻结 DOI/版本/许可、Mendeley file ID、大小、SHA-256、subject/activity 矩阵和三档光照；评测器再次校验 prepared suite、模型摘要和 COCO-17 布局。每个 case 使用 child run 保存敏感 pose events，父报告只按动作/光照发布摘要。详见 [CAUCAFall 压力设计](v1-g4-caucafall-adl-stress.md)与[正式报告](reports/v1-g4-caucafall-adl-stress.md)。
+
 ### V1-M3 语音同集对比
 
 在登录节点固定并校验 OpenAI Whisper small 和已有 FunASR 权重，再由同一 L40 job 顺序运行两个 variant：
@@ -210,6 +219,9 @@ V1-R1 的当前采用/候选/放弃状态见 [探索收敛与 V2 输入清单](v
 11. G4 runner 的姿态 parent/child 是否 clean、completed、E1，且代码、输入与模型摘要完全匹配。
 12. G4 parent/case report 的 `risk_assessment_emitted` 和 `alert_emitted` 是否都为 false。
 13. G4 派生 JSONL 是否没有原始 bbox、keypoints、阶段标签、参考转写或本地源路径。
+14. CAUCAFall source manifest、prepared suite、dataset lock 和 12 个 AVI 的摘要是否一致且二次准备不漂移。
+15. G4 ADL 父报告是否只含 aggregate/case 摘要，原始 pose fields 是否只留在被忽略的 child run。
+16. ADL 中的 horizontal/descent/low-motion 是否只写成代理激活，而没有误写成 false-positive rate 或告警。
 
 快速检查：
 

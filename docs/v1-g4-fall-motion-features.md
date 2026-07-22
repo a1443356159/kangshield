@@ -118,13 +118,13 @@ runner 校验 benchmark ID/digest/case order、parent/child run 状态与代码�
 - RTMPose 主候选：`20260722T103206Z-671bfb95`；
 - YOLO26n 对照：`20260722T103206Z-aa69e875`。
 
-两者都处理 170 帧、输出 170 个无风险 FeatureEvent，manifest completed、`code_dirty=false`。候选在 21 个 lying 采样帧中有 20 帧 bbox、17 帧横卧代理、11 帧关键点门通过和 9 帧 box-only；YOLO 分别为 9、8、3 和 6。两个变体的 82 个有框 ADL 帧均没有横卧框代理。
+两者都处理 170 帧、输出 170 个无风险 FeatureEvent，manifest completed、`code_dirty=false`。候选在 21 个 lying 采样帧中有 20 帧 bbox、17 帧横卧代理、11 帧关键点门通过和 9 帧 box-only；YOLO 分别为 9、8、3 和 6。既有 URFD 三段 ADL 的两个变体各有 82 个可用框且横卧代理为 0。
 
-这些结果只证明 feature/fallback 语义可复现。三条 ADL 不包含目标居家中的弯腰、床上躺卧、空房、家具和宠物真值，因此“ADL 横卧代理 0”不能写成误报率为 0。完整结果见[正式报告](reports/v1-g4-fall-motion-features.md)。
+随后新增的 [CAUCAFall ADL 压力集](v1-g4-caucafall-adl-stress.md)覆盖拾物、坐下、跪地、行走和三种光照。RTMPose 在 602 个有框帧中出现 17 个横卧框代理，全部为关键点门失败的 box-only，最长连续 1000 ms；YOLO 为 0。该结果进一步证明“URFD ADL 横卧为 0”不能外推为误报率，也不能把单一宽高比接到告警。完整压力结果见[CAUCAFall 正式报告](reports/v1-g4-caucafall-adl-stress.md)。
 
 ## 8. V2 前的剩余门
 
 1. 对 C6c 白天/夜视、距离、遮挡、弯腰、坐下、床上躺卧和安全模拟跌倒复跑同一冻结配置。
-2. 增加空房、家具、宠物和多人片段；多人出现时替换 largest-bbox 探索策略。
+2. CAUCAFall 已补弯腰/坐下/跪地/行走和三档光照；继续增加空房、纯家具、床上躺卧、宠物和多人片段，多人出现时替换 largest-bbox 探索策略。
 3. 用人工 person-presence、动作区间和事件起点标注，另行冻结误触发、检出延迟和 track fragmentation 指标。
 4. 只有 G3/G4/G5 共同关闭后，V2-D1 才能设计 RiskAssessment；本 E1 FeatureEvent 不直接触发告警。

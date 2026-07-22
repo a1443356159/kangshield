@@ -573,7 +573,7 @@
 
 | 行动 | 负责人 | 截止日期 | 状态 |
 |---|---|---|---|
-| 增加许可证可审计的空房、家具、弯腰、坐下、床上躺卧和多人负样本来源 | Codex | 2026-07-25 | Open |
+| 增加许可证可审计的空房、家具、弯腰、坐下、床上躺卧和多人负样本来源 | Codex | 2026-07-25 | Partial：REV-012 已补弯腰/坐下/跪地/行走；其余 Open |
 | 用同一冻结配置复跑 C6c 白天/夜视、距离、遮挡和安全模拟跌倒场景 | 待指定 | 2026-08-01 | Open |
 | 为 C6c 集增加 person-presence、动作区间和事件时刻人工标注并冻结事件指标 | 待指定 | 2026-08-03 | Open |
 | 评测一个不依赖 Human-Art 训练条款的姿态候选 | Codex | 2026-07-25 | Open |
@@ -583,3 +583,53 @@
 1. 空房、床上躺卧与家具负样本采用哪个可用于比赛研究和报告展示的数据源？
 2. C6c 目标机位下 bbox 横卧阈值和时间窗是否需按距离/俯仰角分组，而不是全局固定？
 3. 多人片段使用检测追踪、区域约束还是人工选定主目标，才能保持可解释且不串人？
+
+---
+
+## REV-012 V1-R1 G4 CAUCAFall ADL 压力 Review
+
+- 日期：2026-07-22
+- 状态：Accepted for E1 public-data stress slice；V1-R1 milestone remains In progress
+- 参与人：项目组、Codex
+- 评审范围：公开负样本来源/许可、确定性准备、双变体姿态覆盖、代理混淆、性能和 parent/child 隐私边界
+- 输入材料：[压力集设计](v1-g4-caucafall-adl-stress.md)、[正式报告](reports/v1-g4-caucafall-adl-stress.md)、实现提交 `336bbe9`、正式运行 `20260722T112332Z-f7970d63`
+
+### 发现
+
+1. CAUCAFall V4 以 CC-BY-4.0 提供；固定清单的 12 个 AVI 和元数据表均通过 file ID/URL、大小、SHA-256 与解码校验，prepared suite/lock 二次生成不漂移。
+2. RTMPose person-box coverage 为 602/661（91.07%），高于 YOLO 的 540/661（81.69%）；但其关键点 gate 只通过 298/602（49.50%），304 帧必须 box-only。
+3. RTMPose 在 clip-level no-fall ADL 中出现 17 个 horizontal bbox 帧，全部为关键点门失败的 box-only，最长 1000 ms；10 帧来自 kneel，其余涉及拾物、坐下、行走或画面边缘截断。YOLO 为 0。
+4. 两个变体在无跌倒动作中都会激活 rapid descent 和 low motion。代理激活不是误报；当前没有 classifier、event label 或 alert 输出，禁止计算 false-positive rate。
+5. 两个变体均快于实时。RTMPose pose RTF 为 0.125457，YOLO 为 0.061888；覆盖收益伴随约 2 倍纯推理成本。
+6. Parent、24 个 child 和 1322 个 fall-motion events 均通过隐私审计；原始 bbox/keypoints 只存在于被忽略的 child pose events，风险/告警全为 false。
+
+### 决定
+
+1. 接受 CAUCAFall 12-case source manifest、准备器、dataset lock 和 `FallAdl*` 契约作为 G4 E1 回归资产。
+2. 冻结“单帧 bbox horizontal 不得直接触发风险或告警”为 V2-D1 约束；所有组合逻辑必须在独立 held-out 集设计和验收。
+3. 保留 RTMPose 为 conditional accuracy candidate，不因更高框覆盖晋级；关键点质量、C6c 域、剩余负样本和 HumanArt 分发仍是硬门。
+4. 将拾物、坐下、跪地、行走和三档光照的公开 E1 压力子门标记完成；不将其外推到老人、C6c、空房、床上躺卧、宠物或多人。
+5. G4 继续只发布可解释 feature/fallback；V1-R1 保持 In progress。
+
+### 验证
+
+- 自动化：59 passed；`pip check` 无 broken requirements；`compileall`、`bash -n`、CLI help 和 `git diff --check` 通过。
+- 正式执行：Slurm job `1762`，L40，completed，exit `0:0`；parent 与 24 child 均为代码 `336bbe9`、clean、E1、completed。
+- 数据：suite `37cf32e26361f679eb15528856e82e1014bc6e8c1257edcf9dea3079a0cf8277`；lock `f8bb837c07bb354beacb3cc51013b42edd10e54432ea25abd1def565e7c2f4b8`。
+- 产物：parent manifest `95456e8424c26a15f0e13e8c0d0ea79c4602cf9661146f0a16986868cc107214`；report `455be03ab06dea4d99efc5eeedbd62c8680d2feed119f5eaa6bbe3d1fdbef331`。
+- 隐私：父级敏感字段/绝对路径 0 命中；1322 个 fall-motion events 的原始框、关键点、phase label、参考转写、本地路径和 risk/alert true 均为 0。
+
+### 行动项
+
+| 行动 | 负责人 | 截止日期 | 状态 |
+|---|---|---|---|
+| 补空房、纯家具、床上躺卧、宠物和多人负样本；许可证不清时转为受控自采 | Codex / 待指定采集人 | 2026-07-27 | Open |
+| 用 C6c 采集同配置白天/夜视、距离、遮挡和安全模拟跌倒正负样本 | 待指定 | 2026-08-01 | Open |
+| 冻结 held-out 事件标注、组合决策和误触发/延迟口径 | 待指定 | 2026-08-03 | Open |
+| 评测不依赖 HumanArt 训练条款的姿态候选 | Codex | 2026-07-25 | Open |
+
+### 未决问题
+
+1. 床上躺卧、纯家具和 person-absent 数据应继续找明确许可的公开源，还是直接转为 C6c 受控自采？
+2. C6c 固定机位是否需要 ROI/地面区域约束，且如何避免把该约束过拟合到单个房间？
+3. 横卧持续、下降、低运动和人工确认应如何组合，才能在 held-out 集上形成可审计事件，而不是事后调阈值？

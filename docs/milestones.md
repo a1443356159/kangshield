@@ -24,7 +24,7 @@
 | V1-M2b 公开真实场景固定集与对齐评测 | 07-22～07-23 | Done | URFD/FLEURS 固定集、批量 Pipeline、标签/CER/覆盖率与 Slurm 报告 | 六 case 在干净提交和 L40 上可重复完成，公开数据边界固定为 E1 |
 | V1-M2c 目标设备样本与时间基 | 07-22～08-01 | In progress | 容器时间戳探针、C6c 音视频样本、睡眠样例与统一产物 | E1 工具已验收；目标设备视频、音频、睡眠样例仍须可追溯且时间语义明确 |
 | V1-M3 模型快速对比 | 08-02～08-07 | Done | 姿态、VAD/ASR、睡眠字段的对比报告 | E1 姿态、语音与睡眠路线均可重复并完成采用/候选/放弃决定；真机门仍属 M2c |
-| V1-R1 探索 Review | 08-08～08-09 | In progress | V1 结论、淘汰项、G4 离线特征、V2 输入清单 | E1 决策账本与 G4 feature/fallback 契约已冻结；真机、负样本、许可证和负责人硬门关闭后验收 |
+| V1-R1 探索 Review | 08-08～08-09 | In progress | V1 结论、淘汰项、G4 离线特征/ADL 压力、V2 输入清单 | E1 决策账本、G4 feature/fallback 与 CAUCAFall 压力子门已冻结；真机、剩余负样本、许可证和负责人硬门关闭后验收 |
 | V2-D1 设计冻结 | 08-10～08-12 | Planned | V2 架构、Schema、测试矩阵、任务分工 | 跌倒主线、平台接入和演示脚本闭合 |
 | V2-M1 主链路实现 | 08-13～08-20 | Planned | 真实设备/回放、识别、风险、告警基础链路 | 一次跌倒场景可完整追踪 |
 | V2-M2 联合验收 | 08-21～08-28 | Planned | 前端处置、失败降级、指标报告 | 场景矩阵、误报、延迟和处置均有结果 |
@@ -182,12 +182,13 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 - [x] 复核框架、模型权重、训练数据与公开评测数据的许可证边界；在 `f4aa1c5` 纠正 HumanArt ModelBinding 的 Apache-only 过宽标记。
 - [x] 形成 V2-D1 可直接采用输入、七个硬门和不等待真机的开发顺序。
 - [x] 在干净提交 `782026b` 上完成 G4 box-only、COCO-17 关键点质量门、同 track 时间特征和 fallback reason 的双变体 E1 正式运行；硬约束不输出风险或告警。
-- [ ] 使用 C6c 正负样本和扩展居家负样本关闭真实 G4，并决定多人策略、阈值与事件评测口径。
+- [x] 在干净提交 `336bbe9` 上完成 CAUCAFall 12 段 ADL、三档光照、双变体 E1 压力运行；确认 RTMPose 在 no-fall ADL 中有 17 个 horizontal box-only 帧，单一框比例不得触发告警。
+- [ ] 使用 C6c 正负样本并继续补空房、纯家具、床上躺卧、宠物和多人负样本，关闭真实 G4 后再决定多人策略、阈值与事件评测口径。
 - [ ] 用 E2/E3 证据把 C6c 与 SDNL1 从 Unknown 归类为 available、limited 或 blocked。
 - [ ] 决定 V2 最终姿态权重和项目分发许可证，生成第三方 NOTICE。
 - [ ] 为硬门指定负责人和截止日期，并删除无法完成的 V2 能力声明。
 
-预 Review 见 [V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)，G4 设计与证据见[跌倒运动特征设计](v1-g4-fall-motion-features.md)和[正式报告](reports/v1-g4-fall-motion-features.md)。E1 决策账本与 G4 工具完成不等于 V1-R1 Done；真机、负样本、最终姿态分发路线和责任人仍是验收门。
+预 Review 见 [V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。G4 基础设计与证据见[跌倒运动特征设计](v1-g4-fall-motion-features.md)和[正式报告](reports/v1-g4-fall-motion-features.md)，扩展 ADL 子门见 [CAUCAFall 设计](v1-g4-caucafall-adl-stress.md)和[压力报告](reports/v1-g4-caucafall-adl-stress.md)。E1 工具与公开 ADL 压力完成不等于 V1-R1 Done；真机、剩余负样本、最终姿态分发路线和责任人仍是验收门。
 
 ## 5. 里程碑决策优先级
 

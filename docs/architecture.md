@@ -83,6 +83,8 @@ V1-M2c 在 M1/M2 之间增加独立容器时间戳探针：“本地原始容器
 
 V1-R1 G4 在 M3/M7 之间增加“干净 PoseModelComparisonReport + child pose events → box/keypoint 时序特征 → phase/class 汇总”。特征提取器只读取姿态事件，不读取 URFD 阶段标签；标签只由评测器按媒体相对时间匹配。每帧必须选择 `box_plus_keypoints`、`box_only` 或 `unavailable` 并保留 fallback reason；本层固定不产生 RiskAssessment 或 Alert。
 
+G4 另设不污染 M2b 跨模态 case schema 的 CAUCAFall ADL 压力支路：“冻结官方下载清单 → 未转码视频 + dataset lock → 双姿态 variant/case child run → activity/illumination 父汇总”。原始框/关键点只留在被忽略的 child features，父报告只发布摘要。该支路只验证公开无跌倒 ADL 中的覆盖和代理混淆，不产生分类误报率。
+
 ## 5. V1 运行形态
 
 V1 采用一次运行一个目录的离线流水线：
