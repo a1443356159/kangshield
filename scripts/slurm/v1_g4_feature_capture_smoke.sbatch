@@ -20,7 +20,16 @@ kang_rtmpose_detector=${KANG_RTMPOSE_DETECTOR:-${kang_repo_dir}/models/rtmpose/y
 kang_rtmpose_pose=${KANG_RTMPOSE_POSE:-${kang_repo_dir}/models/rtmpose/rtmpose_m_humanart/rtmpose_m_humanart.onnx}
 kang_torchvision_model=${KANG_TORCHVISION_MODEL:-${kang_repo_dir}/models/torchvision/keypointrcnn_resnet50_fpn_coco-fc266e95.pth}
 
+umask 077
 cd "${kang_repo_dir}"
+if [[ -n "${SLURM_JOB_ID:-}" ]]; then
+  kang_slurm_output="${kang_repo_dir}/slurm-${SLURM_JOB_NAME}-${SLURM_JOB_ID}.out"
+  if [[ ! -f "${kang_slurm_output}" ]]; then
+    echo "Slurm output file not found: ${kang_slurm_output}" >&2
+    exit 2
+  fi
+  chmod 600 "${kang_slurm_output}"
+fi
 export PYTHONUNBUFFERED=1
 export PYTHONPATH="${kang_repo_dir}/src${PYTHONPATH:+:${PYTHONPATH}}"
 unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy

@@ -34,7 +34,16 @@ kang_python=${KANG_PYTHON:-${kang_repo_dir}/.venv/bin/python}
 kang_pose_model=${KANG_POSE_MODEL:-${kang_repo_dir}/models/yolo26n-pose.pt}
 kang_runs_dir=${KANG_RUNS_DIR:-${kang_repo_dir}/runs}
 
+umask 077
 cd "${kang_repo_dir}"
+if [[ -n "${SLURM_JOB_ID:-}" ]]; then
+  kang_slurm_output="${kang_repo_dir}/slurm-${SLURM_JOB_NAME}-${SLURM_JOB_ID}.out"
+  if [[ ! -f "${kang_slurm_output}" ]]; then
+    echo "Slurm output file not found: ${kang_slurm_output}" >&2
+    exit 2
+  fi
+  chmod 600 "${kang_slurm_output}"
+fi
 export PYTHONUNBUFFERED=1
 export PYTHONPATH="${kang_repo_dir}/src${PYTHONPATH:+:${PYTHONPATH}}"
 unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy

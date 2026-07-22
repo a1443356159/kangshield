@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import tempfile
 from contextlib import contextmanager
@@ -51,9 +52,15 @@ def atomic_write_json(path: Path, value: Any) -> None:
 
 def append_jsonl(path: Path, value: Any) -> None:
     path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as stream:
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    descriptor = os.open(
+        path,
+        os.O_APPEND | os.O_CREAT | os.O_WRONLY,
+        0o600,
+    )
+    with os.fdopen(descriptor, "a", encoding="utf-8") as stream:
         stream.write(json.dumps(_jsonable(value), ensure_ascii=False) + "\n")
+    path.chmod(0o600)
 
 
 def _git_state(workdir: Path) -> tuple[str, bool]:
@@ -102,7 +109,8 @@ class RunArtifacts:
             self.logs_dir,
             self.artifacts_dir,
         ):
-            directory.mkdir(parents=True, exist_ok=False)
+            directory.mkdir(parents=True, exist_ok=False, mode=0o700)
+            directory.chmod(0o700)
 
         revision, dirty = _git_state(project_dir or Path.cwd())
         self.manifest = RunManifest(
