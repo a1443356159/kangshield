@@ -241,6 +241,55 @@ def build_parser() -> argparse.ArgumentParser:
         help="Allow dirty source pose runs for development only",
     )
 
+    fall_adl = subparsers.add_parser(
+        "benchmark-fall-adl",
+        help="Stress G4 pose and motion proxies on the fixed CAUCAFall no-fall ADL set",
+    )
+    fall_adl.add_argument("fall_adl_cases", type=Path)
+    fall_adl.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    fall_adl.add_argument(
+        "--variant",
+        action="append",
+        choices=("yolo26n-pose", "rtmpose-m-humanart"),
+        help="Repeat to select variants; defaults to both in this order",
+    )
+    fall_adl.add_argument(
+        "--config",
+        type=Path,
+        default=Path("configs/v1-g4-fall-features.json"),
+    )
+    fall_adl.add_argument(
+        "--model-binding-policy",
+        type=Path,
+        default=Path("configs/v1-m3-pose-models.json"),
+    )
+    fall_adl.add_argument(
+        "--yolo-model", type=Path, default=Path("models/yolo26n-pose.pt")
+    )
+    fall_adl.add_argument("--yolo-device", default="auto")
+    fall_adl.add_argument("--yolo-image-size", type=int, default=640)
+    fall_adl.add_argument("--yolo-confidence", type=float, default=0.35)
+    fall_adl.add_argument(
+        "--rtmpose-detector-model",
+        type=Path,
+        default=Path(
+            "models/rtmpose/yolox_m_humanart/yolox_m_humanart.onnx"
+        ),
+    )
+    fall_adl.add_argument(
+        "--rtmpose-pose-model",
+        type=Path,
+        default=Path(
+            "models/rtmpose/rtmpose_m_humanart/rtmpose_m_humanart.onnx"
+        ),
+    )
+    fall_adl.add_argument("--rtmpose-device", default="auto")
+    fall_adl.add_argument(
+        "--rtmpose-detection-confidence", type=float, default=0.05
+    )
+    fall_adl.add_argument("--pose-sample-fps", type=float, default=5.0)
+    fall_adl.add_argument("--max-duration-s", type=float, default=30.0)
+
     speech_benchmark = subparsers.add_parser(
         "benchmark-speech-models",
         help="Compare the FunASR baseline and Whisper small on V1-M2b speech",
@@ -713,6 +762,57 @@ def _benchmark_fall_features_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def _benchmark_fall_adl_command(args: argparse.Namespace) -> int:
+    from .fall_adl_benchmark import run_fall_adl_benchmark
+
+    variants = args.variant or ["yolo26n-pose", "rtmpose-m-humanart"]
+    run, report = run_fall_adl_benchmark(
+        fall_adl_cases_path=args.fall_adl_cases,
+        runs_dir=args.runs_dir,
+        variants=variants,
+        config_path=args.config,
+        model_binding_policy_path=args.model_binding_policy,
+        yolo_model=args.yolo_model,
+        yolo_device=args.yolo_device,
+        yolo_image_size=args.yolo_image_size,
+        yolo_confidence=args.yolo_confidence,
+        rtmpose_detector_model=args.rtmpose_detector_model,
+        rtmpose_pose_model=args.rtmpose_pose_model,
+        rtmpose_device=args.rtmpose_device,
+        rtmpose_detection_confidence=args.rtmpose_detection_confidence,
+        sample_fps=args.pose_sample_fps,
+        max_duration_s=args.max_duration_s,
+    )
+    summaries = []
+    for variant in report.variants:
+        metrics = variant.overall.fall_feature_metrics
+        summaries.append(
+            {
+                "variant_id": variant.variant_id,
+                "pose_frame_coverage": variant.overall.pose_frame_coverage,
+                "bbox_horizontal_frames": metrics.bbox_horizontal_frames,
+                "maximum_horizontal_duration_ms": (
+                    metrics.maximum_horizontal_duration_ms
+                ),
+                "rapid_descent_frames": metrics.rapid_descent_frames,
+                "low_motion_frames": metrics.low_motion_frames,
+                "risk_assessment_emitted": variant.risk_assessment_emitted,
+                "alert_emitted": variant.alert_emitted,
+            }
+        )
+    _print_result(
+        run,
+        {
+            "suite_id": report.suite_id,
+            "case_count": report.case_count,
+            "variants": summaries,
+            "risk_assessment_emitted": report.risk_assessment_emitted,
+            "alert_emitted": report.alert_emitted,
+        },
+    )
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "probe-media":
@@ -731,6 +831,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _benchmark_pose_models_command(args)
     if args.command == "benchmark-fall-features":
         return _benchmark_fall_features_command(args)
+    if args.command == "benchmark-fall-adl":
+        return _benchmark_fall_adl_command(args)
     if args.command == "benchmark-speech-models":
         return _benchmark_speech_models_command(args)
     raise RuntimeError(f"unhandled command: {args.command}")

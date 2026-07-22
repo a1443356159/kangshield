@@ -209,6 +209,7 @@ def test_no_detection_resets_history_and_metrics_keep_missingness():
     assert metrics.box_available_frames == 1
     assert metrics.box_only_frames == 1
     assert metrics.bbox_horizontal_rate == 1.0
+    assert metrics.maximum_horizontal_duration_ms == 0
     assert metrics.fallback_reason_counts["no_person_detection"] == 1
 
 

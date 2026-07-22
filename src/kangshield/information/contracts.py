@@ -487,6 +487,7 @@ class FallFeatureMetrics(ContractModel):
     box_plus_keypoints_frames: int = Field(ge=0)
     bbox_horizontal_frames: int = Field(ge=0)
     bbox_horizontal_rate: float = Field(ge=0.0, le=1.0)
+    maximum_horizontal_duration_ms: int = Field(default=0, ge=0)
     descent_available_frames: int = Field(ge=0)
     rapid_descent_frames: int = Field(ge=0)
     rapid_descent_rate: float = Field(ge=0.0, le=1.0)
@@ -548,6 +549,164 @@ class FallFeatureBenchmarkReport(ContractModel):
     risk_assessment_emitted: Literal[False] = False
     alert_emitted: Literal[False] = False
     limitations: list[str] = Field(default_factory=list)
+
+
+class FallAdlVideoCase(ContractModel):
+    schema_version: str = "1.0"
+    case_id: str
+    evidence_level: EvidenceLevel = EvidenceLevel.E1
+    dataset_id: str
+    dataset_version: int = Field(ge=1)
+    video_path: str
+    video_sha256: str = Field(min_length=64, max_length=64)
+    video_byte_size: int = Field(gt=0)
+    source_file_id: str
+    subject_ref: str
+    activity: Literal["pick_up_object", "sit_down", "kneel", "walk"]
+    illumination_group: Literal[
+        "natural_210_lux",
+        "zero_lux_ir",
+        "artificial_130_lux",
+    ]
+    approx_lux: int = Field(ge=0)
+    expected_person_presence: Literal["present"] = "present"
+    ground_truth_scope: Literal["dataset_action_level_no_fall"] = (
+        "dataset_action_level_no_fall"
+    )
+    limitations: list[str] = Field(default_factory=list)
+
+
+class FallAdlCaseEvaluation(ContractModel):
+    schema_version: str = "1.0"
+    case_id: str
+    variant_id: str
+    run_id: str
+    dataset_id: str
+    activity: str
+    illumination_group: str
+    source_video_sha256: str = Field(min_length=64, max_length=64)
+    frame_width: int = Field(gt=0)
+    frame_height: int = Field(gt=0)
+    sampled_frames: int = Field(ge=0)
+    frames_with_people: int = Field(ge=0)
+    pose_frame_coverage: float = Field(ge=0.0, le=1.0)
+    tracked_frames: int = Field(ge=0)
+    tracking_coverage: float = Field(ge=0.0, le=1.0)
+    unique_track_count: int = Field(ge=0)
+    evaluated_media_duration_ms: int = Field(ge=0)
+    fall_feature_metrics: FallFeatureMetrics
+    timing_ms: dict[str, float] = Field(default_factory=dict)
+    realtime_factors: dict[str, float] = Field(default_factory=dict)
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_counts(self) -> "FallAdlCaseEvaluation":
+        if self.frames_with_people > self.sampled_frames:
+            raise ValueError("frames_with_people cannot exceed sampled_frames")
+        if self.tracked_frames > self.frames_with_people:
+            raise ValueError("tracked_frames cannot exceed frames_with_people")
+        expected_pose = (
+            round(self.frames_with_people / self.sampled_frames, 6)
+            if self.sampled_frames
+            else 0.0
+        )
+        expected_tracking = (
+            round(self.tracked_frames / self.frames_with_people, 6)
+            if self.frames_with_people
+            else 0.0
+        )
+        if abs(self.pose_frame_coverage - expected_pose) > 1e-6:
+            raise ValueError("pose_frame_coverage disagrees with frame counts")
+        if abs(self.tracking_coverage - expected_tracking) > 1e-6:
+            raise ValueError("tracking_coverage disagrees with frame counts")
+        if self.fall_feature_metrics.sampled_frames != self.sampled_frames:
+            raise ValueError("fall feature count disagrees with sampled_frames")
+        return self
+
+
+class FallAdlGroupMetrics(ContractModel):
+    case_count: int = Field(ge=0)
+    sampled_frames: int = Field(ge=0)
+    frames_with_people: int = Field(ge=0)
+    pose_frame_coverage: float = Field(ge=0.0, le=1.0)
+    fall_feature_metrics: FallFeatureMetrics
+
+    @model_validator(mode="after")
+    def validate_counts(self) -> "FallAdlGroupMetrics":
+        if self.frames_with_people > self.sampled_frames:
+            raise ValueError("frames_with_people cannot exceed sampled_frames")
+        expected = (
+            round(self.frames_with_people / self.sampled_frames, 6)
+            if self.sampled_frames
+            else 0.0
+        )
+        if abs(self.pose_frame_coverage - expected) > 1e-6:
+            raise ValueError("pose_frame_coverage disagrees with group counts")
+        if self.fall_feature_metrics.sampled_frames != self.sampled_frames:
+            raise ValueError("fall feature count disagrees with group sampled_frames")
+        return self
+
+
+class FallAdlVariantReport(ContractModel):
+    schema_version: str = "1.0"
+    variant_id: str
+    model_bindings: list[ModelBinding]
+    source_binding_license_corrections: list[str] = Field(default_factory=list)
+    case_count: int = Field(ge=0)
+    cases: list[FallAdlCaseEvaluation]
+    overall: FallAdlGroupMetrics
+    by_activity: dict[str, FallAdlGroupMetrics] = Field(default_factory=dict)
+    by_illumination: dict[str, FallAdlGroupMetrics] = Field(default_factory=dict)
+    runtime_environment: dict[str, Any] = Field(default_factory=dict)
+    timing_ms: dict[str, float] = Field(default_factory=dict)
+    realtime_factors: dict[str, float] = Field(default_factory=dict)
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_case_count(self) -> "FallAdlVariantReport":
+        if self.case_count != len(self.cases):
+            raise ValueError("fall ADL variant case_count disagrees with cases")
+        if self.overall.case_count != self.case_count:
+            raise ValueError("fall ADL overall case_count disagrees with variant")
+        if any(case.variant_id != self.variant_id for case in self.cases):
+            raise ValueError("fall ADL case variant id disagrees with report")
+        return self
+
+
+class FallAdlBenchmarkReport(ContractModel):
+    schema_version: str = "1.0"
+    suite_id: str
+    benchmark_version: str
+    feature_version: str
+    evidence_level: EvidenceLevel = EvidenceLevel.E1
+    suite_manifest_sha256: str = Field(min_length=64, max_length=64)
+    configuration_sha256: str = Field(min_length=64, max_length=64)
+    model_binding_policy_sha256: str = Field(min_length=64, max_length=64)
+    dataset_id: str
+    dataset_version: int = Field(ge=1)
+    dataset_doi: str
+    dataset_license: str
+    case_count: int = Field(ge=0)
+    variants: list[FallAdlVariantReport]
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_case_count(self) -> "FallAdlBenchmarkReport":
+        if not self.variants:
+            raise ValueError("fall ADL report must contain at least one variant")
+        if any(variant.case_count != self.case_count for variant in self.variants):
+            raise ValueError("fall ADL report case_count disagrees with a variant")
+        if len({variant.variant_id for variant in self.variants}) != len(
+            self.variants
+        ):
+            raise ValueError("fall ADL report variant ids must be unique")
+        return self
 
 
 class SpeechBenchmarkCaseEvaluation(ContractModel):

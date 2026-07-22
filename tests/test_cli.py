@@ -88,3 +88,15 @@ def test_fall_feature_parser_defaults_to_candidate_and_clean_source():
     assert args.config.name == "v1-g4-fall-features.json"
     assert args.model_binding_policy.name == "v1-m3-pose-models.json"
     assert args.allow_dirty_source is False
+
+
+def test_fall_adl_parser_defaults_to_fixed_two_variant_stress_run():
+    args = build_parser().parse_args(
+        ["benchmark-fall-adl", "fall-adl-cases.json"]
+    )
+    assert args.command == "benchmark-fall-adl"
+    assert args.variant is None
+    assert args.config.name == "v1-g4-fall-features.json"
+    assert args.model_binding_policy.name == "v1-m3-pose-models.json"
+    assert args.pose_sample_fps == 5.0
+    assert args.max_duration_s == 30.0

@@ -1,9 +1,10 @@
-.PHONY: test info-fixtures prepare-mm-models prepare-mm-smoke prepare-m2c-timing-fixture submit-mm-smoke prepare-m2b-data submit-m2b-benchmark prepare-m3-pose-models submit-m3-pose-comparison prepare-m3-speech-models submit-m3-speech-comparison
+.PHONY: test info-fixtures prepare-mm-models prepare-mm-smoke prepare-m2c-timing-fixture submit-mm-smoke prepare-m2b-data submit-m2b-benchmark prepare-m3-pose-models submit-m3-pose-comparison prepare-m3-speech-models submit-m3-speech-comparison prepare-g4-caucafall submit-g4-adl-benchmark
 
 PYTHON ?= python3
 KANG_VIDEO_INPUT ?= $(CURDIR)/data/raw/public-smoke/ultralytics-bus-replay.avi
 KANG_AUDIO_INPUT ?= $(CURDIR)/data/raw/public-smoke/funasr-asr-example-zh.wav
 KANG_M2B_CASES ?= $(CURDIR)/data/processed/v1-m2b/benchmark-cases.json
+KANG_G4_ADL_CASES ?= $(CURDIR)/data/processed/v1-g4-caucafall/fall-adl-cases.json
 
 test:
 	PYTHONPATH=src $(PYTHON) -m pytest -q
@@ -49,3 +50,11 @@ submit-m3-speech-comparison:
 	test -f "$(KANG_M2B_CASES)"
 	$(PYTHON) scripts/prepare_v1_m3_speech_models.py --offline
 	sbatch --export=ALL,KANG_DATASET_CASES="$(KANG_M2B_CASES)" scripts/slurm/v1_m3_speech_comparison.sbatch
+
+prepare-g4-caucafall:
+	PYTHONPATH=src $(PYTHON) scripts/prepare_v1_g4_caucafall_data.py
+
+submit-g4-adl-benchmark:
+	test -f "$(KANG_G4_ADL_CASES)"
+	$(PYTHON) scripts/prepare_v1_m3_pose_models.py --offline
+	sbatch --export=ALL,KANG_FALL_ADL_CASES="$(KANG_G4_ADL_CASES)" scripts/slurm/v1_g4_fall_adl_benchmark.sbatch

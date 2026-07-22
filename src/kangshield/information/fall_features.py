@@ -488,6 +488,14 @@ def summarize_fall_features(
         ),
         bbox_horizontal_frames=horizontal_count,
         bbox_horizontal_rate=rate(horizontal_count, len(box)),
+        maximum_horizontal_duration_ms=max(
+            (
+                value.horizontal_duration_ms
+                for value in box
+                if value.horizontal_duration_ms is not None
+            ),
+            default=0,
+        ),
         descent_available_frames=len(descent),
         rapid_descent_frames=rapid_count,
         rapid_descent_rate=rate(rapid_count, len(descent)),
@@ -574,7 +582,7 @@ def _pose_binding_digest(
     return matches[0].model_digest
 
 
-def _correct_model_bindings(
+def correct_model_bindings(
     bindings: list[ModelBinding],
     *,
     variant_id: str,
@@ -808,7 +816,7 @@ def run_fall_feature_benchmark(
     source_case_ids = [case.case_id for case in variant.cases]
     if source_case_ids != expected_case_ids:
         raise ValueError("source pose cases do not match the benchmark case order")
-    bindings, corrections = _correct_model_bindings(
+    bindings, corrections = correct_model_bindings(
         variant.model_bindings,
         variant_id=variant_id,
         policy_path=model_binding_policy_path,
