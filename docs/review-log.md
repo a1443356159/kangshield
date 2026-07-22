@@ -469,7 +469,7 @@
 | 行动 | 负责人 | 截止日期 | 状态 |
 |---|---|---|---|
 | 实现 ffprobe/PyAV 容器轨道与 PTS 探针 | Codex | 2026-07-22 | Done（REV-010；仅 E1 工具，C6c G2 仍 Open） |
-| 实现 box-only 跌倒特征、关键点质量门和 fallback reason 的 E1 离线实验 | Codex | 2026-07-24 | Open |
+| 实现 box-only 跌倒特征、关键点质量门和 fallback reason 的 E1 离线实验 | Codex | 2026-07-24 | Done（REV-011；仅 E1，真实 G4 仍 Open） |
 | 评测一个不依赖 Human-Art 训练条款的姿态候选 | Codex | 2026-07-25 | Open |
 | 取得 C6c/SDNL1 E2/E3 或可复核 blocked 证据 | 待指定 | 2026-08-01 | Open |
 | 决定项目 LICENSE、最终模型分发路线并生成 THIRD_PARTY_NOTICES | 待指定 | 2026-08-09 | Open |
@@ -532,3 +532,54 @@
 1. C6c 的直播录制、回放导出或 SDK 导出哪一种能保留原始音频轨与时间戳？
 2. 真实容器是否有多音轨、B-frame 重排、首包负 PTS 或重连后的时间轴跳变？
 3. 无法取得同容器音频时，比赛演示是否按 G2 预案明确降级为视频与语言分开展示？
+
+---
+
+## REV-011 V1-R1 G4 跌倒运动特征 E1 Review
+
+- 日期：2026-07-22
+- 状态：Accepted for E1 offline feature slice；V1-R1 milestone remains In progress
+- 参与人：项目组、Codex
+- 评审范围：box-only 时序特征、COCO-17 关键点质量门、track/history fail-closed、标签隔离、许可证纠偏与隐私
+- 输入材料：[G4 设计](v1-g4-fall-motion-features.md)、[正式报告](reports/v1-g4-fall-motion-features.md)、提交 `782026b`、正式运行 `20260722T103206Z-671bfb95` / `20260722T103206Z-aa69e875`
+
+### 发现
+
+1. RTMPose 主候选在 21 个 lying 采样帧中有 20 帧 bbox、17 帧横卧代理、11 帧关键点门通过和 9 帧 box-only；YOLO 对照分别为 9、8、3 和 6。绝对覆盖差异不能被各自分母下的比例掩盖。
+2. fall-01 lying 虽有 7/8 帧 bbox，但 0/7 通过关键点门、5 次 track reset；box-only 是必要 fallback，却不能修复轨迹碎片或单独形成跌倒判断。
+3. 三段现有 ADL 的两个变体均有 82 个可用框且横卧代理为 0，但下降和低运动代理仍会激活。该集合没有空房、家具、弯腰、床上躺卧、宠物和真实多人，不能据此声称误报率为 0。
+4. 最大有效 bbox 只适用于当前单主目标探索；低阈值多框会触发 `multiple_people_largest_bbox_only`，不等于画面一定存在多人，也不能作为正式身份策略。
+5. 派生器不读取 URFD phase label；标签只由 evaluator 对齐。正式 JSONL 不复制原始 bbox、关键点、phase label、参考转写或本地路径。
+6. 历史姿态报告中 HumanArt artifact 的 Apache-2.0 绑定被当前 digest-bound policy 纠正为 `model-artifact-license-review-required`；这只是 fail-closed 修正，不代表权重分发通过。
+
+### 决定
+
+1. 接受 `FallMotionFrameValue`、`FallKeypointGate`、`FallFeatureBenchmarkReport` 和冻结配置作为 V2-D1 的条件输入契约。
+2. 接受 `box_plus_keypoints`、`box_only` 和 `unavailable` 三条显式路径；关键点门失败时禁止强算躯干角。
+3. 接受 no detection、invalid bbox、missing/change track、frame gap、history warm-up 和 multi-person ambiguity 的 fail-closed fallback。
+4. `risk_assessment_emitted=false` 与 `alert_emitted=false` 继续作为契约硬约束；当前代理不得用于跌倒分类、风险分数或告警。
+5. G4 E1 工具切片验收通过；目标 C6c、扩展负样本、多人策略、事件指标和 G5 许可证仍 Open，V1-R1 保持 In progress。
+
+### 验证
+
+- 自动化：53 passed；`pip check` 无 broken requirements；`compileall`、`git diff --check` 通过。
+- 来源：姿态 parent `20260722T053908Z-9b8096cd`，代码 `0674be9`，parent/child 均 clean、completed、E1。
+- G4：两个正式 run 均在 `782026b` 上 clean、completed、E1，各处理 170 帧并生成 170 个无风险/告警 FeatureEvent。
+- RTMPose 产物：manifest `c73aeb311b9cc3624ad544f272dc924ea3439e3724e152ce930c9254d560a237`；report `98f316b836aa145a4ca4d90ee1276a39580b2f0d989ab9ce11aaf156a2f058af`。
+- YOLO 产物：manifest `8e839fa6fb1b2dc0de79481671d49bc878a910abb3852348b8fdc032b1524366`；report `171d5e30d5bde28be58a93d92c649d69a34acd98eb44ece1b9322d808f6891f5`。
+- 隐私：340 个派生事件中原始 bbox/keypoints/phase label 为 0；本地绝对路径、`data/processed` 和完整 source report path 扫描均为 0 命中。
+
+### 行动项
+
+| 行动 | 负责人 | 截止日期 | 状态 |
+|---|---|---|---|
+| 增加许可证可审计的空房、家具、弯腰、坐下、床上躺卧和多人负样本来源 | Codex | 2026-07-25 | Open |
+| 用同一冻结配置复跑 C6c 白天/夜视、距离、遮挡和安全模拟跌倒场景 | 待指定 | 2026-08-01 | Open |
+| 为 C6c 集增加 person-presence、动作区间和事件时刻人工标注并冻结事件指标 | 待指定 | 2026-08-03 | Open |
+| 评测一个不依赖 Human-Art 训练条款的姿态候选 | Codex | 2026-07-25 | Open |
+
+### 未决问题
+
+1. 空房、床上躺卧与家具负样本采用哪个可用于比赛研究和报告展示的数据源？
+2. C6c 目标机位下 bbox 横卧阈值和时间窗是否需按距离/俯仰角分组，而不是全局固定？
+3. 多人片段使用检测追踪、区域约束还是人工选定主目标，才能保持可解释且不串人？

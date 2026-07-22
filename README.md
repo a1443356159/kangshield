@@ -32,6 +32,8 @@
 - [V1-M3 睡眠字段路线与 Fail-Closed Gate](docs/v1-m3-sleep-field-route.md)
 - [V1-M3 睡眠字段路线评审报告](docs/reports/v1-m3-sleep-field-route.md)
 - [V1-R1 探索收敛与 V2 输入清单](docs/v1-r1-exploration-review.md)
+- [V1-R1 G4 跌倒运动特征与关键点质量门](docs/v1-g4-fall-motion-features.md)
+- [V1-R1 G4 跌倒运动特征 E1 报告](docs/reports/v1-g4-fall-motion-features.md)
 
 ## V1 初步开发
 
@@ -101,6 +103,17 @@ kangshield-info benchmark-pose-models \
 ```
 
 该命令只重放六段视频，对比 YOLO26n-pose 与 YOLOX-m HumanArt + RTMPose-m HumanArt；不会重复运行语言模型。模型固定信息、阈值偏差和评测边界见[V1-M3 设计](docs/v1-m3-pose-model-comparison.md)。
+
+从一份干净的姿态父报告离线派生 G4 运动特征：
+
+```bash
+kangshield-info benchmark-fall-features \
+  data/processed/v1-m2b/benchmark-cases.json \
+  runs/<clean-pose-parent>/reports/pose-model-comparison-report.json \
+  --variant rtmpose-m-humanart
+```
+
+该命令输出 box-only 横卧/下降/低运动代理、关键点质量门和 fallback reason，并强制保持 `risk_assessment_emitted=false`、`alert_emitted=false`。它只属于 E1 特征链路，不代表已实现跌倒判定或报警；设计与结果见 [G4 设计](docs/v1-g4-fall-motion-features.md)和[正式报告](docs/reports/v1-g4-fall-motion-features.md)。
 
 运行 V1-M3 同集语音对比：
 

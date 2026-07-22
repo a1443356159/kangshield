@@ -1,6 +1,6 @@
 # 信息侧模块详细技术路线
 
-状态：Implementation Baseline v0.5
+状态：Implementation Baseline v0.6
 
 更新时间：2026-07-22
 
@@ -74,6 +74,7 @@ src/kangshield/information/
 ├── extractor.py          # 通用模型插件 Protocol
 ├── streaming.py          # OpenCV 时间戳回放、PCM WAV 读取/重采样
 ├── pose_backend.py       # YOLO26n-pose + ByteTrack 适配器
+├── fall_features.py      # 跌倒运动代理、关键点质量门与离线评测
 ├── speech_backend.py     # FunASR VAD/ASR/标点和词面标签
 ├── multimodal_pipeline.py # 特征落盘、时间窗对齐和性能报告
 ├── dataset_preparation.py # 公开固定源校验、媒体转换、case/lock
@@ -185,7 +186,7 @@ runs/<run_id>/
 5. reports 不保存 accessToken、AppKey、验证码、设备序列号或真实姓名。
 6. runs 默认被 Git 忽略。
 
-## 7. 三条初始开发路径
+## 7. 开发路径
 
 ### 7.1 媒体探测
 
@@ -277,6 +278,16 @@ kangshield-info benchmark-dataset <benchmark-cases.json>
 
 V1-M2b 使用固定 SHA-256 的 URFD/FLEURS 子集验证多样本处理。每个 case 独立运行姿态、跟踪、VAD/ASR 和窗口 Pipeline，再按 URFD 帧阶段标签统计视频覆盖率、按 FLEURS 参考转写统计 corpus CER。两路数据不是自然同步录制，融合窗口只有工程验证含义，结果固定为 E1。数据来源、许可证、准备过程和完整指标口径见 [V1-M2b 数据集评测设计](v1-m2b-public-dataset-benchmark.md)。
 
+### 7.6 跌倒运动特征离线评测
+
+```text
+kangshield-info benchmark-fall-features \
+  <benchmark-cases.json> <clean-pose-comparison-report.json> \
+  --variant rtmpose-m-humanart|yolo26n-pose
+```
+
+V1-R1 G4 复用已完成的姿态 child events，只派生 box 横卧/下降/低运动、横卧持续、COCO-17 关键点质量门和 fallback reason。runner 默认拒绝 dirty、未完成、非 E1、代码/模型/输入摘要漂移的姿态来源；阶段标签只进入 evaluator，派生事件不含原始坐标或标签。输出固定不产生 RiskAssessment 或 Alert。设计与 E1 结果见 [G4 设计](v1-g4-fall-motion-features.md)和[正式报告](reports/v1-g4-fall-motion-features.md)。
+
 ## 8. 模型接入路线
 
 模型按“先输入可用性，再输出精度”推进：
@@ -296,7 +307,7 @@ V1-M2b 使用固定 SHA-256 的 URFD/FLEURS 子集验证多样本处理。每个
 ### 阶段 C：候选增强
 
 - V2 姿态准确率有条件候选：YOLOX-m HumanArt + RTMPose-m HumanArt。
-- 跌倒特征输入：box-only 横卧/下降/静止与 keypoint quality gate。
+- 跌倒特征输入：box-only 横卧/下降/静止与 keypoint quality gate 已完成 E1 离线实现；C6c 正负样本、多人策略和真实 G4 仍 Open。
 - MediaPipe、openSMILE、Face/OpenFace、YAMNet 当前 Defer，不继续无标签扩展。
 
 ### 阶段 D：V2 晋级
@@ -348,6 +359,7 @@ V1-R1 已完成 E1 决策收敛：YOLO26n 为 V1 对照，HumanArt + RTMPose 为
 - 原始媒体保留在明确的受控目录，runs 只引用。
 - 语音只在主动开启、同意和受控测试下处理。
 - FeatureEvent 不保留完整语音文本时，应保留脱敏文本或关键词类别。
+- G4 派生 FeatureEvent 不复制原始 bbox、关键点、阶段标签、源路径或参考转写，只保存归一化代理、质量门与摘要引用。
 - Fixture 必须包含 synthetic 标记。
 - 差分隐私在 V1 只做设计评估；没有明确机制、敏感度和效用测试时不得声称已实现。
 

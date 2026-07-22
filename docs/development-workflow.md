@@ -1,6 +1,6 @@
 # 开发与证据晋级流程
 
-状态：Active v0.4
+状态：Active v0.5
 
 ## 1. 开发顺序
 
@@ -163,6 +163,19 @@ make submit-m3-pose-comparison
 
 计算节点不得下载权重。父报告记录两个 variant 的模型摘要、阶段覆盖、关键点质量、耗时和显存口径；详细设计见 [V1-M3 姿态模型对比](v1-m3-pose-model-comparison.md)。
 
+### V1-R1 G4 跌倒运动特征
+
+从干净、completed、E1 的姿态父报告复用 child `video.pose_frame`，不重新运行姿态模型：
+
+```bash
+kangshield-info benchmark-fall-features \
+  data/processed/v1-m2b/benchmark-cases.json \
+  runs/<clean-pose-parent>/reports/pose-model-comparison-report.json \
+  --variant rtmpose-m-humanart
+```
+
+runner 会校验 parent/child 代码版本、输入摘要、模型 digest、case order、annotation 和当前模型许可证 policy。默认拒绝 dirty、未完成或来源漂移的运行。输出只包含 box/keypoint 运动代理、质量门和 fallback reason；`risk_assessment_emitted` 与 `alert_emitted` 必须为 false。设计和正式 E1 证据见 [G4 设计](v1-g4-fall-motion-features.md)与[正式报告](reports/v1-g4-fall-motion-features.md)。
+
 ### V1-M3 语音同集对比
 
 在登录节点固定并校验 OpenAI Whisper small 和已有 FunASR 权重，再由同一 L40 job 顺序运行两个 variant：
@@ -194,6 +207,9 @@ V1-R1 的当前采用/候选/放弃状态见 [探索收敛与 V2 输入清单](v
 8. 完整转写是否只存在于受控 FeatureEvent，而未复制到汇总报告。
 9. 容器探针的 `scan_truncated`、PTS/DTS 缺失和 required audio 状态是否允许使用该报告。
 10. 是否错误地把容器首尾偏移或 duration delta 写成 drift。
+11. G4 runner 的姿态 parent/child 是否 clean、completed、E1，且代码、输入与模型摘要完全匹配。
+12. G4 parent/case report 的 `risk_assessment_emitted` 和 `alert_emitted` 是否都为 false。
+13. G4 派生 JSONL 是否没有原始 bbox、keypoints、阶段标签、参考转写或本地源路径。
 
 快速检查：
 
@@ -258,7 +274,7 @@ Review 接受后同步更新：
 - V1-M2b：公开真实录制固定集、批量评测与 E1 Slurm 证据。
 - V1-M2c：E1 容器时间戳工具，以及真实设备 E2/E3 证据、字段映射与音视频对齐。
 - V1-M3：模型对比代码、固定样本清单和报告。
-- V1-R1：晋级/淘汰决定与 V2 输入冻结。
+- V1-R1：晋级/淘汰决定、G4 离线特征/fallback 契约与 V2 输入冻结。
 
 提交前必须执行：
 

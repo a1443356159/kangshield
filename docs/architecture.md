@@ -1,6 +1,6 @@
 # 康盾工程架构与模块设计
 
-状态：Draft v0.5
+状态：Draft v0.6
 
 更新时间：2026-07-22
 
@@ -81,6 +81,8 @@ V1-M3 在 M3/M7 之间增加“同一 PoseBackend 契约 → 视频-only variant
 
 V1-M2c 在 M1/M2 之间增加独立容器时间戳探针：“本地原始容器 → PyAV stream/packet 扫描 → ContainerTimingReport”。它确认同容器轨道、time base、PTS/DTS 完整性和首尾容器偏移，但固定 `drift_estimate_available=false`；只有真实录制中的两个跨模态同步事件才能形成 offset/drift 验收。E1 工具通过不会提升 C6c 的设备证据等级。
 
+V1-R1 G4 在 M3/M7 之间增加“干净 PoseModelComparisonReport + child pose events → box/keypoint 时序特征 → phase/class 汇总”。特征提取器只读取姿态事件，不读取 URFD 阶段标签；标签只由评测器按媒体相对时间匹配。每帧必须选择 `box_plus_keypoints`、`box_only` 或 `unavailable` 并保留 fallback reason；本层固定不产生 RiskAssessment 或 Alert。
+
 ## 5. V1 运行形态
 
 V1 采用一次运行一个目录的离线流水线：
@@ -130,6 +132,10 @@ DatasetBenchmarkCase 只用于离线评测，冻结公开来源、配对类型�
 
 PoseBenchmarkCaseEvaluation 复用相同视频和 sidecar，分别保存人物框覆盖、关键点质量、轨迹字段和帧耗时。PoseBenchmarkVariantReport 对 class/phase 加权汇总；PoseModelComparisonReport 只计算预先指定的 variant 差值。模型框覆盖、关键点质量和 tracker 字段必须分开解释，不允许用“返回了框”替代“关键点足以支持跌倒特征”。
 
+### FallMotionFrameValue 与 FallFeatureBenchmarkReport
+
+FallMotionFrameValue 保存归一化框形状/位置、同 track 的下降/低运动/横卧持续代理、COCO-17 关键点质量门、feature path 和 fallback reason；不复制原始 bbox、关键点或阶段标签。FallFeatureBenchmarkReport 只在评测层按 case/class/phase 聚合 available 与代理激活数，并以 Literal `false` 固定 `risk_assessment_emitted` 和 `alert_emitted`。来源 parent/child run、代码版本、模型 digest、配置和 sidecar 摘要不一致时 fail closed。
+
 ### ContainerTimingReport
 
 MediaStreamTiming 保存每条视频/音频轨的 codec、time base、声明时间、逐包 PTS/DTS 完整性、时间范围、步长与技术元数据；ContainerTimingReport 汇总轨道数、同容器状态和首尾相对偏移。报告不保存容器 metadata value 或源路径，并把扫描截断显式降级为 partial。duration delta 只是轨道时间范围差，不得解释为 drift。
@@ -159,7 +165,7 @@ V1-R1 将架构能力分为三层：
 2. 只进入候选接口的实现：HumanArt + RTMPose、FunASR 和跌倒 box/keypoint 特征；在目标设备、负样本或许可证门关闭前不能成为正式能力。
 3. 不进入当前主路径的能力：YOLO26n 默认姿态、Whisper 普通话主链路、睡眠模型、自动诈骗/认知/抑郁评分，以及无设备证据的 HRV/SpO2/AHI 等字段。
 
-V2-D1 可以在真机到位前继续设计 adapter seam 和离线跌倒特征层；媒体 PTS 探针的 E1 工具已完成，但真实 G2 仍未关闭。系统必须同时保留三种运行声明：真实平台接入、受控文件回放、能力 blocked。三者不得共享同一个“已接入”状态。
+V2-D1 可以在真机到位前继续设计 adapter seam；媒体 PTS 探针与 G4 跌倒运动特征的 E1 工具均已完成，但真实 G2/G4 仍未关闭。G4 当前只提供离线 feature/fallback 契约，不能进入 RiskAssessment 或告警。系统必须同时保留三种运行声明：真实平台接入、受控文件回放、能力 blocked。三者不得共享同一个“已接入”状态。
 
 完整决策 ID、许可证边界和硬门见 [V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。
 
