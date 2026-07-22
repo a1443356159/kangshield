@@ -878,6 +878,59 @@ class MediaProbeReport(ContractModel):
     issues: list[QualityIssue] = Field(default_factory=list)
 
 
+class M2cClipReadiness(ContractModel):
+    """Privacy-safe result for one C6c capture clip."""
+
+    clip_ref: str
+    scenario_id: str
+    media_asset_id: str | None = None
+    manifest_digest_match: bool = False
+    manifest_byte_size_match: bool = False
+    probe_quality_status: QualityStatus = QualityStatus.UNKNOWN
+    video_track_status: str = "unknown"
+    audio_track_status: str = "unknown"
+    annotation_labels: list[str] = Field(default_factory=list)
+    annotation_window_count: int = Field(ge=0)
+    synchronization_event_count: int = Field(ge=0)
+    synchronization_offset_start_ms: float | None = None
+    synchronization_offset_end_ms: float | None = None
+    synchronization_drift_ms_per_minute: float | None = None
+    usable_for_model_retest: bool = False
+    issues: list[QualityIssue] = Field(default_factory=list)
+
+
+class M2cCaptureReadinessReport(ContractModel):
+    """Aggregate-only M2c gate; raw paths, refs and label windows are excluded."""
+
+    schema_version: str = "1.0"
+    assessor_version: str
+    capture_ref: str
+    evidence_level: EvidenceLevel
+    source_type: SourceType
+    manifest_asset_id: str
+    manifest_sha256: str = Field(min_length=64, max_length=64)
+    policy_version: str
+    policy_sha256: str = Field(min_length=64, max_length=64)
+    template_only: bool
+    synthetic: bool
+    clips: list[M2cClipReadiness]
+    counts: dict[str, int] = Field(default_factory=dict)
+    coverage: dict[str, list[str] | int | bool] = Field(default_factory=dict)
+    held_out_checks: dict[str, bool | int] = Field(default_factory=dict)
+    camera_ready_for_model_retest: bool = False
+    camera_matrix_complete: bool = False
+    sleep_sample_ready_for_profiling: bool = False
+    m2c_ready_for_review: bool = False
+    decision: str
+    quality_status: QualityStatus
+    raw_paths_persisted: Literal[False] = False
+    identity_refs_persisted: Literal[False] = False
+    annotation_windows_persisted: Literal[False] = False
+    health_values_persisted: Literal[False] = False
+    issues: list[QualityIssue] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+
+
 class FieldStat(ContractModel):
     path: str
     types: list[str]

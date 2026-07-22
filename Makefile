@@ -1,10 +1,11 @@
-.PHONY: test info-fixtures prepare-mm-models prepare-mm-smoke prepare-m2c-timing-fixture submit-mm-smoke prepare-m2b-data submit-m2b-benchmark prepare-m3-pose-models submit-m3-pose-comparison prepare-m3-speech-models submit-m3-speech-comparison prepare-g4-caucafall submit-g4-adl-benchmark
+.PHONY: test info-fixtures prepare-mm-models prepare-mm-smoke prepare-m2c-timing-fixture prepare-m2c-capture-fixture assess-m2c-capture-fixture submit-mm-smoke prepare-m2b-data submit-m2b-benchmark prepare-m3-pose-models submit-m3-pose-comparison prepare-m3-speech-models submit-m3-speech-comparison prepare-g4-caucafall submit-g4-adl-benchmark
 
 PYTHON ?= python3
 KANG_VIDEO_INPUT ?= $(CURDIR)/data/raw/public-smoke/ultralytics-bus-replay.avi
 KANG_AUDIO_INPUT ?= $(CURDIR)/data/raw/public-smoke/funasr-asr-example-zh.wav
 KANG_M2B_CASES ?= $(CURDIR)/data/processed/v1-m2b/benchmark-cases.json
 KANG_G4_ADL_CASES ?= $(CURDIR)/data/processed/v1-g4-caucafall/fall-adl-cases.json
+KANG_M2C_CAPTURE_MANIFEST ?= $(CURDIR)/data/raw/public-smoke/v1-m2c-capture/capture-manifest.json
 
 test:
 	PYTHONPATH=src $(PYTHON) -m pytest -q
@@ -22,6 +23,13 @@ prepare-mm-smoke:
 
 prepare-m2c-timing-fixture:
 	$(PYTHON) scripts/prepare_v1_m2c_timing_fixture.py --force
+
+prepare-m2c-capture-fixture: prepare-m2c-timing-fixture
+	PYTHONPATH=src $(PYTHON) scripts/prepare_v1_m2c_capture_fixture.py --force
+
+assess-m2c-capture-fixture:
+	test -f "$(KANG_M2C_CAPTURE_MANIFEST)"
+	PYTHONPATH=src $(PYTHON) -m kangshield.information.cli assess-m2c-capture "$(KANG_M2C_CAPTURE_MANIFEST)" --source-type fixture --evidence-level E1
 
 submit-mm-smoke:
 	test -f "$(KANG_VIDEO_INPUT)"

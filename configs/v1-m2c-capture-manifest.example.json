@@ -1,34 +1,71 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "template_only": true,
+  "synthetic": false,
   "capture_id": "replace-with-local-capture-id",
-  "captured_start_at": "YYYY-MM-DDTHH:MM:SS+08:00",
-  "captured_end_at": "YYYY-MM-DDTHH:MM:SS+08:00",
-  "operator_ref": "replace-with-pseudonymous-ref",
-  "participant_ref": "replace-with-pseudonymous-ref",
-  "consent_ref": "local-controlled-reference-not-a-name",
+  "captured_start_at": "2026-07-30T09:00:00+08:00",
+  "captured_end_at": "2026-07-30T10:00:00+08:00",
+  "operator_ref": "operator-pseudonym",
+  "participant_ref": "participant-pseudonym",
+  "consent": {
+    "relative_path": "consent/local-reference.pdf",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "byte_size": 1
+  },
   "devices": [
     {
       "device_ref": "salted-pseudonymous-camera-ref",
       "model": "CS-C6c-V101-1J4WF",
-      "firmware_version": "unknown-until-inspected",
-      "capability_snapshot_ref": "local-relative-reference",
-      "acquisition_method": "replace-with-live-recording-or-sdk-export"
+      "firmware_version": "record-observed-version",
+      "capability_snapshot": {
+        "relative_path": "capabilities/c6c-sanitized.json",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "byte_size": 1
+      },
+      "acquisition_method": "playback_export"
     },
     {
       "device_ref": "salted-pseudonymous-sleep-ref",
       "model": "CS-EP-SDNL1",
-      "firmware_version": "unknown-until-inspected",
-      "capability_snapshot_ref": "local-relative-reference",
-      "acquisition_method": "replace-with-api-sdk-or-app-export"
+      "firmware_version": "record-observed-version",
+      "capability_snapshot": {
+        "relative_path": "capabilities/sdnl1-sanitized.json",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "byte_size": 1
+      },
+      "acquisition_method": "app_export"
     }
   ],
   "camera_placement": {
-    "height_cm": null,
-    "pitch_degrees": null,
-    "room_zone": "replace-with-generic-zone",
-    "distance_markers_cm": [],
+    "height_cm": 180,
+    "pitch_degrees": -15,
+    "room_zone": "generic-bedroom-zone",
+    "distance_markers_cm": [150, 300, 500],
     "notes": []
+  },
+  "held_out_protocol": {
+    "partition": "held_out",
+    "assignment_rule": "all_manifest_clips",
+    "partition_frozen_at": "2026-07-29T18:00:00+08:00",
+    "labels_frozen_at": "2026-07-30T12:00:00+08:00",
+    "first_inference_at": null,
+    "model_policies": [
+      {
+        "variant_id": "yolo26n-pose",
+        "relative_path": "policies/v1-m3-pose-models.json",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "variant_id": "rtmpose-m-humanart",
+        "relative_path": "policies/v1-m3-pose-models.json",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "variant_id": "torchvision-keypointrcnn",
+        "relative_path": "policies/v1-m3-torchvision-pose-model.json",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    ]
   },
   "clips": [
     {
@@ -36,48 +73,53 @@
       "scenario": "empty_room_static",
       "lighting": "day",
       "night_vision": false,
-      "distance_band": "near_or_mid_or_far",
-      "occlusion": "none_or_description",
+      "distance_band": "near",
+      "occlusion": "none",
+      "expected_person_presence": "absent",
+      "expected_person_count": 0,
       "relative_path": "camera/C01-original-container.mp4",
-      "sha256": "replace-after-capture",
-      "byte_size": null,
-      "media_start_at": "YYYY-MM-DDTHH:MM:SS+08:00",
-      "duration_ms": null,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "byte_size": 1,
+      "media_start_at": "2026-07-30T09:01:00+08:00",
+      "duration_ms": 20000,
+      "audio_expected": false,
       "tracks": {
-        "video_present": null,
-        "audio_present": null,
+        "video_present": true,
+        "audio_present": false,
         "video_codec": null,
         "audio_codec": null,
         "video_time_base": null,
         "audio_time_base": null
       },
-      "synchronization_events_ms": [],
-      "ground_truth_windows": [],
+      "synchronization_events": [],
+      "annotation_windows": [],
       "safety": {
         "simulated_fall": false,
         "safety_mat": false,
-        "spotter_present": false
+        "spotter_present": false,
+        "area_cleared": true
       },
       "issues": []
     }
   ],
   "sleep_exports": [
     {
-      "source_kind": "api_response_or_sdk_export_or_app_export",
+      "source_kind": "app_export",
       "relative_path": "sleep/replace-with-export.json",
-      "sha256": "replace-after-export",
-      "requested_at": "YYYY-MM-DDTHH:MM:SS+08:00",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "byte_size": 1,
+      "requested_at": "2026-07-30T09:00:00+08:00",
       "covered_start_at": null,
       "covered_end_at": null,
-      "device_timezone": null,
-      "documentation_version": null,
+      "device_timezone": "Asia/Shanghai",
+      "documentation_version": "record-observed-version",
       "known_units": {},
       "issues": []
     }
   ],
   "limitations": [
     "this_example_is_not_device_evidence",
-    "actual_manifest_and_media_must_remain_in_gitignored_controlled_storage",
-    "template_placeholders_must_not_be_reported_as_observed_values"
+    "set_template_only_false_only_after_every_reference_and_digest_is_real",
+    "actual_manifest_and_media_must_remain_in_gitignored_controlled_storage"
   ]
 }

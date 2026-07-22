@@ -71,6 +71,35 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum packets scanned for PTS/DTS statistics in each stream",
     )
 
+    capture = subparsers.add_parser(
+        "assess-m2c-capture",
+        help="Validate a controlled C6c/SDNL1 capture bundle without copying raw data",
+    )
+    capture.add_argument("manifest", type=Path)
+    capture.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    capture.add_argument(
+        "--policy",
+        type=Path,
+        default=Path("configs/v1-m2c-capture-policy.json"),
+    )
+    capture.add_argument(
+        "--evidence-level", type=_evidence, default=EvidenceLevel.E1
+    )
+    capture.add_argument(
+        "--source-type", type=_source_type, default=SourceType.FIXTURE
+    )
+    capture.add_argument(
+        "--max-packets-per-stream",
+        type=int,
+        default=200_000,
+        help="Maximum packets scanned for PTS/DTS statistics in each media stream",
+    )
+    capture.add_argument(
+        "--require-ready",
+        action="store_true",
+        help="Exit 2 unless the complete real-device M2c Review gate is ready",
+    )
+
     sleep = subparsers.add_parser(
         "profile-sleep",
         help="Discover JSON/CSV sleep-export fields without persisting values",
@@ -494,6 +523,68 @@ def _profile_sleep_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def _assess_m2c_capture_command(args: argparse.Namespace) -> int:
+    from .m2c_capture import assess_m2c_capture
+
+    with RunArtifacts(
+        args.runs_dir,
+        stage="v1-m2c-capture-readiness",
+        evidence_level=args.evidence_level,
+        configuration={
+            "command": "assess-m2c-capture",
+            "source_type": args.source_type.value,
+            "input_path_persisted": False,
+            "max_packets_per_stream": args.max_packets_per_stream,
+            "require_ready": args.require_ready,
+        },
+    ) as run:
+        with run.step("assess-m2c-capture") as step:
+            assessment = assess_m2c_capture(
+                args.manifest,
+                policy_path=args.policy,
+                evidence_level=args.evidence_level,
+                source_type=args.source_type,
+                packet_scan_limit_per_stream=args.max_packets_per_stream,
+            )
+            run.record_asset(assessment.manifest_asset)
+            for report in assessment.media_reports:
+                run.record_asset(report.asset)
+                run.record_observation(report.observation)
+            for asset in assessment.sleep_assets:
+                run.record_asset(asset)
+            for index, report in enumerate(assessment.media_reports):
+                output = run.write_report(
+                    f"m2c-media-probe-{index:03d}.json",
+                    report,
+                )
+                step.outputs.append(run.relative(output))
+            output = run.write_report(
+                "m2c-capture-readiness.json",
+                assessment.report,
+            )
+            step.outputs.append(run.relative(output))
+    report = assessment.report
+    _print_result(
+        run,
+        {
+            "decision": report.decision,
+            "quality_status": report.quality_status.value,
+            "usable_clip_count": report.counts["usable_clip_count"],
+            "camera_ready_for_model_retest": (
+                report.camera_ready_for_model_retest
+            ),
+            "camera_matrix_complete": report.camera_matrix_complete,
+            "sleep_sample_ready_for_profiling": (
+                report.sleep_sample_ready_for_profiling
+            ),
+            "m2c_ready_for_review": report.m2c_ready_for_review,
+        },
+    )
+    if args.require_ready and not report.m2c_ready_for_review:
+        return 2
+    return 0
+
+
 def _assess_sleep_route_command(args: argparse.Namespace) -> int:
     from .sleep_route import assess_sleep_route
 
@@ -897,6 +988,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "probe-media":
         return _probe_media_command(args)
+    if args.command == "assess-m2c-capture":
+        return _assess_m2c_capture_command(args)
     if args.command == "profile-sleep":
         return _profile_sleep_command(args)
     if args.command == "assess-sleep-route":

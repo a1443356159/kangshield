@@ -80,6 +80,18 @@ def test_media_probe_parser_freezes_packet_scan_and_audio_gate_defaults():
     assert args.max_packets_per_stream == 200_000
 
 
+def test_m2c_capture_parser_defaults_to_fixture_and_fail_closed_policy():
+    args = build_parser().parse_args(
+        ["assess-m2c-capture", "capture-manifest.json"]
+    )
+    assert args.command == "assess-m2c-capture"
+    assert args.evidence_level.value == "E1"
+    assert args.source_type.value == "fixture"
+    assert args.policy.name == "v1-m2c-capture-policy.json"
+    assert args.max_packets_per_stream == 200_000
+    assert args.require_ready is False
+
+
 def test_fall_feature_parser_defaults_to_candidate_and_clean_source():
     args = build_parser().parse_args(
         [
