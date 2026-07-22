@@ -1190,7 +1190,8 @@ def _run_multimodal_command(args: argparse.Namespace) -> int:
             if same_container_av
             else "separate_files_synthetic_common_zero"
         ),
-        "pose_model": args.pose_model,
+        "pose_model": _model_manifest_ref(args.pose_model),
+        "pose_model_path_persisted": False,
         "pose_device": args.pose_device,
         "pose_image_size": args.pose_image_size,
         "pose_confidence": args.pose_confidence,
@@ -1265,6 +1266,15 @@ def _run_multimodal_command(args: argparse.Namespace) -> int:
         },
     )
     return 0
+
+
+def _model_manifest_ref(model: str | Path) -> str:
+    """Return a public model filename without persisting its local directory."""
+
+    name = Path(model).name
+    if not name:
+        raise ValueError("pose model must have a filename")
+    return name
 
 
 def _benchmark_dataset_command(args: argparse.Namespace) -> int:

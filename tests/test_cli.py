@@ -5,8 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from kangshield.information.cli import main
-from kangshield.information.cli import build_parser
+from kangshield.information.cli import _model_manifest_ref, build_parser, main
 
 
 SLEEP_FIXTURE = (
@@ -108,6 +107,13 @@ def test_multimodal_cli_rejects_missing_or_conflicting_audio_selection():
                 "--audio-from-video",
             ]
         )
+
+
+def test_multimodal_manifest_model_ref_drops_local_directory():
+    assert (
+        _model_manifest_ref(Path("/home/private-user/models/yolo26n-pose.pt"))
+        == "yolo26n-pose.pt"
+    )
 
 
 def test_m2c_capture_parser_defaults_to_fixture_and_fail_closed_policy():
