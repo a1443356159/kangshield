@@ -895,7 +895,7 @@ class M2cClipReadiness(ContractModel):
     synchronization_offset_start_ms: float | None = None
     synchronization_offset_end_ms: float | None = None
     synchronization_drift_ms_per_minute: float | None = None
-    usable_for_model_retest: bool = False
+    structurally_usable: bool = False
     issues: list[QualityIssue] = Field(default_factory=list)
 
 

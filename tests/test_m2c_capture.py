@@ -63,7 +63,7 @@ def test_e1_capture_fixture_exercises_full_structure_without_device_claim(tmp_pa
     assert report.decision == "tooling_only"
     assert report.quality_status is QualityStatus.PARTIAL
     assert report.counts["declared_clip_count"] == 10
-    assert report.counts["usable_clip_count"] == 10
+    assert report.counts["structurally_usable_clip_count"] == 10
     assert report.counts["synchronized_usable_clip_count"] == 1
     assert report.counts["error_count"] == 0
     assert report.coverage["missing_core_tags"] == []
@@ -95,7 +95,7 @@ def test_capture_gate_blocks_path_escape_and_does_not_echo_it(tmp_path):
     ).report
 
     c01 = next(clip for clip in report.clips if clip.scenario_id == "C01")
-    assert c01.usable_for_model_retest is False
+    assert c01.structurally_usable is False
     assert "bundle_path_invalid" in {issue.code for issue in c01.issues}
     assert report.decision == "not_ready"
     assert "outside-private-name" not in report.model_dump_json()
@@ -114,8 +114,8 @@ def test_capture_gate_blocks_digest_tampering(tmp_path):
 
     c05 = next(clip for clip in report.clips if clip.scenario_id == "C05")
     assert c05.manifest_digest_match is False
-    assert c05.usable_for_model_retest is False
-    assert report.counts["usable_clip_count"] == 9
+    assert c05.structurally_usable is False
+    assert report.counts["structurally_usable_clip_count"] == 9
     assert "media_sha256_mismatch" in {issue.code for issue in c05.issues}
 
 

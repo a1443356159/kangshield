@@ -900,7 +900,7 @@ def assess_m2c_capture(
             synchronization_offset_start_ms=start_offset,
             synchronization_offset_end_ms=end_offset,
             synchronization_drift_ms_per_minute=drift,
-            usable_for_model_retest=usable,
+            structurally_usable=usable,
             issues=clip_issues,
         )
         clip_results.append(result)
@@ -1055,7 +1055,7 @@ def assess_m2c_capture(
         clips=clip_results,
         counts={
             "declared_clip_count": len(manifest.clips),
-            "usable_clip_count": len(usable_scenarios),
+            "structurally_usable_clip_count": len(usable_scenarios),
             "synchronized_usable_clip_count": synchronized_usable_clips,
             "duplicate_media_content_count": duplicate_media_count,
             "model_policy_count": len(manifest.held_out_protocol.model_policies),

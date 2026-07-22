@@ -569,7 +569,9 @@ def _assess_m2c_capture_command(args: argparse.Namespace) -> int:
         {
             "decision": report.decision,
             "quality_status": report.quality_status.value,
-            "usable_clip_count": report.counts["usable_clip_count"],
+            "structurally_usable_clip_count": report.counts[
+                "structurally_usable_clip_count"
+            ],
             "camera_ready_for_model_retest": (
                 report.camera_ready_for_model_retest
             ),
