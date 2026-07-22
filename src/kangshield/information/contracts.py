@@ -1819,6 +1819,36 @@ class StreamQualificationTrackSignature(ContractModel):
     stream_type: Literal["video", "audio"]
     codec_name: str | None = None
     time_base: str | None = None
+    width_px: int | None = Field(default=None, gt=0)
+    height_px: int | None = Field(default=None, gt=0)
+    pixel_format: str | None = None
+    average_rate: str | None = None
+    sample_rate_hz: int | None = Field(default=None, gt=0)
+    channels: int | None = Field(default=None, gt=0)
+    channel_layout: str | None = None
+
+    @model_validator(mode="after")
+    def validate_type_specific_fields(self):
+        video_fields = (
+            self.width_px,
+            self.height_px,
+            self.pixel_format,
+            self.average_rate,
+        )
+        audio_fields = (
+            self.sample_rate_hz,
+            self.channels,
+            self.channel_layout,
+        )
+        if self.stream_type == "video" and any(
+            value is not None for value in audio_fields
+        ):
+            raise ValueError("video signature cannot include audio fields")
+        if self.stream_type == "audio" and any(
+            value is not None for value in video_fields
+        ):
+            raise ValueError("audio signature cannot include video fields")
+        return self
 
 
 class StreamQualificationAttempt(ContractModel):
@@ -1949,7 +1979,7 @@ class StreamQualificationReport(ContractModel):
         failed = sum(item.status == "failed" for item in self.attempts)
         signature_keys = {
             tuple(
-                (track.stream_type, track.codec_name, track.time_base)
+                tuple(sorted(track.model_dump(mode="json").items()))
                 for track in item.track_signature
             )
             for item in self.attempts

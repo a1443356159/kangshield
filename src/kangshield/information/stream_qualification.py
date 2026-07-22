@@ -66,6 +66,41 @@ def _track_signature(
             stream_type=stream.stream_type,
             codec_name=stream.codec_name,
             time_base=stream.time_base,
+            width_px=(
+                stream.technical_metadata.get("width")
+                if stream.stream_type == "video"
+                else None
+            ),
+            height_px=(
+                stream.technical_metadata.get("height")
+                if stream.stream_type == "video"
+                else None
+            ),
+            pixel_format=(
+                stream.technical_metadata.get("pixel_format")
+                if stream.stream_type == "video"
+                else None
+            ),
+            average_rate=(
+                stream.technical_metadata.get("average_rate")
+                if stream.stream_type == "video"
+                else None
+            ),
+            sample_rate_hz=(
+                stream.technical_metadata.get("sample_rate_hz")
+                if stream.stream_type == "audio"
+                else None
+            ),
+            channels=(
+                stream.technical_metadata.get("channels")
+                if stream.stream_type == "audio"
+                else None
+            ),
+            channel_layout=(
+                stream.technical_metadata.get("channel_layout")
+                if stream.stream_type == "audio"
+                else None
+            ),
         )
         for stream in sorted(
             timing.streams,
@@ -76,9 +111,9 @@ def _track_signature(
 
 def _signature_key(
     signature: list[StreamQualificationTrackSignature],
-) -> tuple[tuple[str, str | None, str | None], ...]:
+) -> tuple[tuple[tuple[str, object], ...], ...]:
     return tuple(
-        (item.stream_type, item.codec_name, item.time_base) for item in signature
+        tuple(sorted(item.model_dump(mode="json").items())) for item in signature
     )
 
 
@@ -106,7 +141,7 @@ def qualify_stream(
 
     attempts: list[StreamQualificationAttempt] = []
     captures: list[StreamCaptureReport] = []
-    signature_keys: set[tuple[tuple[str, str | None, str | None], ...]] = set()
+    signature_keys: set[tuple[tuple[tuple[str, object], ...], ...]] = set()
 
     for attempt_index in range(1, config.attempt_count + 1):
         stem = f"stream-capture-{attempt_index:03d}"

@@ -462,6 +462,15 @@ def test_stream_qualification_reopens_and_gates_stable_ready_captures(tmp_path):
         assert attempt.capture_report_artifact == (
             f"reports/stream-capture-{index:03d}.json"
         )
+        video_signature, audio_signature = attempt.track_signature
+        assert video_signature.stream_type == "video"
+        assert video_signature.width_px == 64
+        assert video_signature.height_px == 48
+        assert video_signature.pixel_format == "yuv420p"
+        assert video_signature.average_rate == "10/1"
+        assert audio_signature.stream_type == "audio"
+        assert audio_signature.sample_rate_hz == 8000
+        assert audio_signature.channels == 1
         artifact = artifacts / f"stream-capture-{index:03d}.mkv"
         assert artifact.is_file()
         assert stat.S_IMODE(artifact.stat().st_mode) == 0o600
