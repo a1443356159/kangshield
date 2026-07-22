@@ -52,6 +52,7 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 | V1-M3/G4 Keypoint R-CNN 独立候选 | `eae5f56` / `d956203` / `5ad8053` | `origin/main` | 2026-07-22 已验证 | 三模型 M2b 与 CAUCAFall L40 对比、候选 G4 派生、权重血缘 fail-closed 和 REV-013；保留 fallback，不是最终选型 |
 | V1-M2c 采集包就绪门 E1 工具 | `8838168` / `6928ac8` / `542bddf` / `6f1c02a` / `967e585` | `origin/main` | 2026-07-22 已验证 | manifest 1.1、场景/标注、文件/媒体、双同步事件、三模型 held-out 摘要、两级 readiness 与 REV-014；不代表取得真机样本 |
 | V1-R1 G4 Open Images 静态人物检测压力 | `40359c1` / `fad9491` / `c77525e` | `origin/main` | 2026-07-22 已验证 | 逐图 CC BY 2.0 / 标注 CC BY 4.0 归因、12-case r2、确定性准备/lock、三模型 L40 与 REV-015；只关闭静态 furniture/pet/multi-person 人物检测子门 |
+| V1-R1 G4 双标注/裁决/事件评估 E1 工具 | `b0b2e97` / `5413b46` | `origin/main` | 2026-07-22 已验证 | 12-clip 确定性 bundle、pairwise agreement、adjudication、三 candidate stream TP/FP/FN/误触发/delay、严格 provenance 与 REV-016；不代表真实模型或 C6c 事件性能 |
 
 这里的“推送验证”只证明代码已到达远端。V1-M1 仍为 In progress，必须取得 C6c 与 CS-EP-SDNL1 的 E2/E3 证据后才能进入 Review/Done。V1-M2a 和 V1-M2b 的 Done 只关闭设备无关 E1 链路及公开固定集评测，不会提升真实设备证据等级。V1-M3 的姿态、语言和睡眠字段三个 E1 切片均已验收，因此仅在 E1 探索范围标记 Done；M2c 已有采集规程、容器时间戳工具和采集包 readiness gate，但仍没有真实 C6c 媒体或 SDNL1 字段证据。V1-R1 G4 的离线特征、公开压力与双标注/裁决/事件 scorer 也都只属于 E1，不能替代 C6c 正负视频、真实候选策略/指标、床上躺卧、多人 tracking 或跌倒风险/告警验收。
 
