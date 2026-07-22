@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 def utc_now() -> datetime:
@@ -363,6 +363,190 @@ class PoseModelComparisonReport(ContractModel):
     comparisons: dict[str, dict[str, float | int | str | None]] = Field(
         default_factory=dict
     )
+    limitations: list[str] = Field(default_factory=list)
+
+
+class FallFeatureConfig(ContractModel):
+    schema_version: str = "1.0"
+    feature_version: str = "fall-motion-features-v0.1.0"
+    selection_strategy: Literal["largest_bbox"] = "largest_bbox"
+    expected_keypoint_layout: Literal["COCO-17"] = "COCO-17"
+    expected_keypoint_count: int = Field(default=17, ge=1)
+    required_keypoint_indices: list[int] = Field(
+        default_factory=lambda: [5, 6, 11, 12], min_length=1
+    )
+    keypoint_confidence_threshold: float = Field(
+        default=0.5, ge=0.0, le=1.0
+    )
+    keypoint_visible_ratio_threshold: float = Field(
+        default=0.5, ge=0.0, le=1.0
+    )
+    torso_horizontal_angle_max_deg: float = Field(
+        default=45.0, ge=0.0, le=90.0
+    )
+    bbox_horizontal_ratio_threshold: float = Field(default=1.0, gt=0.0)
+    descent_history_window_ms: int = Field(default=1000, gt=0)
+    descent_min_span_ms: int = Field(default=600, gt=0)
+    rapid_descent_center_y_ratio_threshold: float = Field(default=0.15, gt=0.0)
+    stationary_window_ms: int = Field(default=600, gt=0)
+    stationary_min_span_ms: int = Field(default=400, gt=0)
+    stationary_center_displacement_diagonal_ratio_threshold: float = Field(
+        default=0.03, gt=0.0
+    )
+    max_frame_gap_ms: int = Field(default=450, gt=0)
+    maximum_annotation_match_error_ms: int = Field(default=120, ge=0)
+
+    @model_validator(mode="after")
+    def validate_windows_and_keypoints(self) -> "FallFeatureConfig":
+        if self.expected_keypoint_count != 17:
+            raise ValueError("COCO-17 layout requires exactly 17 keypoints")
+        if len(self.required_keypoint_indices) != len(
+            set(self.required_keypoint_indices)
+        ):
+            raise ValueError("required keypoint indices must be unique")
+        if any(
+            index < 0 or index >= self.expected_keypoint_count
+            for index in self.required_keypoint_indices
+        ):
+            raise ValueError("required keypoint index is outside the expected layout")
+        if self.required_keypoint_indices != [5, 6, 11, 12]:
+            raise ValueError(
+                "COCO-17 torso geometry requires shoulders 5/6 and hips 11/12"
+            )
+        if self.descent_min_span_ms > self.descent_history_window_ms:
+            raise ValueError("descent minimum span cannot exceed its window")
+        if self.stationary_min_span_ms > self.stationary_window_ms:
+            raise ValueError("stationary minimum span cannot exceed its window")
+        return self
+
+
+class FallKeypointGate(ContractModel):
+    expected_layout: str
+    expected_count: int = Field(ge=1)
+    observed_count: int = Field(ge=0)
+    confidence_threshold: float = Field(ge=0.0, le=1.0)
+    visible_count: int = Field(ge=0)
+    visible_ratio: float | None = Field(default=None, ge=0.0, le=1.0)
+    visible_ratio_threshold: float = Field(ge=0.0, le=1.0)
+    required_indices: list[int] = Field(default_factory=list)
+    required_visible_count: int = Field(ge=0)
+    required_all_visible: bool
+    status: Literal[
+        "passed",
+        "failed_no_detection",
+        "failed_layout",
+        "failed_required_points",
+        "failed_visible_ratio",
+        "failed_degenerate_geometry",
+    ]
+    geometry_available: bool
+    torso_angle_from_horizontal_deg: float | None = Field(
+        default=None, ge=0.0, le=90.0
+    )
+    torso_horizontal_proxy: bool | None = None
+
+
+class FallMotionFrameValue(ContractModel):
+    schema_version: str = "1.0"
+    feature_version: str
+    frame_sequence: int = Field(ge=0)
+    timestamp_ms: int = Field(ge=0)
+    frame_width: int = Field(gt=0)
+    frame_height: int = Field(gt=0)
+    person_count: int = Field(ge=0)
+    selection_strategy: Literal["largest_bbox"] = "largest_bbox"
+    selected_detection_index: int | None = Field(default=None, ge=0)
+    selected_track_id: int | None = None
+    active_path: Literal["unavailable", "box_only", "box_plus_keypoints"]
+    fallback_reasons: list[str] = Field(default_factory=list)
+    bbox_width_height_ratio: float | None = Field(default=None, ge=0.0)
+    bbox_center_x_ratio: float | None = None
+    bbox_center_y_ratio: float | None = None
+    bbox_bottom_y_ratio: float | None = None
+    bbox_area_frame_ratio: float | None = Field(default=None, ge=0.0)
+    bbox_horizontal_proxy: bool | None = None
+    horizontal_duration_ms: int | None = Field(default=None, ge=0)
+    descent_history_span_ms: int | None = Field(default=None, ge=0)
+    center_drop_frame_height_ratio: float | None = None
+    rapid_descent_proxy: bool | None = None
+    stationary_history_span_ms: int | None = Field(default=None, ge=0)
+    max_center_displacement_diagonal_ratio: float | None = Field(
+        default=None, ge=0.0
+    )
+    low_motion_proxy: bool | None = None
+    keypoint_gate: FallKeypointGate
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
+
+
+class FallFeatureMetrics(ContractModel):
+    sampled_frames: int = Field(ge=0)
+    unavailable_frames: int = Field(ge=0)
+    box_available_frames: int = Field(ge=0)
+    box_only_frames: int = Field(ge=0)
+    box_plus_keypoints_frames: int = Field(ge=0)
+    bbox_horizontal_frames: int = Field(ge=0)
+    bbox_horizontal_rate: float = Field(ge=0.0, le=1.0)
+    descent_available_frames: int = Field(ge=0)
+    rapid_descent_frames: int = Field(ge=0)
+    rapid_descent_rate: float = Field(ge=0.0, le=1.0)
+    stationary_available_frames: int = Field(ge=0)
+    low_motion_frames: int = Field(ge=0)
+    low_motion_rate: float = Field(ge=0.0, le=1.0)
+    keypoint_gate_passed_frames: int = Field(ge=0)
+    keypoint_gate_pass_rate: float = Field(ge=0.0, le=1.0)
+    torso_horizontal_available_frames: int = Field(ge=0)
+    torso_horizontal_frames: int = Field(ge=0)
+    torso_horizontal_rate: float = Field(ge=0.0, le=1.0)
+    fallback_reason_counts: dict[str, int] = Field(default_factory=dict)
+
+
+class FallFeatureCaseEvaluation(ContractModel):
+    schema_version: str = "1.0"
+    case_id: str
+    variant_id: str
+    video_sequence: str
+    video_class: str
+    source_pose_run_id: str
+    source_pose_code_version: str
+    source_pose_code_dirty: bool
+    source_pose_manifest_sha256: str = Field(min_length=64, max_length=64)
+    source_features_sha256: str = Field(min_length=64, max_length=64)
+    annotation_sha256: str = Field(min_length=64, max_length=64)
+    frame_width: int = Field(gt=0)
+    frame_height: int = Field(gt=0)
+    sampled_frames: int = Field(ge=0)
+    maximum_annotation_match_error_ms: int = Field(ge=0)
+    overall_metrics: FallFeatureMetrics
+    phase_metrics: dict[str, FallFeatureMetrics] = Field(default_factory=dict)
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
+    limitations: list[str] = Field(default_factory=list)
+
+
+class FallFeatureBenchmarkReport(ContractModel):
+    schema_version: str = "1.0"
+    benchmark_id: str
+    benchmark_version: str
+    feature_version: str
+    evidence_level: EvidenceLevel = EvidenceLevel.E1
+    benchmark_cases_sha256: str = Field(min_length=64, max_length=64)
+    configuration_sha256: str = Field(min_length=64, max_length=64)
+    source_pose_comparison_run_id: str
+    source_pose_comparison_sha256: str = Field(min_length=64, max_length=64)
+    source_pose_manifest_sha256: str = Field(min_length=64, max_length=64)
+    source_pose_code_version: str
+    source_pose_code_dirty: bool
+    model_binding_policy_sha256: str = Field(min_length=64, max_length=64)
+    source_binding_license_corrections: list[str] = Field(default_factory=list)
+    variant_id: str
+    model_bindings: list[ModelBinding]
+    case_count: int = Field(ge=0)
+    cases: list[FallFeatureCaseEvaluation]
+    by_video_class: dict[str, FallFeatureMetrics] = Field(default_factory=dict)
+    by_posture_phase: dict[str, FallFeatureMetrics] = Field(default_factory=dict)
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
     limitations: list[str] = Field(default_factory=list)
 
 

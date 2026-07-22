@@ -73,3 +73,18 @@ def test_media_probe_parser_freezes_packet_scan_and_audio_gate_defaults():
     assert args.command == "probe-media"
     assert args.require_audio_track is False
     assert args.max_packets_per_stream == 200_000
+
+
+def test_fall_feature_parser_defaults_to_candidate_and_clean_source():
+    args = build_parser().parse_args(
+        [
+            "benchmark-fall-features",
+            "benchmark-cases.json",
+            "pose-model-comparison-report.json",
+        ]
+    )
+    assert args.command == "benchmark-fall-features"
+    assert args.variant == "rtmpose-m-humanart"
+    assert args.config.name == "v1-g4-fall-features.json"
+    assert args.model_binding_policy.name == "v1-m3-pose-models.json"
+    assert args.allow_dirty_source is False

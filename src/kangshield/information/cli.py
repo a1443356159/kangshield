@@ -213,6 +213,34 @@ def build_parser() -> argparse.ArgumentParser:
     pose_benchmark.add_argument("--pose-sample-fps", type=float, default=5.0)
     pose_benchmark.add_argument("--max-duration-s", type=float, default=30.0)
 
+    fall_benchmark = subparsers.add_parser(
+        "benchmark-fall-features",
+        help="Derive non-risk fall motion features from a clean pose comparison run",
+    )
+    fall_benchmark.add_argument("benchmark_cases", type=Path)
+    fall_benchmark.add_argument("pose_comparison_report", type=Path)
+    fall_benchmark.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    fall_benchmark.add_argument(
+        "--variant",
+        choices=("yolo26n-pose", "rtmpose-m-humanart"),
+        default="rtmpose-m-humanart",
+    )
+    fall_benchmark.add_argument(
+        "--config",
+        type=Path,
+        default=Path("configs/v1-g4-fall-features.json"),
+    )
+    fall_benchmark.add_argument(
+        "--model-binding-policy",
+        type=Path,
+        default=Path("configs/v1-m3-pose-models.json"),
+    )
+    fall_benchmark.add_argument(
+        "--allow-dirty-source",
+        action="store_true",
+        help="Allow dirty source pose runs for development only",
+    )
+
     speech_benchmark = subparsers.add_parser(
         "benchmark-speech-models",
         help="Compare the FunASR baseline and Whisper small on V1-M2b speech",
@@ -650,6 +678,41 @@ def _benchmark_speech_models_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def _benchmark_fall_features_command(args: argparse.Namespace) -> int:
+    from .fall_features import run_fall_feature_benchmark
+
+    run, report = run_fall_feature_benchmark(
+        benchmark_cases_path=args.benchmark_cases,
+        pose_comparison_report_path=args.pose_comparison_report,
+        runs_dir=args.runs_dir,
+        variant_id=args.variant,
+        config_path=args.config,
+        model_binding_policy_path=args.model_binding_policy,
+        allow_dirty_source=args.allow_dirty_source,
+    )
+    lying = report.by_posture_phase["lying"]
+    transition = report.by_posture_phase["falling_transition"]
+    adl = report.by_video_class.get("adl")
+    _print_result(
+        run,
+        {
+            "benchmark_id": report.benchmark_id,
+            "variant_id": report.variant_id,
+            "case_count": report.case_count,
+            "lying_bbox_horizontal_rate": lying.bbox_horizontal_rate,
+            "lying_keypoint_gate_pass_rate": lying.keypoint_gate_pass_rate,
+            "lying_box_only_frames": lying.box_only_frames,
+            "transition_rapid_descent_rate": transition.rapid_descent_rate,
+            "adl_bbox_horizontal_frames": (
+                adl.bbox_horizontal_frames if adl is not None else 0
+            ),
+            "risk_assessment_emitted": report.risk_assessment_emitted,
+            "alert_emitted": report.alert_emitted,
+        },
+    )
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "probe-media":
@@ -666,6 +729,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _benchmark_dataset_command(args)
     if args.command == "benchmark-pose-models":
         return _benchmark_pose_models_command(args)
+    if args.command == "benchmark-fall-features":
+        return _benchmark_fall_features_command(args)
     if args.command == "benchmark-speech-models":
         return _benchmark_speech_models_command(args)
     raise RuntimeError(f"unhandled command: {args.command}")
