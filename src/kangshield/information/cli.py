@@ -10,6 +10,7 @@ from kangshield import __version__
 
 from .artifacts import RunArtifacts
 from .contracts import EvidenceLevel, SourceType
+from .dataset_benchmark import run_dataset_benchmark
 from .ezviz_snapshot import inspect_ezviz_snapshot
 from .media_probe import probe_media
 from .multimodal_pipeline import (
@@ -115,6 +116,27 @@ def build_parser() -> argparse.ArgumentParser:
     multimodal.add_argument("--offline-models", action="store_true")
     multimodal.add_argument("--fusion-window-ms", type=int, default=2000)
     multimodal.add_argument("--max-duration-s", type=float, default=30.0)
+
+    benchmark = subparsers.add_parser(
+        "benchmark-dataset",
+        help="Run the pinned V1-M2b public dataset suite with separate modality metrics",
+    )
+    benchmark.add_argument("benchmark_cases", type=Path)
+    benchmark.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    benchmark.add_argument("--pose-model", default="models/yolo26n-pose.pt")
+    benchmark.add_argument("--pose-device", default="auto")
+    benchmark.add_argument("--pose-image-size", type=int, default=640)
+    benchmark.add_argument("--pose-confidence", type=float, default=0.35)
+    benchmark.add_argument("--pose-sample-fps", type=float, default=5.0)
+    benchmark.add_argument("--no-track", action="store_true")
+    benchmark.add_argument("--asr-model", default="paraformer-zh")
+    benchmark.add_argument("--vad-model", default="fsmn-vad")
+    benchmark.add_argument("--punc-model", default="ct-punc")
+    benchmark.add_argument("--speech-device", default="auto")
+    benchmark.add_argument("--language", default="zh")
+    benchmark.add_argument("--offline-models", action="store_true")
+    benchmark.add_argument("--fusion-window-ms", type=int, default=1000)
+    benchmark.add_argument("--max-duration-s", type=float, default=30.0)
 
     return parser
 
@@ -313,6 +335,39 @@ def _run_multimodal_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def _benchmark_dataset_command(args: argparse.Namespace) -> int:
+    run, report = run_dataset_benchmark(
+        benchmark_cases_path=args.benchmark_cases,
+        runs_dir=args.runs_dir,
+        pose_model=args.pose_model,
+        pose_device=args.pose_device,
+        pose_image_size=args.pose_image_size,
+        pose_confidence=args.pose_confidence,
+        pose_sample_fps=args.pose_sample_fps,
+        track=not args.no_track,
+        asr_model=args.asr_model,
+        vad_model=args.vad_model,
+        punc_model=args.punc_model,
+        speech_device=args.speech_device,
+        language=args.language,
+        offline_models=args.offline_models,
+        fusion_window_ms=args.fusion_window_ms,
+        max_duration_s=args.max_duration_s,
+    )
+    _print_result(
+        run,
+        {
+            "benchmark_id": report.benchmark_id,
+            "case_count": report.case_count,
+            "pose_frame_coverage": report.pose_frame_coverage,
+            "pose_tracking_coverage": report.pose_tracking_coverage,
+            "corpus_character_error_rate": report.corpus_character_error_rate,
+            "transcript_exact_match_count": report.transcript_exact_match_count,
+        },
+    )
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "probe-media":
@@ -323,6 +378,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _inspect_ezviz_command(args)
     if args.command == "run-multimodal":
         return _run_multimodal_command(args)
+    if args.command == "benchmark-dataset":
+        return _benchmark_dataset_command(args)
     raise RuntimeError(f"unhandled command: {args.command}")
 
 

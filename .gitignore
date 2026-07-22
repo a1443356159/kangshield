@@ -9,6 +9,7 @@ __pycache__/
 !.env.example
 runs/
 data/raw/
+data/processed/
 secrets/
 models/
 slurm-*.out

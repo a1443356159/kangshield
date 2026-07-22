@@ -1,6 +1,6 @@
 # 康盾工程架构与模块设计
 
-状态：Draft v0.2
+状态：Draft v0.3
 
 更新时间：2026-07-22
 
@@ -29,6 +29,8 @@ V1 是探索性工程，不是缩小版生产系统。V1 允许离线文件、�
 - 红外/人体存在传感器产生的房间占用数据。
 - 睡眠仪开发接口是否开放原始雷达、实时生命体征、在离床事件或仅日级报告。
 - 摄像头开放平台是否允许服务端直接取得带音频的视频流。
+
+公开数据集属于模型和工程基线输入，不属于当前设备边界。URFD/FLEURS 可以提供 E1 的固定回放和标签评测，但不能证明 C6c/CS-EP-SDNL1 已接入，也不能提升目标设备能力矩阵。
 
 ## 3. 逻辑架构
 
@@ -68,6 +70,8 @@ flowchart LR
 | M7 评测与报告 | 数据完整性、模型可用性、延迟、场景报告 | 必做 | 比赛证据链 |
 
 模块之间不能读取彼此的内部产物目录或数据库表，只通过版本化契约交互。
+
+M7 在 V1-M2b 增加“固定数据源清单 → 数据准备 → 单 case run → 套件汇总”子链路。数据准备器只生成可回放媒体、标签 sidecar 和 lock；模型 Pipeline 仍只消费标准媒体，评测器只读取 FeatureEvent、sidecar 和 PipelineReport，不把数据集专用标签渗入在线提取器。
 
 ## 5. V1 运行形态
 
@@ -109,6 +113,10 @@ runs/<run_id>/
 ### ModelBinding 与 MultimodalWindow
 
 ModelBinding 冻结模型仓库、框架版本、权重摘要、许可证、设备和推理配置。MultimodalWindow 使用媒体相对毫秒，把姿态帧、语音段、转写引用和词面标签聚合到固定窗口；窗口保留来源引用，不复制原始媒体。
+
+### DatasetBenchmarkCase 与 DatasetBenchmarkReport
+
+DatasetBenchmarkCase 只用于离线评测，冻结公开来源、配对类型、标签 sidecar 和参考转写。DatasetCaseEvaluation 分别记录视频覆盖率/阶段指标和语音 CER；DatasetBenchmarkReport 做加权汇总但不复制参考或识别全文。跨数据集 case 必须声明 `cross_dataset_synthetic_common_zero`，证据等级固定 E1。
 
 ### RunManifest
 

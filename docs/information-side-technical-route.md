@@ -1,6 +1,6 @@
 # 信息侧模块详细技术路线
 
-状态：Implementation Baseline v0.2
+状态：Implementation Baseline v0.3
 
 更新时间：2026-07-22
 
@@ -75,6 +75,8 @@ src/kangshield/information/
 ├── pose_backend.py       # YOLO26n-pose + ByteTrack 适配器
 ├── speech_backend.py     # FunASR VAD/ASR/标点和词面标签
 ├── multimodal_pipeline.py # 特征落盘、时间窗对齐和性能报告
+├── dataset_preparation.py # 公开固定源校验、媒体转换、case/lock
+├── dataset_benchmark.py   # 多 case 调度、标签/CER 和覆盖率汇总
 └── cli.py                # V1 命令行入口
 ```
 
@@ -250,6 +252,14 @@ kangshield-info run-multimodal <video> <pcm-wav>
 首版把两路文件视为共享零时刻的流式回放：视频按可配置 FPS 抽取时间戳帧，音频转为单声道 16 kHz，经姿态跟踪和 VAD/中文 ASR 后汇入固定毫秒窗口。输出完整 ModelBinding、FeatureEvent、MultimodalWindow 以及 warm/cold 两套性能口径。
 
 实现、命令、模型决策和限制见 [V1 视频与语言多模态 Pipeline](v1-multimodal-pipeline.md)。
+
+### 7.5 公开数据固定集评测
+
+```text
+kangshield-info benchmark-dataset <benchmark-cases.json>
+```
+
+V1-M2b 使用固定 SHA-256 的 URFD/FLEURS 子集验证多样本处理。每个 case 独立运行姿态、跟踪、VAD/ASR 和窗口 Pipeline，再按 URFD 帧阶段标签统计视频覆盖率、按 FLEURS 参考转写统计 corpus CER。两路数据不是自然同步录制，融合窗口只有工程验证含义，结果固定为 E1。数据来源、许可证、准备过程和完整指标口径见 [V1-M2b 数据集评测设计](v1-m2b-public-dataset-benchmark.md)。
 
 ## 8. 模型接入路线
 

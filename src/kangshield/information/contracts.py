@@ -211,6 +211,90 @@ class MultimodalPipelineReport(ContractModel):
     limitations: list[str] = Field(default_factory=list)
 
 
+class DatasetBenchmarkCase(ContractModel):
+    schema_version: str = "1.0"
+    case_id: str
+    evidence_level: EvidenceLevel = EvidenceLevel.E1
+    pairing_kind: str
+    video_path: str
+    audio_path: str
+    annotation_path: str
+    video_dataset: str
+    video_sequence: str
+    video_class: str
+    audio_dataset: str
+    audio_sample: str
+    audio_gender: str
+    audio_duration_ms: int = Field(ge=0)
+    reference_transcript: str
+    limitations: list[str] = Field(default_factory=list)
+
+
+class DatasetPhaseMetrics(ContractModel):
+    sampled_frames: int = Field(ge=0)
+    frames_with_people: int = Field(ge=0)
+    pose_frame_coverage: float = Field(ge=0.0, le=1.0)
+    tracked_frames: int = Field(ge=0)
+    tracking_coverage: float = Field(ge=0.0, le=1.0)
+    mean_pose_quality: float | None = Field(default=None, ge=0.0, le=1.0)
+    mean_bbox_width_height_ratio: float | None = Field(default=None, ge=0.0)
+
+
+class DatasetCaseEvaluation(ContractModel):
+    schema_version: str = "1.0"
+    case_id: str
+    run_id: str
+    video_sequence: str
+    video_class: str
+    audio_sample: str
+    audio_gender: str
+    pairing_kind: str
+    sampled_pose_frames: int = Field(ge=0)
+    pose_frames_with_people: int = Field(ge=0)
+    pose_frame_coverage: float = Field(ge=0.0, le=1.0)
+    pose_frames_with_tracks: int = Field(ge=0)
+    pose_tracking_coverage: float = Field(ge=0.0, le=1.0)
+    unique_track_count: int = Field(ge=0)
+    mean_pose_quality: float | None = Field(default=None, ge=0.0, le=1.0)
+    phase_metrics: dict[str, DatasetPhaseMetrics] = Field(default_factory=dict)
+    maximum_annotation_match_error_ms: int = Field(ge=0)
+    audio_duration_ms: int = Field(ge=0)
+    speech_duration_ms: int = Field(ge=0)
+    speech_coverage: float = Field(ge=0.0, le=1.0)
+    reference_char_count: int = Field(ge=0)
+    hypothesis_char_count: int = Field(ge=0)
+    edit_distance: int = Field(ge=0)
+    character_error_rate: float = Field(ge=0.0)
+    transcript_exact_match: bool
+    multimodal_window_count: int = Field(ge=0)
+    processing_realtime_factor: float = Field(ge=0.0)
+    limitations: list[str] = Field(default_factory=list)
+
+
+class DatasetBenchmarkReport(ContractModel):
+    schema_version: str = "1.0"
+    benchmark_id: str
+    benchmark_version: str
+    evidence_level: EvidenceLevel = EvidenceLevel.E1
+    pairing_kind: str
+    source_manifest_sha256: str = Field(min_length=64, max_length=64)
+    benchmark_cases_sha256: str = Field(min_length=64, max_length=64)
+    case_count: int = Field(ge=0)
+    cases: list[DatasetCaseEvaluation]
+    model_bindings: list[ModelBinding]
+    total_reference_chars: int = Field(ge=0)
+    total_edit_distance: int = Field(ge=0)
+    corpus_character_error_rate: float = Field(ge=0.0)
+    transcript_exact_match_count: int = Field(ge=0)
+    pose_frame_coverage: float = Field(ge=0.0, le=1.0)
+    pose_tracking_coverage: float = Field(ge=0.0, le=1.0)
+    by_video_class: dict[str, dict[str, float | int]] = Field(default_factory=dict)
+    by_posture_phase: dict[str, dict[str, float | int]] = Field(default_factory=dict)
+    runtime_environment: dict[str, Any] = Field(default_factory=dict)
+    timing_ms: dict[str, float] = Field(default_factory=dict)
+    limitations: list[str] = Field(default_factory=list)
+
+
 class RunStep(ContractModel):
     name: str
     status: StepStatus = StepStatus.RUNNING

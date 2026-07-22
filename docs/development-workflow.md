@@ -1,6 +1,6 @@
 # 开发与证据晋级流程
 
-状态：Active v0.2
+状态：Active v0.3
 
 ## 1. 开发顺序
 
@@ -111,6 +111,20 @@ sacct -j <job_id> --format=JobID,State,ExitCode,Elapsed,NodeList
 
 脚本会清除指向 `127.0.0.1` 的代理变量，避免计算节点尝试连接登录节点本地代理。权重和运行目录不进入 Git；报告必须保存权重摘要和 Slurm job_id。
 
+### V1-M2b 公开固定集
+
+先阅读 URFD 的 CC-BY-NC-SA-4.0 和 FLEURS 的 CC-BY-4.0 条款，再显式准备固定集：
+
+```bash
+python scripts/prepare_v1_m2b_data.py \
+  --accept-urfd-noncommercial-license
+kangshield-info benchmark-dataset \
+  data/processed/v1-m2b/benchmark-cases.json \
+  --offline-models
+```
+
+下载清单固定 URL/revision、大小和 SHA-256；原始/派生媒体均被 Git 忽略。视频与音频是跨数据集配对，只有各自模态的标签有效。详细边界和指标见 [V1-M2b 数据集评测设计](v1-m2b-public-dataset-benchmark.md)。
+
 ## 5. 运行检查
 
 每次运行后检查：
@@ -184,7 +198,8 @@ Review 接受后同步更新：
 - D0：文档、原始设计输入与架构基线。
 - V1-M1：采集契约、探针、Fixture 与测试。
 - V1-M2a：设备无关视频/语言模型链路与 E1 性能证据。
-- V1-M2b：真实设备 E2/E3 证据、字段映射与音视频对齐。
+- V1-M2b：公开真实录制固定集、批量评测与 E1 Slurm 证据。
+- V1-M2c：真实设备 E2/E3 证据、字段映射与音视频对齐。
 - V1-M3：模型对比代码、固定样本清单和报告。
 - V1-R1：晋级/淘汰决定与 V2 输入冻结。
 

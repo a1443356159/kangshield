@@ -20,6 +20,7 @@
 - [V1 信息采集与模型探索](docs/v1-information-acquisition.md)
 - [V1 视频与语言多模态 Pipeline](docs/v1-multimodal-pipeline.md)
 - [V1-M2a 多模态 Pipeline 初测报告](docs/reports/v1-m2a-multimodal-smoke.md)
+- [V1-M2b 公开真实场景固定集与对齐评测](docs/v1-m2b-public-dataset-benchmark.md)
 
 ## V1 初步开发
 
@@ -55,6 +56,17 @@ kangshield-info run-multimodal <video> <pcm-wav> \
 ```
 
 该命令输出姿态/跟踪、VAD、中文转写、词面标签和固定时间窗。Slurm 环境与模型准备见 [Pipeline 文档](docs/v1-multimodal-pipeline.md)和[开发流程](docs/development-workflow.md)。
+
+准备并运行 V1-M2b 六 case 固定集：
+
+```bash
+python scripts/prepare_v1_m2b_data.py --accept-urfd-noncommercial-license
+kangshield-info benchmark-dataset data/processed/v1-m2b/benchmark-cases.json \
+  --pose-model models/yolo26n-pose.pt \
+  --offline-models
+```
+
+URFD 与 FLEURS 的固定版本、许可证和 SHA-256 见[数据集评测设计](docs/v1-m2b-public-dataset-benchmark.md)。公开视频与语音是跨数据集配对，只用于 E1 工程和分模态精度基线，不能替代萤石目标设备验证。
 
 输出默认写入被 Git 忽略的 runs 目录。Fixture 只能作为 E1 开发证据，不能写成真实设备已接通。
 
