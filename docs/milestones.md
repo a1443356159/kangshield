@@ -54,6 +54,7 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 | V1-R1 G4 Open Images 静态人物检测压力 | `40359c1` / `fad9491` / `c77525e` | `origin/main` | 2026-07-22 已验证 | 逐图 CC BY 2.0 / 标注 CC BY 4.0 归因、12-case r2、确定性准备/lock、三模型 L40 与 REV-015；只关闭静态 furniture/pet/multi-person 人物检测子门 |
 | V1-R1 G4 双标注/裁决/事件评估 E1 工具 | `b0b2e97` / `5413b46` | `origin/main` | 2026-07-22 已验证 | 12-clip 确定性 bundle、pairwise agreement、adjudication、三 candidate stream TP/FP/FN/误触发/delay、严格 provenance 与 REV-016；不代表真实模型或 C6c 事件性能 |
 | V1-R1 G4 Candidate Episode 生成与公开压力 | `dc6cace` / `944e472` | `origin/main` | 2026-07-23 已验证 | held-out 前冻结 label-blind 状态机、54 项三模型公开压力、严格 parent/child provenance、确定性/隐私审计与 REV-017；不代表 C6c 准确率或最终模型选型 |
+| V1-R1 G4 Capture Feature 到 Candidate Export Bridge | `a57b8ee` / `7e206c3` | `origin/main` | 2026-07-23 已验证 | capture-bound feature/prediction 公共契约、strict provenance、三路 rule-bearing fixture、clean scorer 与 REV-018；不代表已实现真实 video-to-feature 或 C6c 性能 |
 
 这里的“推送验证”只证明代码已到达远端。V1-M1 仍为 In progress，必须取得 C6c 与 CS-EP-SDNL1 的 E2/E3 证据后才能进入 Review/Done。V1-M2a 和 V1-M2b 的 Done 只关闭设备无关 E1 链路及公开固定集评测，不会提升真实设备证据等级。V1-M3 的姿态、语言和睡眠字段三个 E1 切片均已验收，因此仅在 E1 探索范围标记 Done；M2c 已有采集规程、容器时间戳工具和采集包 readiness gate，但仍没有真实 C6c 媒体或 SDNL1 字段证据。V1-R1 G4 的离线特征、首版候选状态机、公开压力与双标注/裁决/事件 scorer 也都只属于 E1，不能替代 C6c 正负视频、冻结策略的真实候选/事件指标、床上躺卧、多人 tracking 或跌倒风险/告警验收。
 
@@ -200,7 +201,7 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 - [x] 在干净修正提交 `fad9491` / job `1766` 上完成 Open Images r2 静态家具无人、宠物无人和室内多人三模型压力；首轮标注异常 run 被拒绝，正式结果保持无风险/告警。
 - [x] 在干净提交 `b0b2e97` 上完成双人 interval/onset agreement、裁决、三 candidate stream TP/FP/FN、误触发/小时与 delay 的 E1 正式工具运行；fixture 指标不用于模型比较。
 - [x] 在查看未来 C6c held-out 输出前冻结首版 label-blind candidate episode 状态机；在干净提交 `dc6cace` 上复用 URFD/CAUCAFall 三路 G4 特征完成 54 项 E1 公开压力，结果如实保留 YOLO/RTMPose 漏候选与 RTMPose 行走负候选。
-- [x] 将 capture-bound `FallFeatureCaptureSet`、公共 event prediction、strict source provenance 和 `export-fall-candidates` 接到 REV-016 scorer；三路 rule-bearing E1 fixture 已验证真实状态机到 evaluator 的接口，未使用模型推理。
+- [x] 在干净提交 `a57b8ee` 上将 capture-bound `FallFeatureCaptureSet`、公共 event prediction、strict source provenance 和 `export-fall-candidates` 接到 REV-016 scorer；三路 rule-bearing E1 fixture 与 run `20260722T172634Z-59174d4c` 已验证真实状态机到 evaluator 的接口，未使用模型推理。
 - [ ] 使用 C6c 正负视频继续补空场持续、床上躺卧、宠物移动和真实多人 tracking，按已冻结 policy 生成真实候选并复用事件评估口径。
 - [ ] 用 E2/E3 证据把 C6c 与 SDNL1 从 Unknown 归类为 available、limited 或 blocked。
 - [ ] 决定 V2 最终姿态权重和项目分发许可证，生成第三方 NOTICE；HumanArt 与 Keypoint R-CNN 均未关闭该门。
