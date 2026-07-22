@@ -58,6 +58,7 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 | V1-R1 G4 Capture Feature Producer 与全链复核 | `7a8dc23` / `b233abe` / `b4b72f7` / `243cef3` / `d1d4b5a` / `8b4b52d` / `8fdebd0` | `origin/main` | 2026-07-23 已验证 | job `1776` 三真实姿态 backend、capture-bound pose/G4 feature、clean candidate export、owner-only bundle 与独立 scorer；无人物 E1 fixture 只证明 production interface，不代表 C6c 事件性能 |
 | V1-R1 G4 Event Bundle Assembler | `7b64719` / `07d7edd` / `9411870` / `8fdebd0` | `origin/main` | 2026-07-23 已验证 | 13 项显式输入、`0700/0600` staging、strict preflight、原子发布与独立 scorer 逐字节复核；不提升 fixture 的 camera/event readiness |
 | V1-M2a 同容器 PTS Adapter 与 owner-only 证据 | `8c6df2d` / `15406db` / `eca6231` / `243cef3` / `195c966` / `d1d4b5a` / `8b4b52d` / `8fdebd0` | `origin/main` | 2026-07-23 已验证 | job `1777` 完成单容器音轨解码、PTS 平移、真实 YOLO/FunASR、路径脱敏与 `0700/0600/0600` 审计；仍不证明 C6c 开放音轨或真实 clock/drift |
+| V1 正式 Slurm Runtime/Submit 契约 | `673560d` / `667ad8d` / `b54d8b8` / `fd5025f` | `origin/main` | 2026-07-23 已验证 | 八个 sbatch 统一 runtime，完整 submit/execution commit 绑定、checkout import、owner-only 与 CUDA 门；job `1780` 通过，只验收运行基础设施，不代表模型或设备能力 |
 
 这里的“推送验证”只证明代码已到达远端。V1-M1 仍为 In progress，必须取得 C6c 与 CS-EP-SDNL1 的 E2/E3 证据后才能进入 Review/Done。V1-M2a 和 V1-M2b 的 Done 只关闭设备无关 E1 链路及公开固定集评测，不会提升真实设备证据等级。V1-M3 的姿态、语言和睡眠字段三个 E1 切片均已验收，因此仅在 E1 探索范围标记 Done；M2c 已有采集规程、容器时间戳工具和采集包 readiness gate，但仍没有真实 C6c 媒体或 SDNL1 字段证据。V1-R1 G4 的离线特征、首版候选状态机、公开压力与双标注/裁决/事件 scorer 也都只属于 E1，不能替代 C6c 正负视频、冻结策略的真实候选/事件指标、床上躺卧、多人 tracking 或跌倒风险/告警验收。
 
