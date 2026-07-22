@@ -148,6 +148,82 @@ def build_parser() -> argparse.ArgumentParser:
         help="Allow a dirty upstream G4 feature run for development only",
     )
 
+    feature_capture = subparsers.add_parser(
+        "capture-fall-features",
+        help=(
+            "Replay every frozen capture clip through one pose variant and "
+            "the G4 fall-motion extractor"
+        ),
+    )
+    feature_capture.add_argument("capture_manifest", type=Path)
+    feature_capture.add_argument("readiness_report", type=Path)
+    feature_capture.add_argument("readiness_run_manifest", type=Path)
+    feature_capture.add_argument(
+        "--variant",
+        required=True,
+        choices=(
+            "yolo26n-pose",
+            "rtmpose-m-humanart",
+            "torchvision-keypointrcnn",
+        ),
+    )
+    feature_capture.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    feature_capture.add_argument(
+        "--evidence-level", type=_evidence, default=EvidenceLevel.E1
+    )
+    feature_capture.add_argument(
+        "--source-type", type=_source_type, default=SourceType.FIXTURE
+    )
+    feature_capture.add_argument(
+        "--feature-config",
+        type=Path,
+        default=Path("configs/v1-g4-fall-features.json"),
+    )
+    feature_capture.add_argument("--sample-fps", type=float, default=5.0)
+    feature_capture.add_argument(
+        "--allow-dirty-readiness",
+        action="store_true",
+        help="Allow a dirty capture-readiness source for development only",
+    )
+    feature_capture.add_argument(
+        "--yolo-model", type=Path, default=Path("models/yolo26n-pose.pt")
+    )
+    feature_capture.add_argument("--yolo-device", default="auto")
+    feature_capture.add_argument("--yolo-image-size", type=int, default=640)
+    feature_capture.add_argument("--yolo-confidence", type=float, default=0.35)
+    feature_capture.add_argument(
+        "--rtmpose-detector-model",
+        type=Path,
+        default=Path(
+            "models/rtmpose/yolox_m_humanart/yolox_m_humanart.onnx"
+        ),
+    )
+    feature_capture.add_argument(
+        "--rtmpose-pose-model",
+        type=Path,
+        default=Path(
+            "models/rtmpose/rtmpose_m_humanart/rtmpose_m_humanart.onnx"
+        ),
+    )
+    feature_capture.add_argument("--rtmpose-device", default="auto")
+    feature_capture.add_argument(
+        "--rtmpose-detection-confidence", type=float, default=0.05
+    )
+    feature_capture.add_argument(
+        "--torchvision-model",
+        type=Path,
+        default=Path(
+            "models/torchvision/"
+            "keypointrcnn_resnet50_fpn_coco-fc266e95.pth"
+        ),
+    )
+    feature_capture.add_argument("--torchvision-device", default="auto")
+    feature_capture.add_argument(
+        "--torchvision-detection-confidence", type=float, default=0.5
+    )
+    feature_capture.add_argument("--torchvision-min-size", type=int, default=800)
+    feature_capture.add_argument("--torchvision-max-size", type=int, default=1333)
+
     sleep = subparsers.add_parser(
         "profile-sleep",
         help="Discover JSON/CSV sleep-export fields without persisting values",
@@ -859,6 +935,69 @@ def _export_fall_candidates_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def _capture_fall_features_command(args: argparse.Namespace) -> int:
+    from .fall_adl_benchmark import build_fall_adl_pose_backend
+    from .fall_feature_capture import run_fall_feature_capture
+
+    def backend_factory(model_policy_path: Path):
+        return build_fall_adl_pose_backend(
+            args.variant,
+            yolo_model=args.yolo_model,
+            yolo_device=args.yolo_device,
+            yolo_image_size=args.yolo_image_size,
+            yolo_confidence=args.yolo_confidence,
+            rtmpose_detector_model=args.rtmpose_detector_model,
+            rtmpose_pose_model=args.rtmpose_pose_model,
+            rtmpose_device=args.rtmpose_device,
+            rtmpose_detection_confidence=args.rtmpose_detection_confidence,
+            torchvision_model=args.torchvision_model,
+            torchvision_policy=model_policy_path,
+            torchvision_device=args.torchvision_device,
+            torchvision_detection_confidence=(
+                args.torchvision_detection_confidence
+            ),
+            torchvision_min_size=args.torchvision_min_size,
+            torchvision_max_size=args.torchvision_max_size,
+            track=True,
+        )
+
+    run, feature_set, report = run_fall_feature_capture(
+        capture_manifest_path=args.capture_manifest,
+        readiness_report_path=args.readiness_report,
+        readiness_run_manifest_path=args.readiness_run_manifest,
+        variant_id=args.variant,
+        backend_factory=backend_factory,
+        config_path=args.feature_config,
+        runs_dir=args.runs_dir,
+        evidence_level=args.evidence_level,
+        source_type=args.source_type,
+        sample_fps=args.sample_fps,
+        allow_dirty_readiness=args.allow_dirty_readiness,
+    )
+    _print_result(
+        run,
+        {
+            "variant_id": report.variant_id,
+            "clip_count": report.clip_count,
+            "input_frame_count": report.input_frame_count,
+            "frames_with_people": sum(
+                clip.frames_with_people for clip in report.clips
+            ),
+            "tracked_frames": sum(clip.tracked_frames for clip in report.clips),
+            "feature_set": str(
+                run.reports_dir / "fall-feature-capture-set.json"
+            ),
+            "report": str(
+                run.reports_dir / "fall-feature-capture-report.json"
+            ),
+            "feature_version": feature_set.feature_version,
+            "risk_assessment_emitted": report.risk_assessment_emitted,
+            "alert_emitted": report.alert_emitted,
+        },
+    )
+    return 0
+
+
 def _assess_sleep_route_command(args: argparse.Namespace) -> int:
     from .sleep_route import assess_sleep_route
 
@@ -1376,6 +1515,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _assess_event_evaluation_command(args)
     if args.command == "export-fall-candidates":
         return _export_fall_candidates_command(args)
+    if args.command == "capture-fall-features":
+        return _capture_fall_features_command(args)
     if args.command == "profile-sleep":
         return _profile_sleep_command(args)
     if args.command == "assess-sleep-route":

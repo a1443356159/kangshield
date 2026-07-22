@@ -155,6 +155,30 @@ def test_fall_candidate_parser_requires_sources_and_freezes_policy_default():
     assert args.allow_dirty_source is False
 
 
+def test_fall_feature_capture_parser_requires_variant_and_freezes_defaults():
+    args = build_parser().parse_args(
+        [
+            "capture-fall-features",
+            "capture-manifest.json",
+            "capture-readiness.json",
+            "capture-readiness-run.json",
+            "--variant",
+            "yolo26n-pose",
+        ]
+    )
+    assert args.command == "capture-fall-features"
+    assert args.variant == "yolo26n-pose"
+    assert args.evidence_level.value == "E1"
+    assert args.source_type.value == "fixture"
+    assert args.feature_config.name == "v1-g4-fall-features.json"
+    assert args.sample_fps == 5.0
+    assert args.allow_dirty_readiness is False
+    assert args.yolo_model.name == "yolo26n-pose.pt"
+    assert args.rtmpose_detection_confidence == 0.05
+    assert args.torchvision_model.name.endswith("fc266e95.pth")
+    assert args.torchvision_detection_confidence == 0.5
+
+
 def test_static_home_parser_defaults_to_fixed_three_variant_stress_run():
     args = build_parser().parse_args(
         ["benchmark-static-home", "static-home-cases.json"]

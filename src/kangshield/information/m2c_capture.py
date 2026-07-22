@@ -385,6 +385,34 @@ class M2cEventContext:
     clips: tuple[M2cEventClipContext, ...]
 
 
+@dataclass(frozen=True)
+class M2cInferenceClipContext:
+    """One verified media input exposed without labels or identity fields."""
+
+    clip_ref: str
+    scenario_id: str
+    duration_ms: int
+    media_path: Path
+    media_sha256: str
+    media_byte_size: int
+
+
+@dataclass(frozen=True)
+class M2cInferenceContext:
+    """Label-blind, path-bearing context for an authorized model replay."""
+
+    manifest_sha256: str
+    capture_ref: str
+    template_only: bool
+    synthetic: bool
+    labels_frozen_at: datetime
+    first_inference_at: datetime
+    variant_id: str
+    model_policy_path: Path
+    model_policy_sha256: str
+    clips: tuple[M2cInferenceClipContext, ...]
+
+
 def load_m2c_event_context(manifest_path: Path) -> M2cEventContext:
     """Strictly parse an M2c manifest and return only event-safe facts."""
 
@@ -416,6 +444,68 @@ def load_m2c_event_context(manifest_path: Path) -> M2cEventContext:
             )
             for clip in manifest.clips
         ),
+    )
+
+
+def load_m2c_inference_context(
+    manifest_path: Path,
+    *,
+    variant_id: str,
+) -> M2cInferenceContext:
+    """Verify model/media references and expose no capture annotations."""
+
+    manifest_path = Path(manifest_path).resolve()
+    if not manifest_path.is_file():
+        raise FileNotFoundError("capture manifest not found")
+    manifest = _load_json(manifest_path, _CaptureManifest)
+    if manifest.held_out_protocol.first_inference_at is None:
+        raise ValueError("capture held-out protocol has no first inference timestamp")
+    bindings = [
+        item
+        for item in manifest.held_out_protocol.model_policies
+        if item.variant_id == variant_id
+    ]
+    if len(bindings) != 1:
+        raise ValueError("capture does not bind the selected pose variant exactly once")
+    binding = bindings[0]
+    bundle_root = manifest_path.parent
+    model_policy_path = _safe_bundle_path(bundle_root, binding.relative_path)
+    if not model_policy_path.is_file():
+        raise ValueError("capture model policy file is missing")
+    if sha256_file(model_policy_path) != binding.sha256:
+        raise ValueError("capture model policy digest differs from the manifest")
+
+    clips: list[M2cInferenceClipContext] = []
+    for clip in manifest.clips:
+        media_path = _safe_bundle_path(bundle_root, clip.relative_path)
+        if not media_path.is_file():
+            raise ValueError("capture media file is missing")
+        if media_path.stat().st_size != clip.byte_size:
+            raise ValueError("capture media byte size differs from the manifest")
+        if sha256_file(media_path) != clip.sha256:
+            raise ValueError("capture media digest differs from the manifest")
+        clips.append(
+            M2cInferenceClipContext(
+                clip_ref=f"clip_{clip.sha256[:16]}",
+                scenario_id=clip.scenario_id,
+                duration_ms=clip.duration_ms,
+                media_path=media_path,
+                media_sha256=clip.sha256,
+                media_byte_size=clip.byte_size,
+            )
+        )
+    digest = sha256_file(manifest_path)
+    return M2cInferenceContext(
+        manifest_sha256=digest,
+        capture_ref=f"capture_{digest[:16]}",
+        template_only=manifest.template_only,
+        synthetic=manifest.synthetic,
+        labels_frozen_at=manifest.held_out_protocol.labels_frozen_at,
+        first_inference_at=manifest.held_out_protocol.first_inference_at,
+        variant_id=variant_id,
+        model_policy_path=model_policy_path,
+        model_policy_sha256=binding.sha256,
+        clips=tuple(clips),
     )
 
 

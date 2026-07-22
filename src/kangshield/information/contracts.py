@@ -1127,6 +1127,85 @@ class FallFeatureCaptureSet(ContractModel):
         return self
 
 
+class FallFeatureCaptureClipReport(ContractModel):
+    """Aggregate producer facts for one held-out capture clip."""
+
+    clip_ref: str
+    scenario_id: str
+    duration_ms: int = Field(gt=0)
+    sampled_frames: int = Field(gt=0)
+    frames_with_people: int = Field(ge=0)
+    tracked_frames: int = Field(ge=0)
+    unique_track_count: int = Field(ge=0)
+    fall_feature_metrics: FallFeatureMetrics
+    timing_ms: dict[str, float] = Field(default_factory=dict)
+    realtime_factors: dict[str, float] = Field(default_factory=dict)
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_frame_counts(self) -> "FallFeatureCaptureClipReport":
+        if self.frames_with_people > self.sampled_frames:
+            raise ValueError("capture frames with people exceed sampled frames")
+        if self.tracked_frames > self.frames_with_people:
+            raise ValueError("capture tracked frames exceed frames with people")
+        if self.fall_feature_metrics.sampled_frames != self.sampled_frames:
+            raise ValueError("capture fall-feature frame count disagrees")
+        return self
+
+
+class FallFeatureCaptureReport(ContractModel):
+    """Privacy-safe report for a capture-bound pose-to-G4 producer run."""
+
+    schema_version: Literal["1.0"] = "1.0"
+    producer_version: str
+    source_run_id: str
+    fixture: bool
+    evidence_level: EvidenceLevel
+    capture_ref: str
+    capture_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    capture_readiness_report_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    capture_assessment_run_id: str
+    capture_assessment_run_manifest_sha256: str = Field(
+        pattern=r"^[0-9a-f]{64}$"
+    )
+    variant_id: str
+    model_policy_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    fall_feature_policy_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    fall_feature_set_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    feature_version: str
+    sample_fps: float = Field(gt=0.0)
+    model_bindings: list[ModelBinding] = Field(min_length=1)
+    model_binding_license_corrections: list[str] = Field(default_factory=list)
+    clip_count: int = Field(ge=1)
+    input_frame_count: int = Field(ge=1)
+    clips: list[FallFeatureCaptureClipReport] = Field(min_length=1)
+    model_load_ms: float = Field(ge=0.0)
+    runtime_environment: dict[str, Any] = Field(default_factory=dict)
+    raw_media_copied: Literal[False] = False
+    raw_pose_events_persisted_in_run: Literal[True] = True
+    labels_read_during_generation: Literal[False] = False
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_capture_report(self) -> "FallFeatureCaptureReport":
+        if self.fixture and self.evidence_level is not EvidenceLevel.E1:
+            raise ValueError("fixture fall-feature capture report must remain E1")
+        if self.clip_count != len(self.clips):
+            raise ValueError("fall-feature capture clip count disagrees")
+        if self.input_frame_count != sum(
+            clip.sampled_frames for clip in self.clips
+        ):
+            raise ValueError("fall-feature capture frame count disagrees")
+        values = [clip.scenario_id for clip in self.clips]
+        if len(values) != len(set(values)):
+            raise ValueError("fall-feature capture scenario ids must be unique")
+        return self
+
+
 class FallCandidatePredictionEvent(ContractModel):
     candidate_id: str = Field(min_length=1)
     start_ms: int = Field(ge=0)

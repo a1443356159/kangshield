@@ -4,7 +4,7 @@ import json
 import subprocess
 import tempfile
 from contextlib import contextmanager
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from time import perf_counter
 from typing import Any, Iterator
 from uuid import uuid4
@@ -137,6 +137,32 @@ class RunArtifacts:
 
     def record_feature(self, feature: FeatureEvent) -> None:
         append_jsonl(self.run_dir / "features.jsonl", feature)
+
+    def record_feature_artifact(
+        self,
+        relative_path: str,
+        feature: FeatureEvent,
+    ) -> Path:
+        """Append a feature to a manifest-bound JSONL inside artifacts/."""
+
+        pure = PurePosixPath(relative_path)
+        if (
+            pure.is_absolute()
+            or len(pure.parts) < 2
+            or pure.parts[0] != "artifacts"
+            or any(part in {"", ".", ".."} for part in pure.parts)
+            or "\\" in relative_path
+            or pure.suffix != ".jsonl"
+        ):
+            raise ValueError(
+                "feature artifact must be a normalized artifacts/*.jsonl path"
+            )
+        path = self.run_dir.joinpath(*pure.parts)
+        append_jsonl(path, feature)
+        if relative_path not in self.manifest.artifacts:
+            self.manifest.artifacts.append(relative_path)
+            self.save_manifest()
+        return path
 
     def record_multimodal_window(self, window: MultimodalWindow) -> None:
         append_jsonl(self.run_dir / "multimodal_windows.jsonl", window)

@@ -75,6 +75,7 @@ src/kangshield/information/
 ├── streaming.py          # OpenCV 时间戳回放、PCM WAV 读取/重采样
 ├── pose_backend.py       # YOLO26n-pose + ByteTrack 适配器
 ├── fall_features.py      # 跌倒运动代理、关键点质量门与离线评测
+├── fall_feature_capture.py # capture clip 的 pose→G4 feature producer
 ├── fall_candidates.py    # 无标签候选状态机、来源门与公开压力汇总
 ├── fall_candidate_export.py # capture-bound G4 特征到 evaluator prediction
 ├── speech_backend.py     # FunASR VAD/ASR/标点和词面标签
@@ -311,7 +312,19 @@ kangshield-info assess-event-evaluation <event-evaluation-bundle.json>
 
 bundle 同时绑定 M2c capture/readiness 与 clean assessor run、两份以上独立动作区间、裁决真值、一个 candidate-generator policy，以及三姿态 variant 的 candidate episode/clean source run。评测器不运行候选规则，只做 interval agreement 和 `simulated_fall` 一对一匹配，发布 TP/FP/FN、precision/recall/F1、总暴露 false activations/hour、negative-clip activation rate 与 detection-delay 摘要。E1 确定性夹具只验证公式，真实全部 clip、camera、标注、裁决、最低数据和 provenance 门关闭前 `event_metrics_ready_for_review=false`。完整契约见[事件评估就绪门](v1-g4-event-evaluation-readiness.md)。
 
-capture-bound G4 特征先通过显式桥接导出 evaluator 输入：
+通过 M2c gate 的 capture 先由单 variant producer 生成 G4 特征：
+
+```text
+kangshield-info capture-fall-features \
+  <capture-manifest.json> \
+  <m2c-capture-readiness.json> \
+  <m2c-capture-run-manifest.json> \
+  --variant rtmpose-m-humanart
+```
+
+该命令只从严格 manifest 暴露经摘要验证的媒体路径、duration 和 variant policy，不向 pose/G4 extractor 传递 annotation window、身份或 expected-person。每个 clip 重置 tracker，pose 与 G4 frame event 留在 derived-sensitive run，父报告只保存覆盖、质量、性能和 provenance 摘要。fixture 固定 E1，非 fixture 还要求 camera gate。设计见 [G4 Capture Feature Producer](v1-g4-fall-feature-capture.md)。
+
+capture-bound G4 特征再通过显式桥接导出 evaluator 输入：
 
 ```text
 kangshield-info export-fall-candidates \
