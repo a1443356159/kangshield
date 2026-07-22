@@ -1,6 +1,6 @@
 # 开发与证据晋级流程
 
-状态：Active v0.3
+状态：Active v0.4
 
 ## 1. 开发顺序
 
@@ -59,10 +59,24 @@ export KANGSHIELD_REF_SALT="<local-random-secret>"
 
 ```bash
 kangshield-info probe-media sample.wav --evidence-level E2
-kangshield-info probe-media sample.mp4 --evidence-level E2 --device-ref camera_demo_01
+kangshield-info probe-media sample.mp4 \
+  --evidence-level E2 \
+  --device-ref camera_demo_01 \
+  --require-audio-track
 ```
 
-E2 只表示文件来自一次真实录制；它不证明直播接口稳定。
+E2 只表示文件来自一次真实录制；它不证明直播接口稳定。含语音的 C6c clip 必须启用 `--require-audio-track`。报告中的 start/end offset 与 duration delta 是容器 PTS 诊断，不是物理同步或 drift；后两者需要录制开始和结束附近各一次可见/可听同步事件。
+
+设备到位前可先验证 E1 契约：
+
+```bash
+make prepare-m2c-timing-fixture
+kangshield-info probe-media \
+  data/raw/public-smoke/v1-m2c-timing.synthetic.avi \
+  --evidence-level E1 \
+  --source-type fixture \
+  --require-audio-track
+```
 
 ### 睡眠字段发现
 
@@ -178,6 +192,8 @@ V1-R1 的当前采用/候选/放弃状态见 [探索收敛与 V2 输入清单](v
 6. 输入文件哈希是否与原始文件一致。
 7. processing 与 cold-start 实时系数是否分开解释。
 8. 完整转写是否只存在于受控 FeatureEvent，而未复制到汇总报告。
+9. 容器探针的 `scan_truncated`、PTS/DTS 缺失和 required audio 状态是否允许使用该报告。
+10. 是否错误地把容器首尾偏移或 duration delta 写成 drift。
 
 快速检查：
 
@@ -240,7 +256,7 @@ Review 接受后同步更新：
 - V1-M1：采集契约、探针、Fixture 与测试。
 - V1-M2a：设备无关视频/语言模型链路与 E1 性能证据。
 - V1-M2b：公开真实录制固定集、批量评测与 E1 Slurm 证据。
-- V1-M2c：真实设备 E2/E3 证据、字段映射与音视频对齐。
+- V1-M2c：E1 容器时间戳工具，以及真实设备 E2/E3 证据、字段映射与音视频对齐。
 - V1-M3：模型对比代码、固定样本清单和报告。
 - V1-R1：晋级/淘汰决定与 V2 输入冻结。
 

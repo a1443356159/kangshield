@@ -27,6 +27,8 @@
 - [V1-M3 语音模型同集对比设计](docs/v1-m3-speech-model-comparison.md)
 - [V1-M3 语音模型同集对比报告](docs/reports/v1-m3-speech-model-comparison.md)
 - [V1-M2c 目标设备样本与时间基采集规程](docs/v1-m2c-device-sample-protocol.md)
+- [V1-M2c 容器音视频时间戳探针](docs/v1-m2c-media-timing-probe.md)
+- [V1-M2c 容器时间戳探针初测报告](docs/reports/v1-m2c-media-timing-smoke.md)
 - [V1-M3 睡眠字段路线与 Fail-Closed Gate](docs/v1-m3-sleep-field-route.md)
 - [V1-M3 睡眠字段路线评审报告](docs/reports/v1-m3-sleep-field-route.md)
 - [V1-R1 探索收敛与 V2 输入清单](docs/v1-r1-exploration-review.md)
@@ -54,6 +56,18 @@ kangshield-info probe-media <video-or-wav>
 kangshield-info profile-sleep <json-or-csv>
 kangshield-info inspect-ezviz <sanitized-json> --evidence-level E1
 ```
+
+生成并验证确定性同容器音视频时间戳夹具：
+
+```bash
+make prepare-m2c-timing-fixture
+kangshield-info probe-media \
+  data/raw/public-smoke/v1-m2c-timing.synthetic.avi \
+  --source-type fixture \
+  --require-audio-track
+```
+
+该命令检查 video/audio track、逐轨 time base 和逐包 PTS/DTS；容器首尾偏移不等于实际声画同步或漂移，真实 C6c 仍需两次可见/可听同步事件。
 
 设备无关的视频 + 语言回放链路：
 

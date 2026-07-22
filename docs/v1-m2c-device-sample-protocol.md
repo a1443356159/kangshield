@@ -1,6 +1,6 @@
 # V1-M2c 目标设备样本与时间基采集规程
 
-状态：Ready for capture v0.1
+状态：Ready for capture v0.2；E1 timing probe accepted，真实采集待执行
 
 更新时间：2026-07-22
 
@@ -54,7 +54,7 @@ V1-M2c 不要求立即完成萤石全量 SDK 开发。它先取得可追溯的�
 4. 检查是否存在 video/audio track、各自 time_base、首尾 PTS、duration、帧/包间断和音频采样率。
 5. 若视频与音频分开导出，用两次同步事件估计起始 offset 和随时间漂移；不能只手工平移到“看起来同步”。
 
-当前 `probe-media` 可先记录文件摘要、视频参数和 WAV 参数；容器音轨与逐包 PTS 仍需 ffprobe/PyAV 探针补齐后才能关闭时间基验收。
+当前 `probe-media` 已使用固定 PyAV 18.0.0 记录容器轨道、codec、time base、逐包 PTS/DTS、首尾偏移和扫描完整性；`--require-audio-track` 会在音轨缺失或不可验证时 fail closed。E1 设计与正式夹具结果见[容器音视频时间戳探针](v1-m2c-media-timing-probe.md)和[初测报告](reports/v1-m2c-media-timing-smoke.md)。工具完成仍不能关闭时间基验收：必须对 C6c 原始容器执行，并用开始/结束两次同步事件估计实际 offset/drift。
 
 ## 5. Capture manifest
 

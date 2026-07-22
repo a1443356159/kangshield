@@ -440,7 +440,7 @@
 ### 发现
 
 1. 设备无关 Pipeline、固定集评测、姿态/语音对比和睡眠字段 gate 都已得到可复现 E1 证据，但 C6c 与 CS-EP-SDNL1 仍只有 E0；模型表现不能替代目标设备接入。
-2. M2a/M2b 的独立视频/WAV 共享零点只能验证窗口契约，不能进入 V2 自然音视频同步声明；容器 track/PTS、offset 和 drift 仍未实现。
+2. M2a/M2b 的独立视频/WAV 共享零点只能验证窗口契约，不能进入 V2 自然音视频同步声明；REV-009 时容器 track/PTS、offset 和 drift 仍未实现。REV-010 随后关闭 E1 探针工具缺口，但真实 G2 仍 Open。
 3. HumanArt + RTMPose 的 lying 覆盖显著优于 YOLO26n，但 fall-01 关键点仍不可用；V2 跌倒特征需要 box-only fallback 和显式 keypoint quality gate。
 4. 历史 HumanArt ModelBinding 将 MMPose 实现 Apache-2.0 写成模型 artifact license，语义过宽。Human-Art 官方数据授权限定非商业使用且 annotations 为 CC-BY-NC-SA-4.0，最终权重分发不能自动继承框架许可证。
 5. FunASR 三个冻结 model card 记录 Apache License 2.0，Whisper 代码与权重为 MIT；但项目本身没有顶层 LICENSE 或最终第三方 NOTICE。
@@ -468,7 +468,7 @@
 
 | 行动 | 负责人 | 截止日期 | 状态 |
 |---|---|---|---|
-| 实现 ffprobe/PyAV 容器轨道与 PTS 探针 | Codex | 2026-07-23 | Open |
+| 实现 ffprobe/PyAV 容器轨道与 PTS 探针 | Codex | 2026-07-22 | Done（REV-010；仅 E1 工具，C6c G2 仍 Open） |
 | 实现 box-only 跌倒特征、关键点质量门和 fallback reason 的 E1 离线实验 | Codex | 2026-07-24 | Open |
 | 评测一个不依赖 Human-Art 训练条款的姿态候选 | Codex | 2026-07-25 | Open |
 | 取得 C6c/SDNL1 E2/E3 或可复核 blocked 证据 | 待指定 | 2026-08-01 | Open |
@@ -481,3 +481,54 @@
 2. 不依赖 Human-Art 的姿态候选在 lying 和空场负样本上的性能是否仍足够？
 3. C6c 原始媒体能否同时取得视频、音频和可用 PTS，还是必须设计分流降级？
 4. SDNL1 无开发接口时，比赛演示是否接受明确 blocked 并仅保留接口契约？
+
+---
+
+## REV-010 V1-M2c 容器时间戳探针 E1 Review
+
+- 日期：2026-07-22
+- 状态：Accepted for V1-M2c E1 timing-probe slice；V1-M2c milestone remains In progress
+- 参与人：项目组、Codex
+- 评审范围：容器轨道、逐包 PTS/DTS、required audio、资源上限、时间语义、确定性与隐私
+- 输入材料：[探针设计](v1-m2c-media-timing-probe.md)、[初测报告](reports/v1-m2c-media-timing-smoke.md)、提交 `4a65630`、正式运行 `20260722T095247Z-b49f532e`
+
+### 发现
+
+1. 本机没有系统 `ffprobe`/`ffmpeg`；固定 PyAV 18.0.0 可以直接读取容器、stream、packet PTS/DTS/duration/time base，不需要 shell 外部进程。
+2. Matroska 会生成随机 SegmentUID，不适合作为字节级 provenance 夹具；AVI + FFV1 + PCM S16LE 两次独立生成得到相同的 66,044 bytes 和 SHA-256。
+3. 正式 E1 运行识别 1 条视频轨与 1 条音频轨，两轨各 30 包，PTS/DTS 均完整，无负值、后退或扫描截断；首尾 offset 与 duration delta 均为 0 ms。
+4. 容器 start/end/duration 只描述时间戳范围，不能证明采集时钟、物理声画同步或 drift；当前契约正确保持 `drift_estimate_available=false`。
+5. `--require-audio-track` 能区分 missing 与 unverified 并 fail；packet 扫描达到上限时 partial，不允许用截断数据关闭 G2。
+6. 正式报告不保存容器 metadata value 或源路径；synthetic 元数据值、完整文件名、`data/raw` 和本地绝对路径扫描均为 0 命中。
+
+### 决定
+
+1. 接受 PyAV 18.0.0、MediaStreamTiming 与 ContainerTimingReport 作为 V1-M2c 原始媒体探针。
+2. 接受确定性 AVI 作为 E1 回归夹具；它不属于 C6c 设备证据。
+3. 每个含语音的 C6c 原始 clip 强制使用 `--require-audio-track`，缺失、不可验证和扫描截断均保留失败/降级 manifest。
+4. G2 必须对真实原始容器检测开始和结束附近的两个可见/可听同步事件；不从 duration delta 推导 drift。
+5. V1-M2c 从 Planned 转为 In progress；C6c 与 CS-EP-SDNL1 能力等级保持 E0，里程碑不能进入 Review。
+
+### 验证
+
+- 自动化：46 passed；`pip check` 无 broken requirements；`compileall`、`git diff --check` 通过。
+- 代码：`4a65630`；正式 manifest completed、`code_dirty=false`、`source_type=fixture`、E1。
+- 输入：deterministic AVI，66,044 bytes，SHA-256 `0b3bd01c83cc138780b4f3fd809798413ba8885f5ee0770a467a3bac17f24672`。
+- 轨道：FFV1 `1/10`、PCM S16LE `1/8000`，各 30 个 PTS/DTS 完整 packet。
+- 偏移：start 0 ms、end 0 ms、duration delta 0 ms；drift unavailable。
+- 隐私：metadata value 和 source path 不持久化，五类敏感字符串扫描 0 命中。
+
+### 行动项
+
+| 行动 | 负责人 | 截止日期 | 状态 |
+|---|---|---|---|
+| 取得 C6c 原始同容器媒体并执行 required-audio 探针 | 待指定 | 2026-07-29 | Open |
+| 在真实 clip 开始/结束各录一次可见/可听同步事件 | 待指定 | 2026-07-29 | Open |
+| 实现或复核双事件定位，形成真实 offset/drift 报告 | Codex | 2026-07-30 | Blocked on consented C6c media |
+| 将 C6c 多轨、缺 PTS、断流/重连和无音频结果写入 G2 决定 | 待指定 | 2026-08-01 | Open |
+
+### 未决问题
+
+1. C6c 的直播录制、回放导出或 SDK 导出哪一种能保留原始音频轨与时间戳？
+2. 真实容器是否有多音轨、B-frame 重排、首包负 PTS 或重连后的时间轴跳变？
+3. 无法取得同容器音频时，比赛演示是否按 G2 预案明确降级为视频与语言分开展示？

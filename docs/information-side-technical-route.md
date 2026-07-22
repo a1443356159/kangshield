@@ -1,6 +1,6 @@
 # 信息侧模块详细技术路线
 
-状态：Implementation Baseline v0.4
+状态：Implementation Baseline v0.5
 
 更新时间：2026-07-22
 
@@ -68,6 +68,7 @@ src/kangshield/information/
 ├── artifacts.py          # 运行目录、原子写入、JSONL、代码版本
 ├── privacy.py            # 内容摘要、稳定引用和结构脱敏
 ├── media_probe.py        # 文件、WAV、OpenCV 视频事实与质量探测
+├── container_timing.py   # PyAV 轨道/包时间戳、容器偏移与扫描上限
 ├── sleep_profile.py      # JSON/CSV 字段发现与映射候选
 ├── ezviz_snapshot.py     # SDK/API 脱敏快照分析与证据分级
 ├── extractor.py          # 通用模型插件 Protocol
@@ -191,7 +192,8 @@ runs/<run_id>/
 命令目标：
 
 ```text
-kangshield-info probe-media <file> [<file> ...]
+kangshield-info probe-media <file> [<file> ...] \
+  [--require-audio-track] [--max-packets-per-stream 200000]
 ```
 
 首版能力：
@@ -200,7 +202,12 @@ kangshield-info probe-media <file> [<file> ...]
 - WAV 声道、采样率、位深、帧数和时长。
 - 可选 OpenCV 视频宽高、FPS、帧数、时长、FourCC。
 - 抽样帧亮度、暗帧比例和拉普拉斯模糊度。
-- 明确记录 OpenCV 不检查音轨，音频存在性仍需 ffprobe/SDK 证据。
+- 固定 PyAV 18.0.0 检查容器 video/audio track、codec、time base 和逐包 PTS/DTS。
+- 输出首条音视频轨的 start/end offset 与 duration delta，但不在没有同步事件时输出 drift。
+- required audio 缺失/不可验证时 fail；扫描达到上限时 partial，不用不完整报告关闭 G2。
+- 容器 metadata 只保存 key 数，不保存值或源路径。
+
+确定性 E1 夹具、字段定义和真实 C6c 使用规则见 [V1-M2c 容器音视频时间戳探针](v1-m2c-media-timing-probe.md)。
 
 ### 7.2 睡眠导出字段发现
 
@@ -316,6 +323,7 @@ V1-R1 已完成 E1 决策收敛：YOLO26n 为 V1 对照，HumanArt + RTMPose 为
 
 - 不用本地文件 mtime 代替设备事件时间。
 - 视频帧与音频段优先使用同一容器时间基。
+- 容器 `audio_minus_video_start_ms`/`end_ms` 只表示 PTS 范围关系；真实 offset/drift 还需开始和结束两次跨模态同步事件。
 - 睡眠日级报告保留 report_date 和生成时间，不伪造实时 timestamp。
 - 发现时钟偏差时记录 clock_offset_ms 和估计方法。
 - V1 目标是测量偏差，不预先承诺 ≤1 秒。
@@ -349,6 +357,7 @@ V1-R1 已完成 E1 决策收敛：YOLO26n 为 V1 对照，HumanArt + RTMPose 为
 
 - probe-media 可对 WAV 和普通文件生成完整运行目录。
 - OpenCV 可用时可对视频生成基本探测结果。
+- PyAV 可用时可检查容器轨道和逐包 PTS/DTS；required audio 与扫描截断 fail closed。
 - profile-sleep 可发现任意 JSON/CSV 字段且不泄露敏感值。
 - inspect-ezviz 可分析脱敏 Fixture/导出并保留证据等级。
 - 自动化测试覆盖契约、运行产物、三条命令和脱敏。
@@ -366,3 +375,4 @@ V1-R1 已完成 E1 决策收敛：YOLO26n 为 V1 对照，HumanArt + RTMPose 为
 - CS-EP-SDNL1 的公开硬件参数见[萤石官方商品页](https://www.ys7.com/item/994492.html)；开放 API 字段仍需真实账号验证。
 - 模型候选和指标依据见 [V1 信息采集与模型探索](v1-information-acquisition.md)。
 - 当前模型基线与官方模型卡见 [V1 视频与语言多模态 Pipeline](v1-multimodal-pipeline.md)。
+- 容器 packet 的 PTS/DTS/time base 语义见 PyAV 官方 [Packet](https://pyav.org/docs/stable/api/packet.html)、[Time](https://pyav.org/docs/stable/api/time.html) 和 [Stream](https://pyav.org/docs/stable/api/stream.html) 文档。
