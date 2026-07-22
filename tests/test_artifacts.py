@@ -25,6 +25,7 @@ def test_run_artifacts_complete_and_record_step(tmp_path):
     assert manifest["steps"][0]["status"] == StepStatus.COMPLETED.value
     assert manifest["steps"][0]["outputs"] == ["reports/result.json"]
     assert manifest["artifacts"] == ["reports/result.json"]
+    assert stat.S_IMODE(run.runs_dir.stat().st_mode) == 0o700
     for directory in (
         run.run_dir,
         run.reports_dir,

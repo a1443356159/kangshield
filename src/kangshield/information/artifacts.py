@@ -99,7 +99,10 @@ class RunArtifacts:
     ):
         timestamp = utc_now().strftime("%Y%m%dT%H%M%SZ")
         self.run_id = f"{timestamp}-{uuid4().hex[:8]}"
-        self.run_dir = Path(runs_dir) / self.run_id
+        self.runs_dir = Path(runs_dir)
+        self.runs_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        self.runs_dir.chmod(0o700)
+        self.run_dir = self.runs_dir / self.run_id
         self.reports_dir = self.run_dir / "reports"
         self.logs_dir = self.run_dir / "logs"
         self.artifacts_dir = self.run_dir / "artifacts"
