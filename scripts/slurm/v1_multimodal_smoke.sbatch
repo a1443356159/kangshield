@@ -39,6 +39,14 @@ export PYTHONUNBUFFERED=1
 export PYTHONPATH="${kang_repo_dir}/src${PYTHONPATH:+:${PYTHONPATH}}"
 unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy
 
+kang_cudnn_lib=$("${kang_python}" -c \
+  'from pathlib import Path; import nvidia.cudnn; print(Path(next(iter(nvidia.cudnn.__path__))) / "lib")')
+if [[ ! -f "${kang_cudnn_lib}/libcudnn.so.9" ]]; then
+  echo "cuDNN 9 runtime library not found: ${kang_cudnn_lib}" >&2
+  exit 2
+fi
+export LD_LIBRARY_PATH="${kang_cudnn_lib}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+
 "${kang_python}" -m kangshield.information.cli run-multimodal \
   "${KANG_VIDEO_INPUT}" \
   "${kang_audio_arguments[@]}" \
