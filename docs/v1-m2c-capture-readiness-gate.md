@@ -174,4 +174,4 @@ kangshield-info assess-m2c-capture \
 2. 真实双事件人工定位及 offset/drift Review。
 3. SDNL1 真实导出、字段 profile 与 confirmed mapping。
 4. 三姿态 variant 和 FunASR 在 C6c held-out 集上的正式复测。
-5. 标注内容抽查/双人一致性、多人策略及事件级误触发/检出延迟口径。
+5. 双人一致性、裁决和事件级误触发/检出延迟的 E1 工具口径已由 [G4 事件评估就绪门](v1-g4-event-evaluation-readiness.md)关闭；真实标注内容抽查、真实候选策略/指标和多人策略仍 Open。

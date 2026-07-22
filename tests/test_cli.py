@@ -92,6 +92,17 @@ def test_m2c_capture_parser_defaults_to_fixture_and_fail_closed_policy():
     assert args.require_ready is False
 
 
+def test_event_evaluation_parser_defaults_to_fixture_and_real_readiness_closed():
+    args = build_parser().parse_args(
+        ["assess-event-evaluation", "event-evaluation-bundle.json"]
+    )
+    assert args.command == "assess-event-evaluation"
+    assert args.evidence_level.value == "E1"
+    assert args.source_type.value == "fixture"
+    assert args.policy.name == "v1-g4-event-evaluation-policy.json"
+    assert args.require_ready is False
+
+
 def test_fall_feature_parser_defaults_to_candidate_and_clean_source():
     args = build_parser().parse_args(
         [

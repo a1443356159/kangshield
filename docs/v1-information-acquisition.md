@@ -313,6 +313,8 @@ V1-R1 G4 已把既有姿态事件转换为 box 横卧/下降/低运动、横卧�
 
 另行完成的 [Open Images 静态居家人物检测压力集](v1-g4-openimages-static-home-stress.md)固定 4 张家具无人、4 张宠物无人和 4 张室内多人图片，以人工验证 Person 负标签和 validation Person boxes 测 false activation / IoU 匹配。正式 job `1766` 中 RTMPose / YOLO / Keypoint R-CNN 的无人激活为 2/8、3/8、3/8，多人匹配为 11/11、9/11、11/11，详见[正式报告](reports/v1-g4-openimages-static-home-stress.md)。该结果只缩小静态人物检测缺口：没有视频时间、动作、床上躺卧、宠物移动或多人身份，因此不改变真实 G4 与事件决策的 Open 状态。
 
+[G4 事件评估就绪门](v1-g4-event-evaluation-readiness.md)现已把“独立双标注 → interval/onset agreement → adjudication → 三 candidate stream 的 TP/FP/FN、误触发/小时和检测延迟”实现为严格离线链路。评测器只消费外部去重 candidate episode，不定义或调整跌倒组合规则；所有来源由 capture/model/feature/candidate policy 摘要和 clean run 绑定。确定性 E1 fixture 的指标只用于验证公式，`capture_camera_gate_passed=false`、`event_metrics_ready_for_review=false`、RiskAssessment/Alert 均 false。取得真实 C6c held-out 包后可以复用同一入口，但仍须先冻结候选策略和裁决标签。
+
 V1-M3 语音同集对比已经完成，见 [语音模型对比设计](v1-m3-speech-model-comparison.md)和[正式报告](reports/v1-m3-speech-model-comparison.md)。FunASR 保留为普通话默认候选，Whisper small 不晋级；该结论只来自六条 clean FLEURS 普通话，不代表 C6c 远场、方言、老人或背景噪声效果。
 
 V1-M3 睡眠路线不训练模型，而采用绑定《监测方案》的字段 policy 和 fail-closed mapping gate，见[睡眠字段路线](v1-m3-sleep-field-route.md)和[正式评审报告](reports/v1-m3-sleep-field-route.md)。通用萤石睡觉检测服务的宣传能力不会自动映射到 CS-EP-SDNL1；真实 E2/E3 schema、单位、时间和缺失语义确认前，所有标准化值与多夜派生保持关闭。

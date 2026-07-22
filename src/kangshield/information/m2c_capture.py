@@ -360,6 +360,65 @@ class M2cCaptureAssessment:
     report: M2cCaptureReadinessReport
 
 
+@dataclass(frozen=True)
+class M2cEventClipContext:
+    """Sanitized clip facts exposed to the downstream event evaluator."""
+
+    clip_ref: str
+    scenario_id: str
+    scenario: str
+    duration_ms: int
+
+
+@dataclass(frozen=True)
+class M2cEventContext:
+    """Sanitized held-out facts; paths and participant/operator refs stay private."""
+
+    manifest_sha256: str
+    capture_ref: str
+    template_only: bool
+    synthetic: bool
+    captured_end_at: datetime
+    labels_frozen_at: datetime
+    first_inference_at: datetime | None
+    model_policy_sha256s: tuple[tuple[str, str], ...]
+    clips: tuple[M2cEventClipContext, ...]
+
+
+def load_m2c_event_context(manifest_path: Path) -> M2cEventContext:
+    """Strictly parse an M2c manifest and return only event-safe facts."""
+
+    manifest_path = Path(manifest_path)
+    if not manifest_path.is_file():
+        raise FileNotFoundError("capture manifest not found")
+    manifest = _load_json(manifest_path, _CaptureManifest)
+    digest = sha256_file(manifest_path)
+    return M2cEventContext(
+        manifest_sha256=digest,
+        capture_ref=f"capture_{digest[:16]}",
+        template_only=manifest.template_only,
+        synthetic=manifest.synthetic,
+        captured_end_at=manifest.captured_end_at,
+        labels_frozen_at=manifest.held_out_protocol.labels_frozen_at,
+        first_inference_at=manifest.held_out_protocol.first_inference_at,
+        model_policy_sha256s=tuple(
+            sorted(
+                (binding.variant_id, binding.sha256)
+                for binding in manifest.held_out_protocol.model_policies
+            )
+        ),
+        clips=tuple(
+            M2cEventClipContext(
+                clip_ref=f"clip_{clip.sha256[:16]}",
+                scenario_id=clip.scenario_id,
+                scenario=clip.scenario,
+                duration_ms=clip.duration_ms,
+            )
+            for clip in manifest.clips
+        ),
+    )
+
+
 def _load_json(path: Path, model: type[ConfigModel]) -> ConfigModel:
     try:
         payload = json.loads(Path(path).read_text(encoding="utf-8"))

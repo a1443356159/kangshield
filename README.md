@@ -42,6 +42,8 @@
 - [V1-R1 G4 CAUCAFall ADL 压力报告](docs/reports/v1-g4-caucafall-adl-stress.md)
 - [V1-R1 G4 Open Images 静态居家人物检测压力集](docs/v1-g4-openimages-static-home-stress.md)
 - [V1-R1 G4 Open Images 静态居家人物检测压力报告](docs/reports/v1-g4-openimages-static-home-stress.md)
+- [V1-R1 G4 事件标注、候选评测与就绪门](docs/v1-g4-event-evaluation-readiness.md)
+- [V1-R1 G4 事件评估 E1 初测报告](docs/reports/v1-g4-event-evaluation-smoke.md)
 
 ## V1 初步开发
 
@@ -87,6 +89,15 @@ make PYTHON=.venv/bin/python assess-m2c-capture-fixture
 ```
 
 `assess-m2c-capture` 会检查受控包路径、摘要、媒体轨道、C01～C10 场景/标注、双同步事件和三姿态策略摘要。Fixture 只能得到 `tooling_only`；真实 E2 核心集才可能打开 `camera_ready_for_model_retest`，C01～C10 与 SDNL1 样本都完成后才可能打开 `capture_bundle_ready_for_review`。该布尔量只验收采集包，V1-M2c 里程碑仍需下游模型/语言/睡眠字段报告。详细契约见[采集包就绪门](docs/v1-m2c-capture-readiness-gate.md)。
+
+生成并评估 G4 双标注/裁决/事件指标 E1 回归夹具：
+
+```bash
+make PYTHON=.venv/bin/python prepare-g4-event-evaluation-fixture
+make PYTHON=.venv/bin/python assess-g4-event-evaluation-fixture
+```
+
+该链路只对外部 candidate episode 做一致性、TP/FP/FN、误触发/小时和 delay 评分，不生成跌倒候选或告警。Fixture 固定为 `tooling_only`；真实 E2+ capture/clip、标注、裁决、最低数据和来源门全部通过后，才可能发布 `event_metrics_ready_for_review`。详细口径见[事件评估就绪门](docs/v1-g4-event-evaluation-readiness.md)。
 
 设备无关的视频 + 语言回放链路：
 

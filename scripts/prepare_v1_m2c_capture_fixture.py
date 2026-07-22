@@ -118,6 +118,26 @@ SCENARIOS = (
         "expected_person_presence": "present",
         "labels": ("person_present", "bed_lie", "bed_rise"),
     },
+    {
+        "scenario_id": "C11",
+        "scenario": "simulated_fall",
+        "lighting": "day",
+        "night_vision": False,
+        "distance_band": "mid",
+        "occlusion": "none",
+        "expected_person_presence": "present",
+        "labels": ("person_present", "simulated_fall"),
+    },
+    {
+        "scenario_id": "C12",
+        "scenario": "simulated_fall",
+        "lighting": "night",
+        "night_vision": True,
+        "distance_band": "mid",
+        "occlusion": "none",
+        "expected_person_presence": "present",
+        "labels": ("person_present", "simulated_fall"),
+    },
 )
 
 
@@ -139,6 +159,8 @@ def build_capture_fixture(
     *,
     media_source: Path,
     project_root: Path = PROJECT_ROOT,
+    include_simulated_falls: bool = False,
+    freeze_first_inference: bool = False,
 ) -> Path:
     output_dir = Path(output_dir)
     media_source = Path(media_source)
@@ -190,7 +212,16 @@ def build_capture_fixture(
     capture_tz = timezone(timedelta(hours=8))
     capture_start = datetime(2026, 7, 22, 9, 0, tzinfo=capture_tz)
     clips = []
-    for index, scenario in enumerate(SCENARIOS):
+    scenarios = (
+        SCENARIOS
+        if include_simulated_falls
+        else tuple(
+            scenario
+            for scenario in SCENARIOS
+            if scenario["scenario_id"] not in {"C11", "C12"}
+        )
+    )
+    for index, scenario in enumerate(scenarios):
         scenario_id = str(scenario["scenario_id"])
         media_path = output_dir / "camera" / f"{scenario_id}.synthetic.avi"
         _copy(media_source, media_path)
@@ -257,9 +288,9 @@ def build_capture_fixture(
                 "synchronization_events": synchronization_events,
                 "annotation_windows": windows,
                 "safety": {
-                    "simulated_fall": False,
-                    "safety_mat": False,
-                    "spotter_present": False,
+                    "simulated_fall": scenario["scenario"] == "simulated_fall",
+                    "safety_mat": scenario["scenario"] == "simulated_fall",
+                    "spotter_present": scenario["scenario"] == "simulated_fall",
                     "area_cleared": True,
                 },
                 "issues": [],
@@ -312,7 +343,11 @@ def build_capture_fixture(
             "labels_frozen_at": (
                 capture_start + timedelta(minutes=40)
             ).isoformat(),
-            "first_inference_at": None,
+            "first_inference_at": (
+                (capture_start + timedelta(minutes=50)).isoformat()
+                if freeze_first_inference
+                else None
+            ),
             "model_policies": [
                 {
                     "variant_id": "yolo26n-pose",

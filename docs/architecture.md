@@ -89,6 +89,8 @@ G4 另设不污染 M2b 跨模态 case schema 的 CAUCAFall ADL 压力支路：�
 
 G4 再增加一条与视频事件严格隔离的 Open Images 静态人物检测支路：“逐图许可证审计 + 官方标签/框与像素摘要 → 独立图片单次推理 → IoU 0.5 人物框匹配 → furniture/pet/multi-person 父汇总”。静态 runner 强制关闭 tracking，不把图片重复成伪视频；person-absent 只报告人物 false activation，多人物只报告框级匹配。该支路不运行 G4 运动特征，也不关闭床上躺卧、跌倒、时序事件或 C6c 域内验证。
 
+G4 事件评估支路位于 M2c/M3 与 M7 之间：“严格 capture/readiness 血缘 + 双人独立动作区间 + 裁决真值 + 外部 candidate episode → agreement/TP/FP/FN/误触发/延迟”。evaluator 不执行候选生成策略，只要求三个 variant 绑定同一 candidate-policy 摘要；原始 annotation/candidate 时间、annotator ref 和路径不进入父报告。fixture/sub-E2 只能发布 `tooling_only`，真实全部 clip 可用、camera gate、标注、裁决、最低数据和 clean provenance 同时通过后才发布 `event_metrics_ready_for_review`，且仍不产生 RiskAssessment 或 Alert。
+
 ## 5. V1 运行形态
 
 V1 采用一次运行一个目录的离线流水线：
@@ -154,6 +156,10 @@ MediaStreamTiming 保存每条视频/音频轨的 codec、time base、声明时�
 
 M2cClipReadiness 只保存 opaque clip/asset ref、scenario ID、摘要/大小匹配、轨道状态、标注标签集合/数量和双事件派生 offset/drift，不保存身份、路径或原始窗口。父报告把结构可用数、核心/full-matrix 缺口、三模型策略验证和睡眠文件验证分开，并独立发布摄像头复测、完整矩阵、睡眠 profile 与 M2c Review 四个布尔门。路径越界、文件漂移、fixture marker、真实 clip 重复摘要或 held-out 策略漂移均 fail closed。
 
+### FallEventEvaluationReadinessReport
+
+FallEventAnnotationAgreement 只保存 pair 序号、窗口计数、interval F1 和 fall 起点差摘要；FallEventCaseEvaluation / VariantEvaluation 保存 scenario、暴露时长、TP/FP/FN、误触发率与 delay 摘要，不复制标注/候选时间。父报告分别发布 annotation coverage、agreement、adjudication、minimum data、source provenance 和 capture camera gate；任何输入路径/大小/摘要、held-out 时间、variant/model/feature/candidate policy 或来源 run 配置漂移都 fail closed。`event_metrics_ready_for_review` 只表示真实 E2+ 指标可交人工评审，不授权 M5/M6。
+
 ### RunManifest
 
 描述一次可复现实验：run_id、stage、evidence_level、配置摘要、代码版本与 dirty 状态、输入 ID、步骤状态、开始/结束时间、问题和产物路径。多模态模型由显式 ModelBinding 记录；设备探针仍可先把硬件版本写入 configuration，V1-R1 再决定最终公共字段。
@@ -179,7 +185,7 @@ V1-R1 将架构能力分为三层：
 2. 只进入候选接口的实现：HumanArt + RTMPose、TorchVision Keypoint R-CNN fallback、FunASR 和跌倒 box/keypoint 特征；在目标设备、负样本或许可证门关闭前不能成为正式能力。
 3. 不进入当前主路径的能力：YOLO26n 默认姿态、Whisper 普通话主链路、睡眠模型、自动诈骗/认知/抑郁评分，以及无设备证据的 HRV/SpO2/AHI 等字段。
 
-V2-D1 可以在真机到位前继续设计 adapter seam；媒体 PTS、采集包 readiness、G4 跌倒运动特征与静态人物检测压力工具均已完成，但真实 G2/G3/G4 仍未关闭。G4 当前只提供离线 feature/fallback 与静态 person-detection 证据，不能进入 RiskAssessment 或告警。系统必须同时保留三种运行声明：真实平台接入、受控文件回放、能力 blocked。三者不得共享同一个“已接入”状态。
+V2-D1 可以在真机到位前继续设计 adapter seam；媒体 PTS、采集包 readiness、G4 跌倒运动特征、静态人物检测压力和事件评估工具均已完成，但真实 G2/G3/G4 仍未关闭。G4 当前只提供离线 feature/fallback、静态 person-detection 与 E1 scorer 契约证据，不能进入 RiskAssessment 或告警。系统必须同时保留三种运行声明：真实平台接入、受控文件回放、能力 blocked。三者不得共享同一个“已接入”状态。
 
 完整决策 ID、许可证边界和硬门见 [V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。
 

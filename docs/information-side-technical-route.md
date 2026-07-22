@@ -301,6 +301,14 @@ V1-R1 G4 复用已完成的姿态 child events，只派生 box 横卧/下降/低
 
 Open Images 静态居家支路独立消费 4 张家具无人、4 张宠物无人和 4 张室内多人 validation 图片。每张图片单独推理一次并关闭 tracking；负标签只形成 person false activation，多人物只形成 IoU 0.5 框匹配。逐图许可、归因和像素摘要由准备器/lock 固定，评测 parent 不包含框坐标或作者信息。job `1766` 上 RTMPose / YOLO / Keypoint R-CNN 的无人激活为 2/8、3/8、3/8；多人匹配为 11/11、9/11、11/11。该支路不进入 G4 时序特征，也不替代 C6c。设计见[静态压力集](v1-g4-openimages-static-home-stress.md)与[正式报告](reports/v1-g4-openimages-static-home-stress.md)。
 
+事件级评估另走受控 held-out 支路：
+
+```text
+kangshield-info assess-event-evaluation <event-evaluation-bundle.json>
+```
+
+bundle 同时绑定 M2c capture/readiness 与 clean assessor run、两份以上独立动作区间、裁决真值、一个 candidate-generator policy，以及三姿态 variant 的 candidate episode/clean source run。评测器不运行候选规则，只做 interval agreement 和 `simulated_fall` 一对一匹配，发布 TP/FP/FN、precision/recall/F1、总暴露 false activations/hour、negative-clip activation rate 与 detection-delay 摘要。E1 确定性夹具只验证公式，真实全部 clip、camera、标注、裁决、最低数据和 provenance 门关闭前 `event_metrics_ready_for_review=false`。完整契约见[事件评估就绪门](v1-g4-event-evaluation-readiness.md)。
+
 ## 8. 模型接入路线
 
 模型按“先输入可用性，再输出精度”推进：
@@ -321,7 +329,7 @@ Open Images 静态居家支路独立消费 4 张家具无人、4 张宠物无人
 
 - V2 姿态准确率有条件候选：YOLOX-m HumanArt + RTMPose-m HumanArt。
 - V2 姿态独立 fallback：TorchVision Keypoint R-CNN；覆盖较高但 lying keypoint gate 仅 4/21，且权重分发仍 Open，不替换 RTMPose 条件参考。
-- 跌倒特征输入：box-only 横卧/下降/静止与 keypoint quality gate 已完成 E1 离线实现；Open Images 静态 furniture/pet/multi-person 只补人物检测压力；C6c 正负视频、床上躺卧、多人 tracking、事件指标和真实 G4 仍 Open。
+- 跌倒特征输入：box-only 横卧/下降/静止与 keypoint quality gate 已完成 E1 离线实现；Open Images 静态 furniture/pet/multi-person 只补人物检测压力；双标注/裁决/事件 scorer 契约也已完成 E1 工具验证。C6c 正负视频、床上躺卧、多人 tracking、真实候选策略/指标和真实 G4 仍 Open。
 - MediaPipe、openSMILE、Face/OpenFace、YAMNet 当前 Defer，不继续无标签扩展。
 
 ### 阶段 D：V2 晋级
@@ -374,6 +382,7 @@ V1-R1 已完成 E1 决策收敛：YOLO26n 为 V1 对照，HumanArt + RTMPose 为
 - 语音只在主动开启、同意和受控测试下处理。
 - FeatureEvent 不保留完整语音文本时，应保留脱敏文本或关键词类别。
 - G4 派生 FeatureEvent 不复制原始 bbox、关键点、阶段标签、源路径或参考转写，只保存归一化代理、质量门与摘要引用。
+- G4 事件父报告不复制 annotator/adjudicator ref、动作/候选时间窗口、candidate ID 或输入路径，只发布计数、比例和 delay 摘要。
 - Fixture 必须包含 synthetic 标记。
 - 差分隐私在 V1 只做设计评估；没有明确机制、敏感度和效用测试时不得声称已实现。
 

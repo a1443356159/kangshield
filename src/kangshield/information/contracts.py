@@ -1146,6 +1146,234 @@ class M2cCaptureReadinessReport(ContractModel):
     limitations: list[str] = Field(default_factory=list)
 
 
+class FallEventAnnotationAgreement(ContractModel):
+    """Aggregate-only agreement for one independent annotator pair."""
+
+    schema_version: str = "1.0"
+    pair_ref: str
+    compared_label_count: int = Field(ge=1)
+    left_window_count: int = Field(ge=0)
+    right_window_count: int = Field(ge=0)
+    matched_window_count: int = Field(ge=0)
+    unmatched_window_count: int = Field(ge=0)
+    interval_f1: float = Field(ge=0.0, le=1.0)
+    target_left_window_count: int = Field(ge=0)
+    target_right_window_count: int = Field(ge=0)
+    target_matched_window_count: int = Field(ge=0)
+    target_unmatched_window_count: int = Field(ge=0)
+    target_interval_f1: float = Field(ge=0.0, le=1.0)
+    matched_target_onset_count: int = Field(ge=0)
+    mean_absolute_target_onset_difference_ms: float | None = Field(
+        default=None,
+        ge=0.0,
+    )
+    maximum_absolute_target_onset_difference_ms: float | None = Field(
+        default=None,
+        ge=0.0,
+    )
+    passes: bool
+
+
+class FallEventCaseEvaluation(ContractModel):
+    """Privacy-safe event counts for one held-out clip."""
+
+    schema_version: str = "1.0"
+    case_ref: str
+    scenario_id: str
+    scenario: str
+    duration_ms: int = Field(gt=0)
+    ground_truth_event_count: int = Field(ge=0)
+    candidate_event_count: int = Field(ge=0)
+    true_positive_count: int = Field(ge=0)
+    false_positive_count: int = Field(ge=0)
+    false_negative_count: int = Field(ge=0)
+    precision: float = Field(ge=0.0, le=1.0)
+    recall: float = Field(ge=0.0, le=1.0)
+    f1: float = Field(ge=0.0, le=1.0)
+    negative_case: bool
+    false_activation: bool
+    detection_delay_count: int = Field(ge=0)
+    mean_detection_delay_ms: float | None = None
+    median_detection_delay_ms: float | None = None
+
+    @model_validator(mode="after")
+    def validate_counts(self) -> "FallEventCaseEvaluation":
+        if self.true_positive_count + self.false_positive_count != (
+            self.candidate_event_count
+        ):
+            raise ValueError("candidate event accounting is inconsistent")
+        if self.true_positive_count + self.false_negative_count != (
+            self.ground_truth_event_count
+        ):
+            raise ValueError("ground-truth event accounting is inconsistent")
+        if self.detection_delay_count != self.true_positive_count:
+            raise ValueError("detection-delay count must equal true positives")
+        if self.negative_case != (self.ground_truth_event_count == 0):
+            raise ValueError("negative-case flag disagrees with ground truth")
+        if self.false_activation != (
+            self.negative_case and self.candidate_event_count > 0
+        ):
+            raise ValueError("false-activation flag disagrees with event counts")
+        return self
+
+
+class FallEventVariantEvaluation(ContractModel):
+    """One candidate-event stream scored against adjudicated intervals."""
+
+    schema_version: str = "1.0"
+    variant_id: str
+    source_run_id: str
+    source_code_version: str
+    source_evidence_level: EvidenceLevel
+    source_run_completed: bool
+    source_run_clean: bool
+    model_policy_sha256: str = Field(min_length=64, max_length=64)
+    fall_feature_policy_sha256: str = Field(min_length=64, max_length=64)
+    candidate_generator_policy_sha256: str = Field(min_length=64, max_length=64)
+    clip_count: int = Field(ge=0)
+    exposure_ms: int = Field(ge=0)
+    ground_truth_event_count: int = Field(ge=0)
+    candidate_event_count: int = Field(ge=0)
+    true_positive_count: int = Field(ge=0)
+    false_positive_count: int = Field(ge=0)
+    false_negative_count: int = Field(ge=0)
+    precision: float = Field(ge=0.0, le=1.0)
+    recall: float = Field(ge=0.0, le=1.0)
+    f1: float = Field(ge=0.0, le=1.0)
+    false_activations_per_hour: float = Field(ge=0.0)
+    negative_clip_count: int = Field(ge=0)
+    false_activation_clip_count: int = Field(ge=0)
+    negative_clip_false_activation_rate: float = Field(ge=0.0, le=1.0)
+    detection_delay_count: int = Field(ge=0)
+    mean_detection_delay_ms: float | None = None
+    median_detection_delay_ms: float | None = None
+    p95_detection_delay_ms: float | None = None
+    minimum_detection_delay_ms: float | None = None
+    maximum_detection_delay_ms: float | None = None
+    cases: list[FallEventCaseEvaluation]
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_aggregates(self) -> "FallEventVariantEvaluation":
+        if len(self.cases) != self.clip_count:
+            raise ValueError("event variant clip count disagrees with cases")
+        sums = {
+            "exposure_ms": sum(case.duration_ms for case in self.cases),
+            "ground_truth_event_count": sum(
+                case.ground_truth_event_count for case in self.cases
+            ),
+            "candidate_event_count": sum(
+                case.candidate_event_count for case in self.cases
+            ),
+            "true_positive_count": sum(
+                case.true_positive_count for case in self.cases
+            ),
+            "false_positive_count": sum(
+                case.false_positive_count for case in self.cases
+            ),
+            "false_negative_count": sum(
+                case.false_negative_count for case in self.cases
+            ),
+            "negative_clip_count": sum(case.negative_case for case in self.cases),
+            "false_activation_clip_count": sum(
+                case.false_activation for case in self.cases
+            ),
+            "detection_delay_count": sum(
+                case.detection_delay_count for case in self.cases
+            ),
+        }
+        for field, expected in sums.items():
+            if getattr(self, field) != expected:
+                raise ValueError(f"event variant {field} disagrees with cases")
+        return self
+
+
+class FallEventEvaluationReadinessReport(ContractModel):
+    """Aggregate-only G4 event evaluation and readiness result."""
+
+    schema_version: str = "1.0"
+    assessor_version: str
+    evaluation_ref: str
+    evidence_level: EvidenceLevel
+    source_type: SourceType
+    bundle_sha256: str = Field(min_length=64, max_length=64)
+    policy_version: str
+    policy_sha256: str = Field(min_length=64, max_length=64)
+    capture_ref: str
+    capture_manifest_sha256: str = Field(min_length=64, max_length=64)
+    capture_readiness_sha256: str = Field(min_length=64, max_length=64)
+    candidate_generator_policy_sha256: str = Field(min_length=64, max_length=64)
+    template_only: bool
+    synthetic: bool
+    fixture: bool
+    target_event_label: Literal["simulated_fall"] = "simulated_fall"
+    required_variant_ids: list[str]
+    clip_count: int = Field(ge=0)
+    exposure_ms: int = Field(ge=0)
+    annotation_set_count: int = Field(ge=0)
+    annotation_agreements: list[FallEventAnnotationAgreement]
+    ground_truth_event_count: int = Field(ge=0)
+    negative_clip_count: int = Field(ge=0)
+    annotations_complete: bool
+    agreement_gate_passed: bool
+    adjudication_complete: bool
+    minimum_data_gate_passed: bool
+    provenance_gate_passed: bool
+    capture_camera_gate_passed: bool
+    variants: list[FallEventVariantEvaluation]
+    event_metrics_ready_for_review: bool = False
+    decision: str
+    quality_status: QualityStatus
+    raw_paths_persisted: Literal[False] = False
+    annotator_refs_persisted: Literal[False] = False
+    annotation_windows_persisted: Literal[False] = False
+    candidate_windows_persisted: Literal[False] = False
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
+    issues: list[QualityIssue] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_readiness(self) -> "FallEventEvaluationReadinessReport":
+        variant_ids = [variant.variant_id for variant in self.variants]
+        if len(variant_ids) != len(set(variant_ids)):
+            raise ValueError("event evaluation variants must be unique")
+        if sorted(variant_ids) != sorted(self.required_variant_ids):
+            raise ValueError("event evaluation variants differ from required variants")
+        if any(variant.clip_count != self.clip_count for variant in self.variants):
+            raise ValueError("event evaluation variant clip count disagrees")
+        if any(variant.exposure_ms != self.exposure_ms for variant in self.variants):
+            raise ValueError("event evaluation variant exposure disagrees")
+        if any(
+            variant.ground_truth_event_count != self.ground_truth_event_count
+            for variant in self.variants
+        ):
+            raise ValueError("event evaluation ground-truth count disagrees")
+        if self.event_metrics_ready_for_review:
+            gates = (
+                self.annotations_complete,
+                self.agreement_gate_passed,
+                self.adjudication_complete,
+                self.minimum_data_gate_passed,
+                self.provenance_gate_passed,
+                self.capture_camera_gate_passed,
+            )
+            if not all(gates):
+                raise ValueError("event metrics cannot be ready while a gate is closed")
+            if (
+                self.fixture
+                or self.synthetic
+                or self.template_only
+                or self.source_type is SourceType.FIXTURE
+                or EVIDENCE_RANK[self.evidence_level]
+                < EVIDENCE_RANK[EvidenceLevel.E2]
+            ):
+                raise ValueError("fixture or sub-E2 evidence cannot open event readiness")
+        return self
+
+
 class FieldStat(ContractModel):
     path: str
     types: list[str]

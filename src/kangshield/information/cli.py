@@ -100,6 +100,29 @@ def build_parser() -> argparse.ArgumentParser:
         help="Exit 2 unless the complete real-device capture-bundle gate is ready",
     )
 
+    event_evaluation = subparsers.add_parser(
+        "assess-event-evaluation",
+        help="Score held-out fall candidates against independently adjudicated labels",
+    )
+    event_evaluation.add_argument("bundle", type=Path)
+    event_evaluation.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    event_evaluation.add_argument(
+        "--policy",
+        type=Path,
+        default=Path("configs/v1-g4-event-evaluation-policy.json"),
+    )
+    event_evaluation.add_argument(
+        "--evidence-level", type=_evidence, default=EvidenceLevel.E1
+    )
+    event_evaluation.add_argument(
+        "--source-type", type=_source_type, default=SourceType.FIXTURE
+    )
+    event_evaluation.add_argument(
+        "--require-ready",
+        action="store_true",
+        help="Exit 2 unless real E2+ event metrics are ready for review",
+    )
+
     sleep = subparsers.add_parser(
         "profile-sleep",
         help="Discover JSON/CSV sleep-export fields without persisting values",
@@ -593,6 +616,7 @@ def _profile_sleep_command(args: argparse.Namespace) -> int:
 
 def _assess_m2c_capture_command(args: argparse.Namespace) -> int:
     from .m2c_capture import assess_m2c_capture
+    from .privacy import sha256_file
 
     with RunArtifacts(
         args.runs_dir,
@@ -631,6 +655,13 @@ def _assess_m2c_capture_command(args: argparse.Namespace) -> int:
                 assessment.report,
             )
             step.outputs.append(run.relative(output))
+            run.manifest.configuration.update(
+                {
+                    "capture_manifest_sha256": assessment.report.manifest_sha256,
+                    "capture_readiness_report_sha256": sha256_file(output),
+                }
+            )
+            run.save_manifest()
     report = assessment.report
     _print_result(
         run,
@@ -653,6 +684,87 @@ def _assess_m2c_capture_command(args: argparse.Namespace) -> int:
         },
     )
     if args.require_ready and not report.capture_bundle_ready_for_review:
+        return 2
+    return 0
+
+
+def _assess_event_evaluation_command(args: argparse.Namespace) -> int:
+    from .event_evaluation import assess_fall_event_evaluation
+    from .privacy import sha256_file
+
+    with RunArtifacts(
+        args.runs_dir,
+        stage="v1-g4-event-evaluation-readiness",
+        evidence_level=args.evidence_level,
+        configuration={
+            "command": "assess-event-evaluation",
+            "source_type": args.source_type.value,
+            "input_paths_persisted": False,
+            "require_ready": args.require_ready,
+        },
+    ) as run:
+        with run.step("assess-event-evaluation") as step:
+            assessment = assess_fall_event_evaluation(
+                args.bundle,
+                policy_path=args.policy,
+                evidence_level=args.evidence_level,
+                source_type=args.source_type,
+            )
+            for asset in assessment.assets:
+                run.record_asset(asset)
+            output = run.write_report(
+                "g4-event-evaluation-readiness.json",
+                assessment.report,
+            )
+            step.outputs.append(run.relative(output))
+            run.manifest.configuration.update(
+                {
+                    "bundle_sha256": assessment.report.bundle_sha256,
+                    "policy_sha256": assessment.report.policy_sha256,
+                    "capture_manifest_sha256": (
+                        assessment.report.capture_manifest_sha256
+                    ),
+                    "candidate_generator_policy_sha256": (
+                        assessment.report.candidate_generator_policy_sha256
+                    ),
+                    "event_evaluation_report_sha256": sha256_file(output),
+                }
+            )
+            run.save_manifest()
+    report = assessment.report
+    _print_result(
+        run,
+        {
+            "decision": report.decision,
+            "quality_status": report.quality_status.value,
+            "annotation_set_count": report.annotation_set_count,
+            "agreement_gate_passed": report.agreement_gate_passed,
+            "ground_truth_event_count": report.ground_truth_event_count,
+            "negative_clip_count": report.negative_clip_count,
+            "event_metrics_ready_for_review": (
+                report.event_metrics_ready_for_review
+            ),
+            "variants": [
+                {
+                    "variant_id": variant.variant_id,
+                    "true_positive_count": variant.true_positive_count,
+                    "false_positive_count": variant.false_positive_count,
+                    "false_negative_count": variant.false_negative_count,
+                    "recall": variant.recall,
+                    "false_activations_per_hour": (
+                        variant.false_activations_per_hour
+                    ),
+                    "median_detection_delay_ms": (
+                        variant.median_detection_delay_ms
+                    ),
+                }
+                for variant in report.variants
+            ],
+            "risk_assessment_emitted": report.risk_assessment_emitted,
+            "alert_emitted": report.alert_emitted,
+        },
+    )
+    if args.require_ready and not report.event_metrics_ready_for_review:
         return 2
     return 0
 
@@ -1127,6 +1239,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _probe_media_command(args)
     if args.command == "assess-m2c-capture":
         return _assess_m2c_capture_command(args)
+    if args.command == "assess-event-evaluation":
+        return _assess_event_evaluation_command(args)
     if args.command == "profile-sleep":
         return _profile_sleep_command(args)
     if args.command == "assess-sleep-route":
