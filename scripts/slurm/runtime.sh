@@ -4,7 +4,7 @@
 # This file is sourced by sbatch scripts after Slurm has populated
 # SLURM_SUBMIT_DIR, SLURM_JOB_ID, and SLURM_JOB_NAME.
 
-kang_slurm_runtime_version=slurm-runtime-v0.1.0
+kang_slurm_runtime_version=slurm-runtime-v0.2.0
 
 kang_slurm_init() {
   if [[ -z "${SLURM_SUBMIT_DIR:-}" ]]; then
@@ -48,6 +48,20 @@ kang_slurm_init() {
   fi
   if [[ ! -f "${repository_root}/pyproject.toml" || ! -f "${repository_root}/src/kangshield/__init__.py" ]]; then
     echo "SLURM_SUBMIT_DIR is not a KangShield checkout" >&2
+    return 2
+  fi
+
+  if [[ ! "${KANG_SUBMIT_COMMIT:-}" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "KANG_SUBMIT_COMMIT must be the full submitted Git commit" >&2
+    return 2
+  fi
+  local execution_commit
+  if ! execution_commit=$(git -C "${repository_root}" rev-parse HEAD); then
+    echo "Cannot resolve execution checkout commit" >&2
+    return 2
+  fi
+  if [[ "${execution_commit}" != "${KANG_SUBMIT_COMMIT}" ]]; then
+    echo "Submit and execution checkout commits differ" >&2
     return 2
   fi
 
@@ -112,7 +126,7 @@ kang_slurm_init() {
   fi
 
   kang_code_version=$(git -C "${kang_repo_dir}" rev-parse --short HEAD)
-  echo "KangShield Slurm runtime: contract=${kang_slurm_runtime_version} code=${kang_code_version} clean=${checkout_clean} checkout_bound=true owner_only=true"
+  echo "KangShield Slurm runtime: contract=${kang_slurm_runtime_version} code=${kang_code_version} clean=${checkout_clean} submit_commit_bound=true checkout_bound=true owner_only=true"
 }
 
 kang_slurm_bind_cudnn9() {
