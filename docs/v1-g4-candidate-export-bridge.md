@@ -152,3 +152,5 @@ make PYTHON=.venv/bin/python assess-g4-candidate-export-fixture
 本切片完成：公共 feature/prediction/summary 契约、严格 provenance、CLI、三 variant rule-bearing fixture、evaluator 直接消费、摘要篡改拒绝和自动化回归。
 
 仍未完成：真实 capture G4 feature producer、C6c E2 数据、三路 clean feature run、真实 bundle 组装、人工标注责任与事件指标、多人物 candidate 归属、最终姿态许可证以及 RiskAssessment/Alert。V1-R1 因此继续保持 In progress。
+
+干净提交上的正式 E1 证据见 [Candidate Export Bridge 报告](reports/v1-g4-candidate-export-bridge.md)。

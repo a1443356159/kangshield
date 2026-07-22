@@ -903,3 +903,58 @@
 1. 当前 largest-bbox 只能形成场景级单主目标 candidate；C6c 多人数据到位后，是升级为 per-person episode 还是继续场景级人工确认队列？
 2. 比赛对外主指标最终采用 episodes/hour、negative-clip activation 还是每夜/每日误触发；必须在真实曝光和评分细则到位后冻结。
 3. 如果 frozen policy 在 C6c 上失败，是降级为人工姿态证据工具，还是在独立开发集上设计 v0.2.0 并保留 C6c held-out；不能用同一 held-out 既调参又报最终指标。
+
+---
+
+## REV-018 G4 Capture Feature 到 Candidate Export Bridge Review
+
+- 日期：2026-07-23
+- 状态：Accepted for E1 production-interface tooling；V1-R1 remains In progress
+- 参与人：项目组、Codex
+- 评审范围：capture-bound feature/prediction 公共契约、candidate exporter、上游来源门、rule-bearing fixture、REV-016 scorer 兼容、隐私与真实设备边界
+- 输入材料：[导出桥接设计](v1-g4-candidate-export-bridge.md)、[正式 E1 报告](reports/v1-g4-candidate-export-bridge.md)、实现提交 `a57b8ee`、正式 scorer run `20260722T172634Z-59174d4c`
+
+### 发现
+
+1. REV-016 的 prediction schema 原为 evaluator 私有类，REV-017 public runner 又绑定 URFD/CAUCAFall 专用来源，真实 C6c feature 到位后仍需人工拼 candidate JSON/run manifest。本轮将 exact prediction 提升为公共 `FallCandidatePredictionSet`，字段与 scorer 保持兼容。
+2. `FallFeatureCaptureSet` 将一个姿态 variant 的 capture/model/feature policy、source run、clip order/duration、observation、逐流相对路径/大小/摘要/frame count 固定成显式契约。路径越界、artifact 未绑定、时间顺序、证据、代码或配置漂移均 fail closed。
+3. Exporter 不读取 annotation/adjudication，只把经验证的 `FallMotionFrameValue` 送入已冻结状态机；输出 source manifest 自动绑定 scorer 所需六项摘要和上游 feature run/set。评测层继续不执行候选规则，两侧责任仍分离。
+4. Fixture policy 现在区分 scorer-only 与 rule-bearing：前者可无规则但不能生成；后者必须同时具备 transition/settled/state-machine。正式 bridge fixture 使用与真实 v0.1.0 相同的规则值，但 fixture marker 使其 policy SHA-256 独立为 `b426f823eb72f034b2bd1f2f6613b2c1c86be5d005680e0cd0d8334da04124a3`，没有伪装成真实 policy evidence。
+5. 干净提交 `a57b8ee` 上，YOLO/RTMPose/Keypoint R-CNN fixture source 分别提供 92/96/100 个 frame，真实 exporter 生成 2/3/4 个 episode。三个 candidate run 均 clean/completed/E1、0 issue、各 16 个 SourceAsset。
+6. 原 REV-016 scorer 无需特殊分支即读取新 prediction/source run，输出 TP/FP/FN 为 1/1/1、2/1/0、2/2/0；annotation、agreement、adjudication、minimum-data 和 provenance 五门通过。camera/E2 门按设计关闭，最终仍为 `tooling_only`。
+7. 篡改 JSONL 会在下游 run 创建前失败。12 个聚合 manifest/report/assets 的隐私扫描中，绝对路径、candidate 时间/ID、observation/track、bbox/keypoints 和 risk/alert true 均为 0；exact episode 仅留在被忽略的 derived-sensitive prediction。
+8. 该 fixture 不运行任何 pose backend；三模型名只验证 variant/model-policy binding，2/3/4 候选是预构造 activation layout，不能解释为模型差异或 C6c 性能。
+
+### 决定
+
+1. 接受 `FallFeatureCaptureSet`、公共 `FallCandidatePredictionSet`、timestamp-free `FallCandidateExportSummary`、`export-fall-candidates` CLI、strict provenance 和 rule-bearing 三路 fixture，作为 G4 production interface 基线。
+2. 冻结上游 stage `v1-g4-fall-feature-capture`、下游 stage `v1-g4-fall-event-candidates`、source-run 根目录相对路径语义，以及 capture/model/feature/candidate/prediction 摘要绑定；修改时必须走契约版本升级。
+3. 保持 scorer-only fixture，不用 rule-bearing fixture 替换公式级回归。前者验证评分边界，后者验证生产接口；两者都只属于 E1 tooling。
+4. 真实 C6c 执行必须使用非 fixture candidate policy SHA-256 `380151c86ddaf6b79328ca516a778111fe8a7b2c2caa61e209a055bc8942dd08`；不得复用 fixture policy digest，也不得看到 held-out 输出后改阈值。
+5. 下一开发切片优先实现通用 capture G4 feature producer；之后补通用 event-bundle assembler。当前 bridge 完成不代表已有真实 video-to-feature 或完整真实 bundle 自动化。
+6. 模型状态不变：YOLO 为 V1 对照，RTMPose 为有条件候选，Keypoint R-CNN 为未选 fallback；许可证、多人物和 C6c 事件指标仍是硬门。
+7. RiskAssessment 与 Alert 继续 Literal false，V1-R1 保持 In progress。
+
+### 验证
+
+- 自动化：97 passed；`pip check` 无 broken requirements；`compileall`、全部 shell/sbatch `bash -n` 与 `git diff --check` 通过。
+- Candidate runs：`20260722T172633Z-02e4b8ff`、`20260722T172633Z-c2ad7e03`、`20260722T172633Z-4ae20581`；均为 `a57b8ee`、clean、completed、E1、0 issue。
+- Scorer：run `20260722T172634Z-59174d4c`；manifest `427f8c6beccdc047a81189cbb3c1efd20dd190e3f0e03b71e0791320dc83bdab`；report `ead63c22f96478f0a474cb37b30778c65bd6a0a48d6a7c56d4374e9efec82057`；provenance true、decision `tooling_only`。
+- 输入：bundle `0937ee8031d796134de8cd3b14dad2308d0590cd457434a161be23d2c599a1e7`；fixture candidate policy `b426f823eb72f034b2bd1f2f6613b2c1c86be5d005680e0cd0d8334da04124a3`。
+- 隐私：12 个聚合文件的本地路径、精确 episode/candidate/track/observation、bbox/keypoints 与 risk/alert true 均为 0；三 summary 时间字段为 0。
+
+### 行动项
+
+| 行动 | 负责人 | 截止日期 | 状态 |
+|---|---|---|---|
+| 实现通用 `v1-g4-fall-feature-capture` producer，消费 frozen capture/pose 输出并写本桥接 feature-set/JSONL | Codex | 2026-07-24 | Open |
+| 实现真实 event bundle 的通用组装/摘要验证入口 | Codex | 2026-07-25 | Open |
+| 按 REV-014 取得 C6c E2 held-out capture，并指定独立标注/裁决责任人 | 待指定采集人 / 项目组 | 2026-08-02 | Open |
+| 对三路真实 clean feature run 原样执行 frozen candidate policy 与 REV-016 scorer | Codex | 2026-08-03 | Blocked on capture and annotation |
+| 评审多人 per-person/场景级 candidate 归属与跨 track 去重 | 项目组 | 2026-08-04 | Open |
+
+### 未决问题
+
+1. 通用 capture producer 是直接重放原始 clip，还是先消费一个独立 pose-capture run；必须保证 pose policy、feature policy 和 clip 时序只计算一次且可审计。
+2. 真实 bundle assembler 是否复制 derived-sensitive prediction 到受控 bundle，还是只允许同一受控根目录内引用；需要结合数据保留策略冻结。
+3. C6c 多人物场景是否继续 largest-bbox 场景级候选；本桥接保持现有语义，没有提前替项目组做身份策略决定。

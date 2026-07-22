@@ -47,6 +47,7 @@
 - [V1-R1 G4 跌倒候选 episode 设计](docs/v1-g4-fall-event-candidates.md)
 - [V1-R1 G4 跌倒候选 episode 公开压力报告](docs/reports/v1-g4-fall-candidate-public-stress.md)
 - [V1-R1 G4 Capture Feature 到 Candidate 导出桥接](docs/v1-g4-candidate-export-bridge.md)
+- [V1-R1 G4 Candidate Export Bridge E1 报告](docs/reports/v1-g4-candidate-export-bridge.md)
 
 ## V1 初步开发
 
