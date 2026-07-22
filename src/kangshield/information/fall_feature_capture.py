@@ -199,7 +199,14 @@ def _pose_binding(bindings: list[ModelBinding]) -> ModelBinding:
     pose = matches[0]
     if pose.configuration.get("keypoint_layout") != "COCO-17":
         raise ValueError("capture backend must expose COCO-17 keypoints")
-    if pose.configuration.get("tracking") is not True:
+    inline_tracking = pose.configuration.get("tracking") is True
+    explicit_trackers = [
+        binding
+        for binding in bindings
+        if binding.task == "short_term_pose_tracking"
+        and binding.configuration.get("enabled") is True
+    ]
+    if not inline_tracking and len(explicit_trackers) != 1:
         raise ValueError("capture backend must enable tracking")
     return pose
 

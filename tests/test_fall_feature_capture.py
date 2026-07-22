@@ -14,7 +14,10 @@ from kangshield.information.contracts import (
 )
 from kangshield.information.fall_adl_benchmark import YOLO26N_POSE_SHA256
 from kangshield.information.fall_candidate_export import run_fall_candidate_export
-from kangshield.information.fall_feature_capture import run_fall_feature_capture
+from kangshield.information.fall_feature_capture import (
+    _pose_binding,
+    run_fall_feature_capture,
+)
 from kangshield.information.pose_backend import PoseDetection
 from kangshield.information.privacy import sha256_file
 from scripts.prepare_v1_g4_event_evaluation_fixture import (
@@ -66,6 +69,30 @@ class _FakePoseBackend:
                 track_id=1,
             )
         ]
+
+
+def test_capture_pose_binding_accepts_inline_or_explicit_tracking():
+    inline = _FakePoseBackend().bindings[0]
+    assert _pose_binding([inline]) == inline
+
+    separated_pose = inline.model_copy(
+        update={
+            "task": "human_pose_estimation",
+            "configuration": {"keypoint_layout": "COCO-17"},
+        }
+    )
+    tracker = ModelBinding(
+        task="short_term_pose_tracking",
+        backend="fixture-iou-tracker",
+        model_name="greedy-iou",
+        model_version="fixture-v0.1.0",
+        license="fixture-only",
+        device="cpu",
+        configuration={"enabled": True},
+    )
+    assert _pose_binding([separated_pose, tracker]) == separated_pose
+    with pytest.raises(ValueError, match="enable tracking"):
+        _pose_binding([separated_pose])
 
 
 def _prepare_capture(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
