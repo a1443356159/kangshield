@@ -38,6 +38,7 @@ class SourceType(StrEnum):
     SDK_EXPORT = "sdk_export"
     API_RESPONSE = "api_response"
     FIXTURE = "fixture"
+    RUNTIME_SNAPSHOT = "runtime_snapshot"
 
 
 EVIDENCE_RANK = {
@@ -53,6 +54,7 @@ MAX_EVIDENCE_BY_SOURCE = {
     SourceType.LOCAL_FILE: EvidenceLevel.E2,
     SourceType.SDK_EXPORT: EvidenceLevel.E2,
     SourceType.API_RESPONSE: EvidenceLevel.E3,
+    SourceType.RUNTIME_SNAPSHOT: EvidenceLevel.E1,
 }
 
 

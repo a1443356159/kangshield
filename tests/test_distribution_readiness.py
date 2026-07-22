@@ -31,8 +31,8 @@ def test_current_distribution_policy_is_complete_and_fail_closed():
     assert report.submission_bundle_ready is False
     assert report.decision == "blocked_pending_distribution_review"
     assert report.counts == {
-        "source_total": 7,
-        "source_matched": 7,
+        "source_total": 8,
+        "source_matched": 8,
         "source_missing_or_drifted": 0,
         "required_file_total": 3,
         "required_file_present": 0,
@@ -269,8 +269,8 @@ def test_distribution_cli_writes_owner_only_completed_run(tmp_path, capsys):
 
     assert exit_code == 0
     assert output["submission_bundle_ready"] is False
-    assert output["source_matched"] == 7
-    assert output["source_total"] == 7
+    assert output["source_matched"] == 8
+    assert output["source_total"] == 8
     assert output["required_file_missing"] == 3
     assert output["decision_open"] == 5
     assert output["asset_blocking"] == 6

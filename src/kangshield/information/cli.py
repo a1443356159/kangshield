@@ -321,6 +321,32 @@ def build_parser() -> argparse.ArgumentParser:
         help="Exit 2 unless every submission distribution gate is ready",
     )
 
+    runtime_closure = subparsers.add_parser(
+        "assess-runtime-closure",
+        help="Assess a candidate competition runtime against a sanitized dependency closure",
+    )
+    runtime_closure.add_argument(
+        "--profile",
+        type=Path,
+        default=Path("configs/v1-r1-runtime-profile-rtmpose-funasr.json"),
+    )
+    runtime_closure.add_argument(
+        "--snapshot",
+        type=Path,
+        help="Replay a sanitized runtime inventory instead of inspecting the current interpreter",
+    )
+    runtime_closure.add_argument(
+        "--repository-root",
+        type=Path,
+        default=Path("."),
+    )
+    runtime_closure.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    runtime_closure.add_argument(
+        "--require-ready",
+        action="store_true",
+        help="Exit 2 unless all candidate closure snapshot gates are ready",
+    )
+
     ezviz = subparsers.add_parser(
         "inspect-ezviz",
         help="Inspect and redact an EZVIZ SDK/API JSON snapshot",
@@ -1221,6 +1247,95 @@ def _assess_distribution_readiness_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def _assess_runtime_closure_command(args: argparse.Namespace) -> int:
+    from .privacy import sha256_file
+    from .runtime_closure import (
+        assess_runtime_closure,
+        capture_runtime_inventory,
+        load_runtime_inventory,
+        runtime_inventory_asset,
+        runtime_profile_asset,
+    )
+
+    capture_method = "sanitized_snapshot_replay" if args.snapshot else "live_pip_inspect"
+    with RunArtifacts(
+        args.runs_dir,
+        stage="v1-r1-runtime-closure",
+        evidence_level=EvidenceLevel.E1,
+        configuration={
+            "command": "assess-runtime-closure",
+            "capture_method": capture_method,
+            "profile_path_persisted": False,
+            "snapshot_path_persisted": False,
+            "repository_root_persisted": False,
+            "require_ready": args.require_ready,
+            "final_lock_emission_authorized": False,
+            "legal_advice_provided": False,
+        },
+        project_dir=args.repository_root,
+    ) as run:
+        with run.step("assess-runtime-closure") as step:
+            inventory = (
+                load_runtime_inventory(args.snapshot)
+                if args.snapshot
+                else capture_runtime_inventory()
+            )
+            inventory_output = run.write_report(
+                "runtime-inventory.json",
+                inventory,
+            )
+            profile_asset = runtime_profile_asset(args.profile)
+            inventory_asset = runtime_inventory_asset(inventory)
+            if sha256_file(inventory_output) != inventory_asset.sha256:
+                raise RuntimeError("persisted runtime inventory digest changed")
+            run.record_asset(profile_asset)
+            run.record_asset(inventory_asset)
+            report = assess_runtime_closure(
+                profile_path=args.profile,
+                repository_root=args.repository_root,
+                inventory=inventory,
+            )
+            output = run.write_report("runtime-closure.json", report)
+            step.outputs.extend(
+                [run.relative(inventory_output), run.relative(output)]
+            )
+            run.manifest.configuration.update(
+                {
+                    "profile_id": report.profile_id,
+                    "profile_sha256": report.profile_sha256,
+                    "snapshot_sha256": report.snapshot_sha256,
+                }
+            )
+            run.save_manifest()
+    _print_result(
+        run,
+        {
+            "decision": report.decision,
+            "closure_snapshot_ready": report.closure_snapshot_ready,
+            "direct_matched": report.counts["direct_matched"],
+            "direct_total": report.counts["direct_total"],
+            "closure_package_total": report.counts["closure_package_total"],
+            "dependency_issue_total": report.counts[
+                "dependency_issue_total"
+            ],
+            "extraneous_installed_total": report.counts[
+                "extraneous_installed_total"
+            ],
+            "license_metadata_missing_total": report.counts[
+                "license_metadata_missing_total"
+            ],
+            "gate_ready": report.counts["gate_ready"],
+            "gate_total": report.counts["gate_total"],
+            "competition_lock_emitted": report.competition_lock_emitted,
+            "third_party_notice_emitted": report.third_party_notice_emitted,
+            "legal_advice_provided": report.legal_advice_provided,
+        },
+    )
+    if args.require_ready and not report.closure_snapshot_ready:
+        return 2
+    return 0
+
+
 def _inspect_ezviz_command(args: argparse.Namespace) -> int:
     with RunArtifacts(
         args.runs_dir,
@@ -1724,6 +1839,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _assess_sleep_route_command(args)
     if args.command == "assess-distribution-readiness":
         return _assess_distribution_readiness_command(args)
+    if args.command == "assess-runtime-closure":
+        return _assess_runtime_closure_command(args)
     if args.command == "inspect-ezviz":
         return _inspect_ezviz_command(args)
     if args.command == "run-multimodal":

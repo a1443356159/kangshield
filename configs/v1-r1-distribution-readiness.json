@@ -8,12 +8,19 @@
   "source_bindings": [
     {
       "relative_path": "pyproject.toml",
-      "sha256": "8092ca469ec591b1f018d774282a68a936a8f108d6c0376e7fbfc3ded35841a3",
+      "sha256": "9b6015661dacc85a91f41a88ddf0414c5ff317f7a4f74aea6a6f2b04ee073902",
       "covered_asset_ids": [
         "kangshield-project-code",
         "python-dependency-closure",
         "ultralytics-runtime",
         "yolo26n-pose-weight"
+      ]
+    },
+    {
+      "relative_path": "configs/v1-r1-runtime-profile-rtmpose-funasr.json",
+      "sha256": "a1ef8ef46caf5002cd9e5fdaf461c7aeb09e0ac4b55cb0fc36f5ec7f69d10823",
+      "covered_asset_ids": [
+        "python-dependency-closure"
       ]
     },
     {
