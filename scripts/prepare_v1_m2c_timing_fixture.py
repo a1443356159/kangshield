@@ -14,7 +14,7 @@ from kangshield.information.privacy import sha256_file
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT = (
-    PROJECT_ROOT / "data" / "raw" / "public-smoke" / "v1-m2c-timing.synthetic.mkv"
+    PROJECT_ROOT / "data" / "raw" / "public-smoke" / "v1-m2c-timing.synthetic.avi"
 )
 
 
@@ -33,7 +33,9 @@ def build_fixture(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     samples_per_frame = sample_rate_hz // fps
     click_times_s = {0.5, duration_s - 0.5}
-    with av.open(str(output_path), "w", format="matroska") as output:
+    # AVI avoids Matroska's randomly generated SegmentUID, so identical inputs
+    # produce a byte-identical fixture suitable for a provenance smoke test.
+    with av.open(str(output_path), "w", format="avi") as output:
         output.metadata["title"] = "kangshield-synthetic-av-timing-fixture"
         output.metadata["fixture"] = "synthetic-no-personal-data"
         video = output.add_stream("ffv1", rate=fps)
