@@ -61,10 +61,11 @@ frozen source manifest
 ```text
 fall-adl-cases.json
         │
-        ├── YOLO26n-pose + ByteTrack ─┐
-        └── YOLOX-m + RTMPose-m + IoU ├── child video.pose_frame
-                                      ├── FallMotionFeatureExtractor
-                                      └── child fall case report
+        ├── YOLO26n-pose + ByteTrack ──────┐
+        ├── YOLOX-m + RTMPose-m + IoU ─────┤
+        └── Keypoint R-CNN + IoU ──────────┼── child video.pose_frame
+                                           ├── FallMotionFeatureExtractor
+                                           └── child fall case report
 
 12 child reports × variant ──> parent aggregate by activity / illumination
 ```
@@ -84,12 +85,12 @@ kangshield-info benchmark-fall-adl \
 make submit-g4-adl-benchmark
 ```
 
-计算节点只做离线模型校验和推理，不下载模型。YOLO 权重摘要必须是冻结值；HumanArt detector/pose 必须同时匹配当前模型 policy，artifact license 继续保持 `model-artifact-license-review-required`。
+计算节点只做离线模型校验和推理，不下载模型。YOLO 权重摘要必须是冻结值；HumanArt detector/pose 和 Keypoint R-CNN 必须分别匹配自己的 policy，两个候选 artifact license 均继续保持 `model-artifact-license-review-required`。
 
 ## 7. E1 验收门
 
 1. 12 个源文件与元数据表逐项通过大小、SHA-256 和解码校验，lock 二次生成不漂移。
-2. 两个 variant 在干净提交、L40、完整 12 case 上 completed，所有 child 与 parent 均为 E1。
+2. 三个 variant 在干净提交、L40、完整 12 case 上 completed，所有 child 与 parent 均为 E1。
 3. 按 activity、illumination 和 case 报告 pose coverage、fallback、横卧最长持续、下降与低运动代理。
 4. 所有 `video.fall_motion_frame` 的风险与告警字段为 false；父报告不含原始框、关键点或本地路径。
 5. 横卧、下降或低运动代理出现时只做定位，不写成误报率、precision、recall 或告警性能。
@@ -102,4 +103,6 @@ make submit-g4-adl-benchmark
 2. 空房、纯家具、床上躺卧、宠物和真实多人负样本。
 3. person-presence、动作区间、跌倒事件起点与 held-out 阈值冻结。
 4. 多人身份策略、事件级误触发/检出延迟和人工确认闭环。
-5. 非 HumanArt 训练路线候选和最终模型分发许可证。
+5. 最终模型分发许可证；Keypoint R-CNN 已完成 E1 对比，但 COCO/ImageNet 权重血缘仍未关闭。
+
+REV-013 的第三候选结果见 [Keypoint R-CNN 独立候选报告](reports/v1-m3-torchvision-keypointrcnn-candidate.md)。历史双模型报告继续保留，三模型正式 run 为 `20260722T120722Z-10fe9abb`。

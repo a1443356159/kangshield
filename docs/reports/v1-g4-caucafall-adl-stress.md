@@ -135,3 +135,9 @@ Slurm accounting elapsed 38 秒；`/usr/bin/time` wall 33.58 秒，最大 RSS 1,
 2. 用 C6c 按同一 5 FPS 配置采集白天/夜视、距离、遮挡和安全模拟跌倒，先保持阈值冻结以观察域偏移。
 3. 另设 held-out 决策集后才设计横卧持续 + 下降 + 低运动 + 质量/区域约束的候选规则，并报告事件级误触发与延迟。
 4. 继续评测一个不依赖 HumanArt 训练条款的姿态候选；RTMPose 仍是条件候选，不是最终提交模型。
+
+## 10. REV-013 三模型补充证据
+
+后续 job `1764` 在干净提交 `eae5f56` 上增加 Keypoint R-CNN：person-box 为 621/661（93.95%），box + keypoints 为 523，keypoint gate 为 523/621（84.22%），推理 RTF 为 0.105836。它出现 7 个 horizontal bbox 帧，最长 200 ms；其中 5 帧同时通过关键点门且 torso-horizontal，动作仍是 no-fall kneel/walk。
+
+这项补充把原决定加强为：“单帧 bbox horizontal 不得告警”之外，“关键点门通过 + torso-horizontal 也不得直接告警”。候选移除了 HumanArt 依赖，但 URFD lying gate 仅通过 4/21，且 COCO/ImageNet 权重分发仍待审查，因此只保留为 fallback。完整运行、哈希和错误定位见 [Keypoint R-CNN 独立候选报告](v1-m3-torchvision-keypointrcnn-candidate.md)。

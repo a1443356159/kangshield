@@ -1,6 +1,6 @@
 # 康盾里程碑与验收门
 
-状态：Active v0.5
+状态：Active v0.6
 
 基准日期：2026-07-22
 
@@ -49,6 +49,7 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 | V1-M2c 容器时间戳 E1 工具 | `4b17b21` / `4a65630` / `c5f2715` | `origin/main` | 2026-07-22 已验证 | PyAV 轨道与逐包 PTS/DTS、required-audio gate、确定性 AVI、正式 E1 报告和 REV-010；不代表 C6c 音频或 G2 已验收 |
 | V1-R1 G4 跌倒运动特征 E1 工具 | `782026b` / `3defab6` | `origin/main` | 2026-07-22 已验证 | box-only 时序代理、COCO-17 质量门、fail-closed fallback、双变体正式报告和 REV-011；不代表真实 G4、跌倒判断或告警已验收 |
 | V1-R1 G4 CAUCAFall ADL 压力 | `336bbe9` / `97062d5` | `origin/main` | 2026-07-22 已验证 | CC-BY-4.0 固定 12-case、确定性准备/lock、双变体 L40 压力报告和 REV-012；只关闭公开拾物/坐下/跪地/行走子门 |
+| V1-M3/G4 Keypoint R-CNN 独立候选 | `eae5f56` / `d956203` / 待文档提交 | `origin/main` | 待本轮推送验证 | 三模型 M2b 与 CAUCAFall L40 对比、候选 G4 派生、权重血缘 fail-closed 和 REV-013；保留 fallback，不是最终选型 |
 
 这里的“推送验证”只证明代码已到达远端。V1-M1 仍为 In progress，必须取得 C6c 与 CS-EP-SDNL1 的 E2/E3 证据后才能进入 Review/Done。V1-M2a 和 V1-M2b 的 Done 只关闭设备无关 E1 链路及公开固定集评测，不会提升真实设备证据等级。V1-M3 的姿态、语言和睡眠字段三个 E1 切片均已验收，因此仅在 E1 探索范围标记 Done；M2c 已有采集规程和 E1 容器时间戳工具，但仍没有真实 C6c 媒体或 SDNL1 字段证据。V1-R1 G4 的离线特征与 CAUCAFall 压力也只属于 E1，不能替代 C6c 正负样本、剩余居家负样本或跌倒风险/告警验收。
 
@@ -144,8 +145,11 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 - [x] CPU 开发预检验证完整报告；该 dirty run 不作为正式里程碑证据。
 - [x] 在干净提交 `0674be9` 上完成 L40 双 variant 对比（job `1760`）。
 - [x] Review 横卧覆盖、fall-01 关键点质量和性能；候选有条件进入 V2，许可证门仍 Open。
+- [x] 冻结并接入 TorchVision Keypoint R-CNN 独立候选，不针对固定集调参。
+- [x] 在 job `1763` / `1764` 完成三模型 M2b 与 CAUCAFall E1 回放，并从干净 child events 派生候选 G4 特征。
+- [x] Review 候选 lying gate 4/21、ADL 几何混淆和 COCO/ImageNet 权重血缘；决定仅保留 fallback，不替换 RTMPose 条件参考。
 
-设计见 [V1-M3 姿态模型对比](v1-m3-pose-model-comparison.md)，实测证据见 [同集对比报告](reports/v1-m3-pose-model-comparison.md)。姿态切片已通过 REV-006；语言和睡眠路线随后分别在 REV-007、REV-008 关闭。
+设计见 [V1-M3 姿态模型对比](v1-m3-pose-model-comparison.md)，历史双模型证据见 [同集对比报告](reports/v1-m3-pose-model-comparison.md)。REV-013 的独立候选设计与三模型结果见 [Keypoint R-CNN 设计](v1-m3-torchvision-keypointrcnn-candidate.md)和[正式报告](reports/v1-m3-torchvision-keypointrcnn-candidate.md)。姿态 E1 探索有了 fallback 结论，但最终比赛模型仍等待真机和分发门。
 
 当前语言切片：
 
@@ -184,9 +188,11 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 - [x] 形成 V2-D1 可直接采用输入、七个硬门和不等待真机的开发顺序。
 - [x] 在干净提交 `782026b` 上完成 G4 box-only、COCO-17 关键点质量门、同 track 时间特征和 fallback reason 的双变体 E1 正式运行；硬约束不输出风险或告警。
 - [x] 在干净提交 `336bbe9` 上完成 CAUCAFall 12 段 ADL、三档光照、双变体 E1 压力运行；确认 RTMPose 在 no-fall ADL 中有 17 个 horizontal box-only 帧，单一框比例不得触发告警。
+- [x] 在干净提交 `eae5f56` 上完成 Keypoint R-CNN 三模型复跑；确认 no-fall ADL 中“关键点门通过 + torso-horizontal”也会激活，不得直接触发告警。
+- [x] 完成一个不依赖 HumanArt 的公开权重候选评测；因 lying gate 4/21 和 COCO/ImageNet 分发仍 Open，只保留 fallback。
 - [ ] 使用 C6c 正负样本并继续补空房、纯家具、床上躺卧、宠物和多人负样本，关闭真实 G4 后再决定多人策略、阈值与事件评测口径。
 - [ ] 用 E2/E3 证据把 C6c 与 SDNL1 从 Unknown 归类为 available、limited 或 blocked。
-- [ ] 决定 V2 最终姿态权重和项目分发许可证，生成第三方 NOTICE。
+- [ ] 决定 V2 最终姿态权重和项目分发许可证，生成第三方 NOTICE；HumanArt 与 Keypoint R-CNN 均未关闭该门。
 - [ ] 为硬门指定负责人和截止日期，并删除无法完成的 V2 能力声明。
 
 预 Review 见 [V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。G4 基础设计与证据见[跌倒运动特征设计](v1-g4-fall-motion-features.md)和[正式报告](reports/v1-g4-fall-motion-features.md)，扩展 ADL 子门见 [CAUCAFall 设计](v1-g4-caucafall-adl-stress.md)和[压力报告](reports/v1-g4-caucafall-adl-stress.md)。E1 工具与公开 ADL 压力完成不等于 V1-R1 Done；真机、剩余负样本、最终姿态分发路线和责任人仍是验收门。

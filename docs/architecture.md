@@ -1,6 +1,6 @@
 # 康盾工程架构与模块设计
 
-状态：Draft v0.6
+状态：Draft v0.7
 
 更新时间：2026-07-22
 
@@ -73,7 +73,7 @@ flowchart LR
 
 M7 在 V1-M2b 增加“固定数据源清单 → 数据准备 → 单 case run → 套件汇总”子链路。数据准备器只生成可回放媒体、标签 sidecar 和 lock；模型 Pipeline 仍只消费标准媒体，评测器只读取 FeatureEvent、sidecar 和 PipelineReport，不把数据集专用标签渗入在线提取器。
 
-V1-M3 在 M3/M7 之间增加“同一 PoseBackend 契约 → 视频-only variant runner → 阶段/质量/性能对比”。在线姿态事件不读取 URFD 标签；标签只在评测器中按媒体相对时间匹配。RTMPose 采用独立人物检测、top-down 关键点和短时 IoU ID，但仍输出既有 PoseDetection，避免候选框架反向改变公共数据契约。
+V1-M3 在 M3/M7 之间增加“同一 PoseBackend 契约 → 视频-only variant runner → 阶段/质量/性能对比”。在线姿态事件不读取 URFD 标签；标签只在评测器中按媒体相对时间匹配。RTMPose 与 TorchVision Keypoint R-CNN 均通过 adapter 输出既有 PoseDetection 和短时 IoU ID，避免候选框架反向改变公共数据契约；Keypoint R-CNN 的 heatmap logit 只转换为未校准质量代理。
 
 语言切片沿用相同边界：“同一 SpeechBackend 契约 → audio-only variant runner → CER/静音/性能对比”。FunASR 与 Whisper 都只返回 SpeechSegment；参考文本仅由 M7 评测器读取，提取器不能读取或调参。逐句转写停留在被忽略的 child FeatureEvent，case/variant/父报告只包含字符计数和聚合指标。
 
@@ -83,7 +83,7 @@ V1-M2c 在 M1/M2 之间增加独立容器时间戳探针：“本地原始容器
 
 V1-R1 G4 在 M3/M7 之间增加“干净 PoseModelComparisonReport + child pose events → box/keypoint 时序特征 → phase/class 汇总”。特征提取器只读取姿态事件，不读取 URFD 阶段标签；标签只由评测器按媒体相对时间匹配。每帧必须选择 `box_plus_keypoints`、`box_only` 或 `unavailable` 并保留 fallback reason；本层固定不产生 RiskAssessment 或 Alert。
 
-G4 另设不污染 M2b 跨模态 case schema 的 CAUCAFall ADL 压力支路：“冻结官方下载清单 → 未转码视频 + dataset lock → 双姿态 variant/case child run → activity/illumination 父汇总”。原始框/关键点只留在被忽略的 child features，父报告只发布摘要。该支路只验证公开无跌倒 ADL 中的覆盖和代理混淆，不产生分类误报率。
+G4 另设不污染 M2b 跨模态 case schema 的 CAUCAFall ADL 压力支路：“冻结官方下载清单 → 未转码视频 + dataset lock → 三姿态 variant/case child run → activity/illumination 父汇总”。原始框/关键点只留在被忽略的 child features，父报告只发布摘要。该支路只验证公开无跌倒 ADL 中的覆盖和代理混淆，不产生分类误报率。
 
 ## 5. V1 运行形态
 
@@ -164,7 +164,7 @@ V1 暂不冻结 RiskAssessment、AlertEvent 和 FeedbackEvent；这些对象在 
 V1-R1 将架构能力分为三层：
 
 1. 直接进入 V2-D1 的基线：公共契约、运行 provenance、回放/评测接口、隐私与证据等级、睡眠 fail-closed gate。
-2. 只进入候选接口的实现：HumanArt + RTMPose、FunASR 和跌倒 box/keypoint 特征；在目标设备、负样本或许可证门关闭前不能成为正式能力。
+2. 只进入候选接口的实现：HumanArt + RTMPose、TorchVision Keypoint R-CNN fallback、FunASR 和跌倒 box/keypoint 特征；在目标设备、负样本或许可证门关闭前不能成为正式能力。
 3. 不进入当前主路径的能力：YOLO26n 默认姿态、Whisper 普通话主链路、睡眠模型、自动诈骗/认知/抑郁评分，以及无设备证据的 HRV/SpO2/AHI 等字段。
 
 V2-D1 可以在真机到位前继续设计 adapter seam；媒体 PTS 探针与 G4 跌倒运动特征的 E1 工具均已完成，但真实 G2/G4 仍未关闭。G4 当前只提供离线 feature/fallback 契约，不能进入 RiskAssessment 或告警。系统必须同时保留三种运行声明：真实平台接入、受控文件回放、能力 blocked。三者不得共享同一个“已接入”状态。

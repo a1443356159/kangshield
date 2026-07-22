@@ -24,6 +24,8 @@
 - [V1-M2b 公开固定集初测报告](docs/reports/v1-m2b-public-dataset-benchmark.md)
 - [V1-M3 姿态模型对比设计](docs/v1-m3-pose-model-comparison.md)
 - [V1-M3 姿态模型同集对比报告](docs/reports/v1-m3-pose-model-comparison.md)
+- [V1-M3 Keypoint R-CNN 独立候选设计](docs/v1-m3-torchvision-keypointrcnn-candidate.md)
+- [V1-M3 Keypoint R-CNN 独立候选报告](docs/reports/v1-m3-torchvision-keypointrcnn-candidate.md)
 - [V1-M3 语音模型同集对比设计](docs/v1-m3-speech-model-comparison.md)
 - [V1-M3 语音模型同集对比报告](docs/reports/v1-m3-speech-model-comparison.md)
 - [V1-M2c 目标设备样本与时间基采集规程](docs/v1-m2c-device-sample-protocol.md)
@@ -98,13 +100,14 @@ URFD 与 FLEURS 的固定版本、许可证和 SHA-256 见[数据集评测设计
 运行 V1-M3 同集姿态对比：
 
 ```bash
-python -m pip install -e ".[dev,rtmpose-gpu]"
+python -m pip install -e ".[dev,multimodal,rtmpose-gpu]"
 python scripts/prepare_v1_m3_pose_models.py
+PYTHONPATH=src python scripts/prepare_v1_m3_torchvision_pose_model.py
 kangshield-info benchmark-pose-models \
   data/processed/v1-m2b/benchmark-cases.json
 ```
 
-该命令只重放六段视频，对比 YOLO26n-pose 与 YOLOX-m HumanArt + RTMPose-m HumanArt；不会重复运行语言模型。模型固定信息、阈值偏差和评测边界见[V1-M3 设计](docs/v1-m3-pose-model-comparison.md)。
+该命令只重放六段视频，默认对比 YOLO26n-pose、YOLOX-m HumanArt + RTMPose-m HumanArt 和 TorchVision Keypoint R-CNN；不会重复运行语言模型。第三候选的权重血缘、未校准关键点分数和 fail-closed 分发边界见[独立候选设计](docs/v1-m3-torchvision-keypointrcnn-candidate.md)。
 
 从一份干净的姿态父报告离线派生 G4 运动特征：
 

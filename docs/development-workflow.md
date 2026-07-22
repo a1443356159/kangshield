@@ -1,6 +1,6 @@
 # 开发与证据晋级流程
 
-状态：Active v0.5
+状态：Active v0.6
 
 ## 1. 开发顺序
 
@@ -158,10 +158,11 @@ Python 3.13 的当前 Slurm 环境不安装完整 MMCV/MMPose 栈；候选使用
 python -m pip install -r requirements/slurm-rtmpose.txt
 python scripts/prepare_v1_m3_pose_models.py
 python scripts/prepare_v1_m3_pose_models.py --offline
+PYTHONPATH=src python scripts/prepare_v1_m3_torchvision_pose_model.py --offline
 make submit-m3-pose-comparison
 ```
 
-计算节点不得下载权重。父报告记录两个 variant 的模型摘要、阶段覆盖、关键点质量、耗时和显存口径；详细设计见 [V1-M3 姿态模型对比](v1-m3-pose-model-comparison.md)。
+计算节点不得下载权重。父报告默认记录三个 variant 的模型摘要、阶段覆盖、关键点质量、耗时和显存口径；Keypoint R-CNN 的 logit 质量代理禁止跨模型作概率比较。详细设计见 [V1-M3 姿态模型对比](v1-m3-pose-model-comparison.md)和[独立候选扩展](v1-m3-torchvision-keypointrcnn-candidate.md)。
 
 ### V1-R1 G4 跌倒运动特征
 
@@ -176,7 +177,7 @@ kangshield-info benchmark-fall-features \
 
 runner 会校验 parent/child 代码版本、输入摘要、模型 digest、case order、annotation 和当前模型许可证 policy。默认拒绝 dirty、未完成或来源漂移的运行。输出只包含 box/keypoint 运动代理、质量门和 fallback reason；`risk_assessment_emitted` 与 `alert_emitted` 必须为 false。设计和正式 E1 证据见 [G4 设计](v1-g4-fall-motion-features.md)与[正式报告](reports/v1-g4-fall-motion-features.md)。
 
-扩展公开 ADL 压力集保持独立 schema，先在联网节点准备并校验 12 个 CAUCAFall AVI，再提交双变体 L40 job：
+扩展公开 ADL 压力集保持独立 schema，先在联网节点准备并校验 12 个 CAUCAFall AVI，再提交三变体 L40 job：
 
 ```bash
 make prepare-g4-caucafall
@@ -200,7 +201,7 @@ make submit-m3-speech-comparison
 
 ### V1-R1 决策与许可证门
 
-V1-R1 的当前采用/候选/放弃状态见 [探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。框架许可证、预训练权重、训练数据和比赛提交物必须分别记录；特别是 HumanArt + RTMPose 的 ModelBinding 已改为 `model-artifact-license-review-required`，不能因 MMPose 实现为 Apache-2.0 而自动解锁权重分发。
+V1-R1 的当前采用/候选/放弃状态见 [探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。框架许可证、预训练权重、训练数据和比赛提交物必须分别记录；HumanArt + RTMPose 与 Keypoint R-CNN 的 ModelBinding 均为 `model-artifact-license-review-required`，不能分别因 MMPose Apache-2.0 或 TorchVision BSD-3-Clause 自动解锁权重分发。
 
 ## 5. 运行检查
 

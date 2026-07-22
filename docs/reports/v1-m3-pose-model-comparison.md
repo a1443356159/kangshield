@@ -94,3 +94,7 @@ runs/20260722T053908Z-9b8096cd/reports/pose-model-comparison-report.json
 2. 在相同 5 fps、0.05 阈值下复跑候选，按白天/夜视、距离、遮挡和动作分组。
 3. 增加关键点质量门和 box-only 横卧 fallback 的离线特征实验，不直接生成告警。
 4. 按 REV-008 的 fail-closed gate 取得 CS-EP-SDNL1 脱敏 API/SDK/导出样例；不训练睡眠模型，也不在 E2/E3 证据前输出标准化字段。
+
+## 8. REV-013 后续候选说明
+
+本报告保留 job `1760` 的历史双模型结果。后续 Keypoint R-CNN 三模型复跑在 M2b 达到 163/170、lying 21/21，但 G4 必需肩/髋点门在 lying 仅通过 4/21，未形成稳定几何优势；其 COCO/ImageNet 权重分发也仍未关闭。完整证据见 [Keypoint R-CNN 独立候选报告](v1-m3-torchvision-keypointrcnn-candidate.md)。RTMPose 因此仍是条件参考，而不是已选最终模型。

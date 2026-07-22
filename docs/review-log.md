@@ -470,7 +470,7 @@
 |---|---|---|---|
 | 实现 ffprobe/PyAV 容器轨道与 PTS 探针 | Codex | 2026-07-22 | Done（REV-010；仅 E1 工具，C6c G2 仍 Open） |
 | 实现 box-only 跌倒特征、关键点质量门和 fallback reason 的 E1 离线实验 | Codex | 2026-07-24 | Done（REV-011；仅 E1，真实 G4 仍 Open） |
-| 评测一个不依赖 Human-Art 训练条款的姿态候选 | Codex | 2026-07-25 | Open |
+| 评测一个不依赖 Human-Art 训练条款的姿态候选 | Codex | 2026-07-25 | Done（REV-013；保留 fallback，分发仍 Open） |
 | 取得 C6c/SDNL1 E2/E3 或可复核 blocked 证据 | 待指定 | 2026-08-01 | Open |
 | 决定项目 LICENSE、最终模型分发路线并生成 THIRD_PARTY_NOTICES | 待指定 | 2026-08-09 | Open |
 | 为 V2 硬门指定最终负责人和演示降级声明 | 待指定 | 2026-08-09 | Open |
@@ -576,7 +576,7 @@
 | 增加许可证可审计的空房、家具、弯腰、坐下、床上躺卧和多人负样本来源 | Codex | 2026-07-25 | Partial：REV-012 已补弯腰/坐下/跪地/行走；其余 Open |
 | 用同一冻结配置复跑 C6c 白天/夜视、距离、遮挡和安全模拟跌倒场景 | 待指定 | 2026-08-01 | Open |
 | 为 C6c 集增加 person-presence、动作区间和事件时刻人工标注并冻结事件指标 | 待指定 | 2026-08-03 | Open |
-| 评测一个不依赖 Human-Art 训练条款的姿态候选 | Codex | 2026-07-25 | Open |
+| 评测一个不依赖 Human-Art 训练条款的姿态候选 | Codex | 2026-07-25 | Done（REV-013；保留 fallback，分发仍 Open） |
 
 ### 未决问题
 
@@ -626,10 +626,62 @@
 | 补空房、纯家具、床上躺卧、宠物和多人负样本；许可证不清时转为受控自采 | Codex / 待指定采集人 | 2026-07-27 | Open |
 | 用 C6c 采集同配置白天/夜视、距离、遮挡和安全模拟跌倒正负样本 | 待指定 | 2026-08-01 | Open |
 | 冻结 held-out 事件标注、组合决策和误触发/延迟口径 | 待指定 | 2026-08-03 | Open |
-| 评测不依赖 HumanArt 训练条款的姿态候选 | Codex | 2026-07-25 | Open |
+| 评测不依赖 HumanArt 训练条款的姿态候选 | Codex | 2026-07-25 | Done（REV-013；保留 fallback，分发仍 Open） |
 
 ### 未决问题
 
 1. 床上躺卧、纯家具和 person-absent 数据应继续找明确许可的公开源，还是直接转为 C6c 受控自采？
 2. C6c 固定机位是否需要 ROI/地面区域约束，且如何避免把该约束过拟合到单个房间？
 3. 横卧持续、下降、低运动和人工确认应如何组合，才能在 held-out 集上形成可审计事件，而不是事后调阈值？
+
+---
+
+## REV-013 V1-M3/G4 Keypoint R-CNN 独立候选 Review
+
+- 日期：2026-07-22
+- 状态：Accepted E1 evidence；candidate retained as fallback；V1-R1 milestone remains In progress
+- 参与人：项目组、Codex
+- 评审范围：非 HumanArt 姿态候选、权重血缘、M2b 横卧覆盖、G4 关键点门、CAUCAFall no-fall 混淆、性能与隐私
+- 输入材料：[候选设计](v1-m3-torchvision-keypointrcnn-candidate.md)、[正式报告](reports/v1-m3-torchvision-keypointrcnn-candidate.md)、提交 `eae5f56` / `d956203`、正式运行 `20260722T120654Z-d1d51960` / `20260722T120722Z-10fe9abb` / `20260722T121434Z-2e11f559`
+
+### 发现
+
+1. Keypoint R-CNN 在 M2b 为 163/170，lying 21/21；与 RTMPose 总覆盖相同，并多覆盖 1 个 lying 帧，但 ADL 少 1 帧。
+2. 覆盖未转化为横卧关键点优势：候选 lying gate 仅 4/21，17 帧 box-only；RTMPose 为 11/20 和 9 帧 box-only。候选问题集中在横卧必需肩/髋点，而不是 not-lying。
+3. CAUCAFall 上候选 coverage 为 621/661、gate 523/621，优于 RTMPose 的 602/661、298/602；但候选仍有 7 个 horizontal bbox、46 个 torso-horizontal、10 个 rapid-descent 和 313 个 low-motion 激活。
+4. 候选 7 个 horizontal bbox 中有 5 个同时通过关键点门且 torso-horizontal，动作是无跌倒 kneel/walk。关键点门只证明几何字段可用，不证明事件为跌倒。
+5. 候选 L40 推理 RTF 在 M2b/G4 分别为 0.100451/0.105836，满足 E1 实时回放；速度不是当前阻断项。
+6. TorchVision 实现为 BSD-3-Clause，但官方预训练模型条款要求使用者审查关联数据集。COCO 逐图许可、ImageNet access/use 和比赛包权重再分发均未关闭；移除 HumanArt 不等于 license-cleared。
+
+### 决定
+
+1. 接受 Keypoint R-CNN frozen policy、adapter、三模型 runner、G4 派生接入和正式 E1 证据。
+2. 候选状态固定为 `Conditional fallback / not selected`，不替换 RTMPose 当前条件参考，也不进入最终比赛包。
+3. 不在 M2b 或 CAUCAFall 上继续调 0.5、800/1333 或 G4 阈值；下一轮只在预先冻结的 C6c held-out 集检验。
+4. V2-D1 增加硬约束：单一 bbox-horizontal 不得告警；即使关键点门通过且 torso-horizontal，也不得直接告警。
+5. HumanArt 与 Keypoint R-CNN 两条公开预训练路线的分发门都保持 Open；若不能关闭，转向权利清晰的数据和自有训练/导出权重。
+6. V1-R1 继续 In progress，等待 C6c、剩余负样本、事件指标、最终分发路线和负责人。
+
+### 验证
+
+- 自动化：65 passed；`pip check` 无 broken requirements；`compileall`、`bash -n`、离线权重校验和 `git diff --check` 通过。
+- 权重：237,034,793 bytes，SHA-256 `fc266e953d2b302cdcbb9ae66f71f6b0d4649928bf02dc573961e361e4918926`；policy `921883358f6f2b23f0760d9f9612213adb044f54c9ac3e6ae24c8225e186f8db`。
+- M2b：job `1763`，L40，completed 0:0；parent + 18 child clean/E1/completed；report `9c2264b14140f4923c2ed28b6a5ec79ddffea6477f402822746137e05a6c964f`。
+- CAUCAFall：job `1764`，L40，completed 0:0；parent + 36 child clean/E1/completed；report `369275b58a9148e32a58c25f36abefc8b566bd57be4533dea8684f991b3aaef4`。
+- G4 派生：run `20260722T121434Z-2e11f559`，代码/source 均 clean、E1、completed；report `87a90bf1b8cb327e41702a2f8414bc237998e290a5775fa9a198bfb2b71d72c1`。
+- 隐私：CAUCAFall 1983 个 fall-motion events 与 M2b 170 个派生 events 均无原始框、关键点或本地路径，risk/alert true 为 0。
+
+### 行动项
+
+| 行动 | 负责人 | 截止日期 | 状态 |
+|---|---|---|---|
+| 冻结 C6c held-out 场景/事件标注后复跑三候选，不在目标集调阈值 | 待指定采集人 / Codex | 2026-08-03 | Open |
+| 确认比赛提交物是否包含权重及 COCO/ImageNet/HumanArt 再分发要求 | 待指定许可证负责人 | 2026-07-29 | Open |
+| 若公开 checkpoint 均不能关闭分发门，冻结自有训练数据/模型路线 | 项目组 | 2026-08-05 | Open |
+| 补空房、床上躺卧、家具、宠物和真实多人负样本 | 待指定采集人 | 2026-08-03 | Open |
+
+### 未决问题
+
+1. 比赛是否允许运行时下载但不随包分发权重，且该方式是否满足离线演示要求？
+2. C6c 固定机位是否需要预先冻结 ROI/地面几何，还是先评测无 ROI 的域偏移？
+3. 自有训练路线优先使用姿态估计 + 事件规则，还是直接训练带时间上下文的事件模型？

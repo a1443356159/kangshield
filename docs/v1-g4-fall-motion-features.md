@@ -4,7 +4,7 @@
 
 基准日期：2026-07-22
 
-主输入：V1-M3 RTMPose / YOLO26n 干净姿态事件、V1-M2b URFD 固定集
+主输入：V1-M3 RTMPose / YOLO26n / Keypoint R-CNN 干净姿态事件、V1-M2b URFD 固定集
 
 ## 1. 目标与非目标
 
@@ -111,6 +111,8 @@ runner 校验 benchmark ID/digest/case order、parent/child run 状态与代码�
 
 历史 `0674be9` 姿态报告生成于许可证纠偏之前，里面的 HumanArt binding 仍写成过宽的 Apache-2.0。G4 不继承该值，而是用当前 `configs/v1-m3-pose-models.json` 的模型 digest 逐项匹配，将 detector/pose artifact 重新绑定为 `model-artifact-license-review-required`，保存策略 SHA-256 和 correction ledger。digest 不匹配即失败。
 
+REV-013 后 runner 也接受 `torchvision-keypointrcnn`。该路线不做历史 license correction，而是要求来源 ModelBinding 的权重 digest、`model-artifact-license-review-required` 和 `configs/v1-m3-torchvision-pose-model.json` 策略摘要逐项一致；关键点分数仍是未校准质量代理。
+
 ## 7. E1 验收
 
 干净实现提交 `782026b` 上完成两个正式运行：
@@ -121,6 +123,8 @@ runner 校验 benchmark ID/digest/case order、parent/child run 状态与代码�
 两者都处理 170 帧、输出 170 个无风险 FeatureEvent，manifest completed、`code_dirty=false`。候选在 21 个 lying 采样帧中有 20 帧 bbox、17 帧横卧代理、11 帧关键点门通过和 9 帧 box-only；YOLO 分别为 9、8、3 和 6。既有 URFD 三段 ADL 的两个变体各有 82 个可用框且横卧代理为 0。
 
 随后新增的 [CAUCAFall ADL 压力集](v1-g4-caucafall-adl-stress.md)覆盖拾物、坐下、跪地、行走和三种光照。RTMPose 在 602 个有框帧中出现 17 个横卧框代理，全部为关键点门失败的 box-only，最长连续 1000 ms；YOLO 为 0。该结果进一步证明“URFD ADL 横卧为 0”不能外推为误报率，也不能把单一宽高比接到告警。完整压力结果见[CAUCAFall 正式报告](reports/v1-g4-caucafall-adl-stress.md)。
+
+Keypoint R-CNN 后续在 URFD lying 为 21/21 有框，但只有 4/21 通过关键点门；CAUCAFall 又出现 5 个 gate-passed + torso-horizontal 的 no-fall kneel/walk 帧。因此质量门是字段可用门，不是事件决策门。完整证据见[独立候选报告](reports/v1-m3-torchvision-keypointrcnn-candidate.md)。
 
 ## 8. V2 前的剩余门
 

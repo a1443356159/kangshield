@@ -1,6 +1,6 @@
 # 信息侧模块详细技术路线
 
-状态：Implementation Baseline v0.6
+状态：Implementation Baseline v0.7
 
 更新时间：2026-07-22
 
@@ -307,6 +307,7 @@ V1-R1 G4 复用已完成的姿态 child events，只派生 box 横卧/下降/低
 ### 阶段 C：候选增强
 
 - V2 姿态准确率有条件候选：YOLOX-m HumanArt + RTMPose-m HumanArt。
+- V2 姿态独立 fallback：TorchVision Keypoint R-CNN；覆盖较高但 lying keypoint gate 仅 4/21，且权重分发仍 Open，不替换 RTMPose 条件参考。
 - 跌倒特征输入：box-only 横卧/下降/静止与 keypoint quality gate 已完成 E1 离线实现；C6c 正负样本、多人策略和真实 G4 仍 Open。
 - MediaPipe、openSMILE、Face/OpenFace、YAMNet 当前 Defer，不继续无标签扩展。
 
@@ -320,7 +321,7 @@ V1-R1 G4 复用已完成的姿态 child events，只派生 box 横卧/下降/低
 - 错误案例和限制可解释。
 - 能支撑跌倒主线或明确的增强演示。
 
-V1-R1 已完成 E1 决策收敛：YOLO26n 为 V1 对照，HumanArt + RTMPose 为准确率有条件候选，FunASR 为普通话有条件候选，Whisper small 不晋级普通话主链路。Human-Art-trained artifact 不能继承 MMPose 实现的 Apache-2.0 标记，目标设备、负样本和分发门关闭前仍不得晋级。完整账本见 [V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。
+V1-R1 已完成 E1 决策收敛：YOLO26n 为 V1 对照，HumanArt + RTMPose 为准确率条件参考，Keypoint R-CNN 为未选 fallback，FunASR 为普通话有条件候选，Whisper small 不晋级普通话主链路。HumanArt artifact 不能继承 MMPose Apache-2.0，Keypoint R-CNN 权重也不能继承 TorchVision BSD-3-Clause；目标设备、负样本和分发门关闭前均不得晋级。完整账本见 [V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。
 
 ## 9. 时间与多模态对齐
 

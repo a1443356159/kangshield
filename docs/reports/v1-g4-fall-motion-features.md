@@ -136,4 +136,10 @@ yolox_m_humanart.onnx: Apache-2.0 -> model-artifact-license-review-required
 1. REV-012 已用 CAUCAFall 补拾物/坐下/跪地/行走和三档光照；继续增加空房、纯家具、床上躺卧、宠物和多人负样本并完成许可证审查。
 2. 取得 C6c 场景矩阵后以同一配置复跑，并报告按光照/距离/遮挡的 available、fallback 和代理激活。
 3. 为真实设备集增加 person-presence、动作区间和事件时刻人工标注，届时再设计误触发与检出延迟口径。
-4. 评估不依赖 Human-Art 训练条款的姿态候选；最终模型与项目 LICENSE/NOTICE 仍需独立决定。
+4. REV-013 已评估不依赖 Human-Art 的 Keypoint R-CNN；因 lying gate 仅 4/21 和 COCO/ImageNet 分发仍 Open，只保留 fallback。最终模型与项目 LICENSE/NOTICE 仍需独立决定。
+
+## 9. REV-013 候选派生补充
+
+Keypoint R-CNN 来源 parent `20260722T120654Z-d1d51960` 为 clean/E1/completed；派生 run `20260722T121434Z-2e11f559` 使用代码 `d956203`，同样 clean/E1/completed。候选 lying 21/21 有框、21 个 horizontal bbox，但只有 4 帧通过关键点门，17 帧进入 box-only；not-lying 则为 126/127 有框且 126 帧全部过门。
+
+该分裂说明候选的困难点特定于横卧几何。它不推翻 box-only fallback，反而强化“覆盖、质量门和事件语义必须分层”。正式 report SHA-256 为 `87a90bf1b8cb327e41702a2f8414bc237998e290a5775fa9a198bfb2b71d72c1`；170 个派生事件仍无原始坐标、风险或告警。完整三模型比较见 [Keypoint R-CNN 候选报告](v1-m3-torchvision-keypointrcnn-candidate.md)。

@@ -1,6 +1,6 @@
 # V1 信息采集与多模态模型探索
 
-状态：Active v0.3
+状态：Active v0.4
 
 更新时间：2026-07-22
 
@@ -195,6 +195,7 @@ AppKey、AccessToken、设备验证码和设备序列号不得提交到仓库。
 | 单人姿态快速候选 | MediaPipe Pose Landmarker | 每人 33 个图像/世界姿态点、可见性、可选分割 | V1-R1 Defer；只有 CPU/移动端成为明确部署门时重开 |
 | 多人/远距离姿态 | YOLO26n-pose + ByteTrack | 人体框、17 个 COCO 关键点、置信度、轨迹 | V1 对照；lying 42.86% 且有 AGPL/Enterprise 门，不进入 V2 默认主链路 |
 | 姿态精度候选 | YOLOX-m HumanArt + RTMPose-m HumanArt | 人体框、COCO-17 关键点、置信度、短时轨迹 | V1-R1 Conditional；lying 95.24%，但 C6c、fall-01 关键点、负样本和 Human-Art artifact 分发门仍 Open |
+| 姿态独立备选 | TorchVision Keypoint R-CNN COCO_V1 | 人体框、COCO-17、未校准 logit 质量代理、短时轨迹 | V1-R1 fallback/not selected；lying coverage 100% 但关键点门仅 4/21，COCO/ImageNet/权重分发仍 Open |
 | 跌倒时序 | 规则特征 | 框中心下降、宽高比、横卧/静止窗口、关键点质量与 fallback | V1-R1 G4 E1 已实现；真实 C6c、居家正负样本、多人策略和阈值仍 Open，不输出风险结论 |
 | 时序动作模型 | MMAction2 PoseC3D / ST-GCN 系列 | 骨架序列动作分类 | V1-R1 Defer；只有规则基线、目标设备和足够标注片段完成后才启动 |
 | 人脸几何 | MediaPipe Face Landmarker | 478 个 3D 人脸点、52 个 blendshape、变换矩阵 | V1-R1 Defer，不直接当 FACS AU |
@@ -300,13 +301,13 @@ V1 不在没有参考设备的情况下声称心率、呼吸或睡眠分期准�
 2. 对摄像头执行设备列表、能力集、直播、回放、抓图、告警和音频探测。
 3. 对睡眠仪获取一份真实 API/导出样例及字段说明。
 4. 使用 C6c 录制首批白天、夜视、远近距离视频与受控音频。
-5. 在冻结的真实样本上运行 YOLO26 对照、HumanArt + RTMPose 候选和 FunASR；不重复无门槛增加 MediaPipe/Whisper。
+5. 在冻结的真实样本上运行 YOLO26 对照、HumanArt + RTMPose 条件参考、Keypoint R-CNN fallback 和 FunASR；REV-013 后不再无门槛横向增加姿态 checkpoint。
 
 设备无关基线已在 Slurm L40 上通过 E1 smoke，见 [V1-M2a 初测报告](reports/v1-m2a-multimodal-smoke.md)。该结果不改变前四项真实设备任务的证据状态。
 
-V1-M3 姿态同集对比已经冻结模型、摘要、阈值和报告契约，见[姿态模型对比设计](v1-m3-pose-model-comparison.md)和[正式报告](reports/v1-m3-pose-model-comparison.md)。HumanArt + RTMPose 已成为准确率有条件候选；最终是否进入 V2 仍取决于 C6c V1-M2c 复测、负样本和许可证 Review。
+V1-M3 姿态同集对比已经冻结模型、摘要、阈值和报告契约，见[姿态模型对比设计](v1-m3-pose-model-comparison.md)和[历史双模型报告](reports/v1-m3-pose-model-comparison.md)。HumanArt + RTMPose 保持准确率条件参考；REV-013 的 [Keypoint R-CNN 独立候选](reports/v1-m3-torchvision-keypointrcnn-candidate.md)虽达到 lying 21/21，但横卧关键点门仅 4/21，因此只保留 fallback。两条路线最终是否进入 V2 都取决于 C6c、负样本和分发 Review。
 
-V1-R1 G4 已把既有姿态事件转换为 box 横卧/下降/低运动、横卧持续、COCO-17 关键点质量门和显式 fallback reason，见 [G4 设计](v1-g4-fall-motion-features.md)和[正式 E1 报告](reports/v1-g4-fall-motion-features.md)。RTMPose 在 21 个 lying 采样帧中有 20 帧可用框、17 帧横卧代理、11 帧通过关键点门，另 9 帧进入 box-only；这些是特征覆盖证据，不是跌倒准确率。真实 C6c G4 与居家负样本仍未关闭，且本切片不生成 RiskAssessment 或告警。
+V1-R1 G4 已把既有姿态事件转换为 box 横卧/下降/低运动、横卧持续、COCO-17 关键点质量门和显式 fallback reason，见 [G4 设计](v1-g4-fall-motion-features.md)和[正式 E1 报告](reports/v1-g4-fall-motion-features.md)。RTMPose 在 21 个 lying 采样帧中有 20 帧可用框、11 帧通过关键点门；Keypoint R-CNN 为 21 帧有框但只有 4 帧过门。CAUCAFall 又证明 gate-passed torso-horizontal 会出现在 no-fall kneel/walk。这些是特征覆盖与混淆证据，不是跌倒准确率；真实 C6c G4、居家负样本和事件决策仍未关闭，且本切片不生成 RiskAssessment 或告警。
 
 V1-M3 语音同集对比已经完成，见 [语音模型对比设计](v1-m3-speech-model-comparison.md)和[正式报告](reports/v1-m3-speech-model-comparison.md)。FunASR 保留为普通话默认候选，Whisper small 不晋级；该结论只来自六条 clean FLEURS 普通话，不代表 C6c 远场、方言、老人或背景噪声效果。
 

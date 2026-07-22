@@ -78,7 +78,7 @@ flowchart LR
 准备并验证模型：
 
 ```bash
-python -m pip install -e ".[dev,rtmpose-gpu]"
+python -m pip install -e ".[dev,multimodal,rtmpose-gpu]"
 python scripts/prepare_v1_m3_pose_models.py
 python scripts/prepare_v1_m3_pose_models.py --offline
 ```
@@ -98,7 +98,7 @@ L40 正式运行：
 make submit-m3-pose-comparison
 ```
 
-输出包括父级 `pose-model-comparison-report.json`、每个 variant 汇总和 12 个独立 case run。模型、数据集媒体和 `runs/` 均不提交 Git。
+历史双模型运行输出 12 个独立 case run；REV-013 后默认 runner 增加 Keypoint R-CNN，共输出 18 个 variant/case child。模型、数据集媒体和 `runs/` 均不提交 Git。
 
 ## 7. 当前边界
 
@@ -107,3 +107,9 @@ make submit-m3-pose-comparison
 - 公开数据和阈值扫描都固定为 E1；不能替代 C6c E2/E3 设备证据。
 - 人体框覆盖率不等于关键点几何正确。尤其 fall-01 即使返回框，也可能没有足够可信的髋、肩、踝点支持跌倒规则。
 - 干净提交 `0674be9` 已由 Slurm job `1760` 在 L40 上完成；结果与决定见 [V1-M3 姿态模型同集对比报告](reports/v1-m3-pose-model-comparison.md)。
+
+## 8. REV-013 独立候选扩展
+
+REV-012 后新增 TorchVision Keypoint R-CNN，用于检查不依赖 HumanArt 的替代路线。该候选冻结 COCO_V1 权重摘要、0.5 人物阈值、800/1333 resize、COCO-17 adapter 和未校准 logit 变换；当前默认 runner 为三模型。
+
+新增候选没有改写 job `1760` 的历史双模型结论。其设计、三模型 job `1763`、CAUCAFall job `1764` 和最终“保留 fallback、不替换 RTMPose”决定见 [独立候选设计](v1-m3-torchvision-keypointrcnn-candidate.md)与[正式报告](reports/v1-m3-torchvision-keypointrcnn-candidate.md)。
