@@ -16,7 +16,7 @@
 
 未采用的候选：
 
-- [UP-Fall 官方页](https://sites.google.com/up.edu.mx/challenge-up-2019/data/datasets)明确说明图像文件不再公开，无法形成可重复视频准备链路；
+- [UP-Fall 官方页](https://sites.google.com/up.edu.mx/har-up/)与[论文](https://www.mdpi.com/1424-8220/19/9/1988)提供双摄像头、11 类活动和公开下载信息，但完整数据量很大，本轮检查也未找到足以冻结到逐文件清单的数据像素许可证，因此暂不纳入；
 - [NTU RGB+D 官方页](https://rose1.ntu.edu.sg/dataset/actionRecognition/)要求账号审批，并限制为学术非商业使用且禁止再分发/派生，不适合当前快速可重复切片；
 - [E-FPDS 官方页](https://gram.web.uah.es/data/datasets/fpds/index.html)有床/沙发类场景价值，但当前页面没有找到足以冻结的明确数据许可证，因此 fail closed，不进入本轮下载清单。
 
@@ -100,7 +100,7 @@ make submit-g4-adl-benchmark
 ## 8. 仍未关闭
 
 1. C6c 白天/夜视、距离、俯仰角、遮挡和安全模拟跌倒正样本。
-2. 空房、纯家具、床上躺卧、宠物和真实多人负样本。
+2. Open Images 静态 furniture/pet/multi-person 人物检测子门已有独立设计；空房视频、床上躺卧、宠物移动、多人 tracking 与真实 C6c 仍未关闭。
 3. person-presence、动作区间、跌倒事件起点与 held-out 阈值冻结。
 4. 多人身份策略、事件级误触发/检出延迟和人工确认闭环。
 5. 最终模型分发许可证；Keypoint R-CNN 已完成 E1 对比，但 COCO/ImageNet 权重血缘仍未关闭。

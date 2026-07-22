@@ -126,9 +126,11 @@ REV-013 后 runner 也接受 `torchvision-keypointrcnn`。该路线不做历史 
 
 Keypoint R-CNN 后续在 URFD lying 为 21/21 有框，但只有 4/21 通过关键点门；CAUCAFall 又出现 5 个 gate-passed + torso-horizontal 的 no-fall kneel/walk 帧。因此质量门是字段可用门，不是事件决策门。完整证据见[独立候选报告](reports/v1-m3-torchvision-keypointrcnn-candidate.md)。
 
+[Open Images 静态居家压力集](v1-g4-openimages-static-home-stress.md)进一步冻结 4 张家具无人、4 张宠物无人和 4 张室内多人图片，只评测 person-absent false activation 与 IoU 0.5 人物框匹配。它不运行本节时序特征，不能补床上躺卧、宠物移动、多人 tracking 或事件级指标。
+
 ## 8. V2 前的剩余门
 
 1. 对 C6c 白天/夜视、距离、遮挡、弯腰、坐下、床上躺卧和安全模拟跌倒复跑同一冻结配置。
-2. CAUCAFall 已补弯腰/坐下/跪地/行走和三档光照；继续增加空房、纯家具、床上躺卧、宠物和多人片段，多人出现时替换 largest-bbox 探索策略。
+2. CAUCAFall 已补弯腰/坐下/跪地/行走和三档光照；Open Images 静态子集补 furniture/pet/multi-person 的人物检测压力。继续增加空房视频、床上躺卧、宠物移动和真实多人片段，多人出现时替换 largest-bbox 探索策略。
 3. 用人工 person-presence、动作区间和事件起点标注，另行冻结误触发、检出延迟和 track fragmentation 指标。
 4. 只有 G3/G4/G5 共同关闭后，V2-D1 才能设计 RiskAssessment；本 E1 FeatureEvent 不直接触发告警。

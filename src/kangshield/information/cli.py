@@ -374,6 +374,74 @@ def build_parser() -> argparse.ArgumentParser:
     fall_adl.add_argument("--pose-sample-fps", type=float, default=5.0)
     fall_adl.add_argument("--max-duration-s", type=float, default=30.0)
 
+    static_home = subparsers.add_parser(
+        "benchmark-static-home",
+        help=(
+            "Stress person detection on the fixed Open Images furniture, pet, "
+            "and multi-person still-image set"
+        ),
+    )
+    static_home.add_argument("static_home_cases", type=Path)
+    static_home.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    static_home.add_argument(
+        "--variant",
+        action="append",
+        choices=(
+            "yolo26n-pose",
+            "rtmpose-m-humanart",
+            "torchvision-keypointrcnn",
+        ),
+        help="Repeat to select variants; defaults to all three in this order",
+    )
+    static_home.add_argument(
+        "--model-binding-policy",
+        type=Path,
+        default=Path("configs/v1-m3-pose-models.json"),
+    )
+    static_home.add_argument(
+        "--yolo-model", type=Path, default=Path("models/yolo26n-pose.pt")
+    )
+    static_home.add_argument("--yolo-device", default="auto")
+    static_home.add_argument("--yolo-image-size", type=int, default=640)
+    static_home.add_argument("--yolo-confidence", type=float, default=0.35)
+    static_home.add_argument(
+        "--rtmpose-detector-model",
+        type=Path,
+        default=Path(
+            "models/rtmpose/yolox_m_humanart/yolox_m_humanart.onnx"
+        ),
+    )
+    static_home.add_argument(
+        "--rtmpose-pose-model",
+        type=Path,
+        default=Path(
+            "models/rtmpose/rtmpose_m_humanart/rtmpose_m_humanart.onnx"
+        ),
+    )
+    static_home.add_argument("--rtmpose-device", default="auto")
+    static_home.add_argument(
+        "--rtmpose-detection-confidence", type=float, default=0.05
+    )
+    static_home.add_argument(
+        "--torchvision-model",
+        type=Path,
+        default=Path(
+            "models/torchvision/"
+            "keypointrcnn_resnet50_fpn_coco-fc266e95.pth"
+        ),
+    )
+    static_home.add_argument(
+        "--torchvision-policy",
+        type=Path,
+        default=Path("configs/v1-m3-torchvision-pose-model.json"),
+    )
+    static_home.add_argument("--torchvision-device", default="auto")
+    static_home.add_argument(
+        "--torchvision-detection-confidence", type=float, default=0.5
+    )
+    static_home.add_argument("--torchvision-min-size", type=int, default=800)
+    static_home.add_argument("--torchvision-max-size", type=int, default=1333)
+
     speech_benchmark = subparsers.add_parser(
         "benchmark-speech-models",
         help="Compare the FunASR baseline and Whisper small on V1-M2b speech",
@@ -988,6 +1056,71 @@ def _benchmark_fall_adl_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def _benchmark_static_home_command(args: argparse.Namespace) -> int:
+    from .static_home_benchmark import run_static_home_benchmark
+
+    variants = args.variant or [
+        "yolo26n-pose",
+        "rtmpose-m-humanart",
+        "torchvision-keypointrcnn",
+    ]
+    run, report = run_static_home_benchmark(
+        static_home_cases_path=args.static_home_cases,
+        runs_dir=args.runs_dir,
+        variants=variants,
+        model_binding_policy_path=args.model_binding_policy,
+        yolo_model=args.yolo_model,
+        yolo_device=args.yolo_device,
+        yolo_image_size=args.yolo_image_size,
+        yolo_confidence=args.yolo_confidence,
+        rtmpose_detector_model=args.rtmpose_detector_model,
+        rtmpose_pose_model=args.rtmpose_pose_model,
+        rtmpose_device=args.rtmpose_device,
+        rtmpose_detection_confidence=args.rtmpose_detection_confidence,
+        torchvision_model=args.torchvision_model,
+        torchvision_policy=args.torchvision_policy,
+        torchvision_device=args.torchvision_device,
+        torchvision_detection_confidence=(
+            args.torchvision_detection_confidence
+        ),
+        torchvision_min_size=args.torchvision_min_size,
+        torchvision_max_size=args.torchvision_max_size,
+    )
+    summaries = []
+    for variant in report.variants:
+        metrics = variant.overall
+        summaries.append(
+            {
+                "variant_id": variant.variant_id,
+                "person_absent_false_activation_rate": (
+                    metrics.person_absent_false_activation_rate
+                ),
+                "matched_person_count": metrics.matched_person_count,
+                "false_positive_count": metrics.false_positive_count,
+                "false_negative_count": metrics.false_negative_count,
+                "detection_precision": metrics.detection_precision,
+                "detection_recall": metrics.detection_recall,
+                "multi_all_people_matched_cases": (
+                    metrics.multi_all_people_matched_cases
+                ),
+                "risk_assessment_emitted": variant.risk_assessment_emitted,
+                "alert_emitted": variant.alert_emitted,
+            }
+        )
+    _print_result(
+        run,
+        {
+            "suite_id": report.suite_id,
+            "case_count": report.case_count,
+            "matching_iou_threshold": report.matching_iou_threshold,
+            "variants": summaries,
+            "risk_assessment_emitted": report.risk_assessment_emitted,
+            "alert_emitted": report.alert_emitted,
+        },
+    )
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "probe-media":
@@ -1010,6 +1143,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _benchmark_fall_features_command(args)
     if args.command == "benchmark-fall-adl":
         return _benchmark_fall_adl_command(args)
+    if args.command == "benchmark-static-home":
+        return _benchmark_static_home_command(args)
     if args.command == "benchmark-speech-models":
         return _benchmark_speech_models_command(args)
     raise RuntimeError(f"unhandled command: {args.command}")

@@ -87,6 +87,8 @@ V1-R1 G4 在 M3/M7 之间增加“干净 PoseModelComparisonReport + child pose 
 
 G4 另设不污染 M2b 跨模态 case schema 的 CAUCAFall ADL 压力支路：“冻结官方下载清单 → 未转码视频 + dataset lock → 三姿态 variant/case child run → activity/illumination 父汇总”。原始框/关键点只留在被忽略的 child features，父报告只发布摘要。该支路只验证公开无跌倒 ADL 中的覆盖和代理混淆，不产生分类误报率。
 
+G4 再增加一条与视频事件严格隔离的 Open Images 静态人物检测支路：“逐图许可证审计 + 官方标签/框与像素摘要 → 独立图片单次推理 → IoU 0.5 人物框匹配 → furniture/pet/multi-person 父汇总”。静态 runner 强制关闭 tracking，不把图片重复成伪视频；person-absent 只报告人物 false activation，多人物只报告框级匹配。该支路不运行 G4 运动特征，也不关闭床上躺卧、跌倒、时序事件或 C6c 域内验证。
+
 ## 5. V1 运行形态
 
 V1 采用一次运行一个目录的离线流水线：
@@ -140,6 +142,10 @@ PoseBenchmarkCaseEvaluation 复用相同视频和 sidecar，分别保存人物�
 
 FallMotionFrameValue 保存归一化框形状/位置、同 track 的下降/低运动/横卧持续代理、COCO-17 关键点质量门、feature path 和 fallback reason；不复制原始 bbox、关键点或阶段标签。FallFeatureBenchmarkReport 只在评测层按 case/class/phase 聚合 available 与代理激活数，并以 Literal `false` 固定 `risk_assessment_emitted` 和 `alert_emitted`。来源 parent/child run、代码版本、模型 digest、配置和 sidecar 摘要不一致时 fail closed。
 
+### StaticHomeImageCase 与 StaticHomeBenchmarkReport
+
+StaticHomeImageCase 固定 Open Images validation 图片摘要、尺寸、场景、Person 人工验证标签与 normalized Person boxes；逐图作者、标题和许可证只进入独立 attribution 资产，不复制到评测报告。StaticHomeCaseEvaluation 保存匹配/FP/FN 计数、平均匹配 IoU 与单图耗时，不保存预测坐标。StaticHomeGroupMetrics 按家具无人、宠物无人和室内多人汇总 false activation、precision/recall 与多人完整匹配；variant/parent report 固定 `risk_assessment_emitted=false`、`alert_emitted=false`。
+
 ### ContainerTimingReport
 
 MediaStreamTiming 保存每条视频/音频轨的 codec、time base、声明时间、逐包 PTS/DTS 完整性、时间范围、步长与技术元数据；ContainerTimingReport 汇总轨道数、同容器状态和首尾相对偏移。报告不保存容器 metadata value 或源路径，并把扫描截断显式降级为 partial。duration delta 只是轨道时间范围差，不得解释为 drift。
@@ -173,7 +179,7 @@ V1-R1 将架构能力分为三层：
 2. 只进入候选接口的实现：HumanArt + RTMPose、TorchVision Keypoint R-CNN fallback、FunASR 和跌倒 box/keypoint 特征；在目标设备、负样本或许可证门关闭前不能成为正式能力。
 3. 不进入当前主路径的能力：YOLO26n 默认姿态、Whisper 普通话主链路、睡眠模型、自动诈骗/认知/抑郁评分，以及无设备证据的 HRV/SpO2/AHI 等字段。
 
-V2-D1 可以在真机到位前继续设计 adapter seam；媒体 PTS、采集包 readiness 与 G4 跌倒运动特征的 E1 工具均已完成，但真实 G2/G3/G4 仍未关闭。G4 当前只提供离线 feature/fallback 契约，不能进入 RiskAssessment 或告警。系统必须同时保留三种运行声明：真实平台接入、受控文件回放、能力 blocked。三者不得共享同一个“已接入”状态。
+V2-D1 可以在真机到位前继续设计 adapter seam；媒体 PTS、采集包 readiness、G4 跌倒运动特征与静态人物检测压力工具均已完成，但真实 G2/G3/G4 仍未关闭。G4 当前只提供离线 feature/fallback 与静态 person-detection 证据，不能进入 RiskAssessment 或告警。系统必须同时保留三种运行声明：真实平台接入、受控文件回放、能力 blocked。三者不得共享同一个“已接入”状态。
 
 完整决策 ID、许可证边界和硬门见 [V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。
 

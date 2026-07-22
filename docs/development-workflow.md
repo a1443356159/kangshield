@@ -197,6 +197,17 @@ make submit-g4-adl-benchmark
 
 准备器冻结 DOI/版本/许可、Mendeley file ID、大小、SHA-256、subject/activity 矩阵和三档光照；评测器再次校验 prepared suite、模型摘要和 COCO-17 布局。每个 case 使用 child run 保存敏感 pose events，父报告只按动作/光照发布摘要。详见 [CAUCAFall 压力设计](v1-g4-caucafall-adl-stress.md)与[正式报告](reports/v1-g4-caucafall-adl-stress.md)。
 
+家具/宠物人物负标签与多人框采用独立的 Open Images 静态 suite，不把图片重复成视频：
+
+```bash
+make PYTHON=.venv/bin/python prepare-g4-static-home
+kangshield-info benchmark-static-home \
+  data/processed/v1-g4-openimages-static-home/static-home-cases.json
+make submit-g4-static-home-benchmark
+```
+
+准备器同时冻结 4 个官方 provenance CSV、12 张图片的字节摘要、Open Images Person 标签/框、逐图作者/标题/CC BY 2.0 landing-page 审计，以及 Google LLC / CC BY 4.0 标注归因。runner 对每张图独立推理且 `tracking=false`，person-absent 预测全部计 FP，多人物按 IoU 0.5 一对一匹配。该结果只能称为静态人物检测压力，不能写成跌倒误报率或 C6c 结果。详见[静态压力集设计](v1-g4-openimages-static-home-stress.md)。
+
 ### V1-M3 语音同集对比
 
 在登录节点固定并校验 OpenAI Whisper small 和已有 FunASR 权重，再由同一 L40 job 顺序运行两个 variant：
@@ -234,6 +245,10 @@ V1-R1 的当前采用/候选/放弃状态见 [探索收敛与 V2 输入清单](v
 14. CAUCAFall source manifest、prepared suite、dataset lock 和 12 个 AVI 的摘要是否一致且二次准备不漂移。
 15. G4 ADL 父报告是否只含 aggregate/case 摘要，原始 pose fields 是否只留在被忽略的 child run。
 16. ADL 中的 horizontal/descent/low-motion 是否只写成代理激活，而没有误写成 false-positive rate 或告警。
+17. Open Images source manifest、4 个 provenance CSV、12 张图片、attribution、prepared suite 与 dataset lock 是否全部摘要一致且二次准备不漂移。
+18. 每张 Open Images 图片是否保留作者、标题、原始 landing page、CC BY 2.0 URL、未改动声明和复审日期；比赛提交前是否计划逐图重审。
+19. 静态 runner 是否关闭 tracking，parent/case report 是否无预测坐标、绝对路径、逐图作者信息及 risk/alert true。
+20. 静态 false activation 与 IoU box 指标是否只按人物检测解释，没有外推到视频、床上躺卧、跌倒事件或目标 C6c。
 
 快速检查：
 

@@ -299,6 +299,8 @@ kangshield-info benchmark-fall-features \
 
 V1-R1 G4 复用已完成的姿态 child events，只派生 box 横卧/下降/低运动、横卧持续、COCO-17 关键点质量门和 fallback reason。runner 默认拒绝 dirty、未完成、非 E1、代码/模型/输入摘要漂移的姿态来源；阶段标签只进入 evaluator，派生事件不含原始坐标或标签。输出固定不产生 RiskAssessment 或 Alert。设计与 E1 结果见 [G4 设计](v1-g4-fall-motion-features.md)和[正式报告](reports/v1-g4-fall-motion-features.md)。
 
+Open Images 静态居家支路独立消费 4 张家具无人、4 张宠物无人和 4 张室内多人 validation 图片。每张图片单独推理一次并关闭 tracking；负标签只形成 person false activation，多人物只形成 IoU 0.5 框匹配。逐图许可、归因和像素摘要由准备器/lock 固定，评测 parent 不包含框坐标或作者信息。该支路不进入 G4 时序特征，也不替代 C6c。设计见[静态压力集](v1-g4-openimages-static-home-stress.md)。
+
 ## 8. 模型接入路线
 
 模型按“先输入可用性，再输出精度”推进：
@@ -319,7 +321,7 @@ V1-R1 G4 复用已完成的姿态 child events，只派生 box 横卧/下降/低
 
 - V2 姿态准确率有条件候选：YOLOX-m HumanArt + RTMPose-m HumanArt。
 - V2 姿态独立 fallback：TorchVision Keypoint R-CNN；覆盖较高但 lying keypoint gate 仅 4/21，且权重分发仍 Open，不替换 RTMPose 条件参考。
-- 跌倒特征输入：box-only 横卧/下降/静止与 keypoint quality gate 已完成 E1 离线实现；C6c 正负样本、多人策略和真实 G4 仍 Open。
+- 跌倒特征输入：box-only 横卧/下降/静止与 keypoint quality gate 已完成 E1 离线实现；Open Images 静态 furniture/pet/multi-person 只补人物检测压力；C6c 正负视频、床上躺卧、多人 tracking、事件指标和真实 G4 仍 Open。
 - MediaPipe、openSMILE、Face/OpenFace、YAMNet 当前 Defer，不继续无标签扩展。
 
 ### 阶段 D：V2 晋级

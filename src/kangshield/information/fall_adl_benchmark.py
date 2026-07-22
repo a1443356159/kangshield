@@ -385,6 +385,7 @@ def build_fall_adl_pose_backend(
     torchvision_detection_confidence: float,
     torchvision_min_size: int,
     torchvision_max_size: int,
+    track: bool = True,
 ) -> PoseBackend:
     if variant_id == "yolo26n-pose":
         return UltralyticsPoseBackend(
@@ -392,7 +393,7 @@ def build_fall_adl_pose_backend(
             device=yolo_device,
             image_size=yolo_image_size,
             confidence=yolo_confidence,
-            track=True,
+            track=track,
         )
     if variant_id == "rtmpose-m-humanart":
         from .rtmpose_backend import HumanArtRTMPoseBackend
@@ -402,7 +403,7 @@ def build_fall_adl_pose_backend(
             pose_model=rtmpose_pose_model,
             device=rtmpose_device,
             detection_confidence=rtmpose_detection_confidence,
-            track=True,
+            track=track,
         )
     if variant_id == "torchvision-keypointrcnn":
         from .torchvision_pose_backend import TorchvisionKeypointRCNNBackend
@@ -414,7 +415,7 @@ def build_fall_adl_pose_backend(
             detection_confidence=torchvision_detection_confidence,
             min_size=torchvision_min_size,
             max_size=torchvision_max_size,
-            track=True,
+            track=track,
         )
     raise ValueError(f"unknown fall ADL pose variant: {variant_id}")
 

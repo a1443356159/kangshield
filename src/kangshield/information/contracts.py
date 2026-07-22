@@ -715,6 +715,221 @@ class FallAdlBenchmarkReport(ContractModel):
         return self
 
 
+class StaticPersonBox(ContractModel):
+    bbox_norm_xyxy: list[float] = Field(min_length=4, max_length=4)
+    is_occluded: bool = False
+    is_truncated: bool = False
+
+    @model_validator(mode="after")
+    def validate_box(self) -> "StaticPersonBox":
+        x1, y1, x2, y2 = self.bbox_norm_xyxy
+        if any(value < 0.0 or value > 1.0 for value in self.bbox_norm_xyxy):
+            raise ValueError("normalized person box coordinates must be in [0, 1]")
+        if x2 <= x1 or y2 <= y1:
+            raise ValueError("normalized person box must have positive area")
+        return self
+
+
+class StaticHomeImageCase(ContractModel):
+    schema_version: str = "1.0"
+    case_id: str
+    evidence_level: EvidenceLevel = EvidenceLevel.E1
+    dataset_id: str
+    dataset_version: int = Field(ge=1)
+    split: Literal["validation"] = "validation"
+    image_id: str
+    image_path: str
+    image_sha256: str = Field(min_length=64, max_length=64)
+    image_byte_size: int = Field(gt=0)
+    image_width: int = Field(gt=0)
+    image_height: int = Field(gt=0)
+    scenario: Literal[
+        "person_absent_furniture",
+        "person_absent_pet",
+        "multi_person_indoor",
+    ]
+    expected_person_presence: Literal["absent", "present"]
+    expected_person_count: int = Field(ge=0)
+    person_boxes: list[StaticPersonBox] = Field(default_factory=list)
+    context_labels: list[str] = Field(default_factory=list)
+    image_license: Literal["CC-BY-2.0"] = "CC-BY-2.0"
+    manual_review_status: Literal["passed"] = "passed"
+    ground_truth_scope: Literal[
+        "openimages_verified_person_label_and_validation_person_boxes"
+    ] = "openimages_verified_person_label_and_validation_person_boxes"
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_person_contract(self) -> "StaticHomeImageCase":
+        if self.expected_person_count != len(self.person_boxes):
+            raise ValueError("expected person count disagrees with person boxes")
+        if self.scenario.startswith("person_absent"):
+            if self.expected_person_presence != "absent" or self.person_boxes:
+                raise ValueError("person-absent case cannot contain person boxes")
+        elif (
+            self.expected_person_presence != "present"
+            or self.expected_person_count < 2
+        ):
+            raise ValueError("multi-person case must contain at least two people")
+        if not self.context_labels:
+            raise ValueError("static home case requires context labels")
+        return self
+
+
+class StaticHomeCaseEvaluation(ContractModel):
+    schema_version: str = "1.0"
+    case_id: str
+    variant_id: str
+    run_id: str
+    scenario: str
+    source_image_sha256: str = Field(min_length=64, max_length=64)
+    image_width: int = Field(gt=0)
+    image_height: int = Field(gt=0)
+    ground_truth_person_count: int = Field(ge=0)
+    predicted_person_count: int = Field(ge=0)
+    matched_person_count: int = Field(ge=0)
+    false_positive_count: int = Field(ge=0)
+    false_negative_count: int = Field(ge=0)
+    person_activation: bool
+    mean_detection_confidence: float | None = Field(
+        default=None, ge=0.0, le=1.0
+    )
+    mean_matched_iou: float | None = Field(default=None, ge=0.0, le=1.0)
+    inference_ms: float = Field(ge=0.0)
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_counts(self) -> "StaticHomeCaseEvaluation":
+        if self.matched_person_count > min(
+            self.ground_truth_person_count, self.predicted_person_count
+        ):
+            raise ValueError("matched person count exceeds available boxes")
+        if self.false_positive_count != (
+            self.predicted_person_count - self.matched_person_count
+        ):
+            raise ValueError("static false-positive count is inconsistent")
+        if self.false_negative_count != (
+            self.ground_truth_person_count - self.matched_person_count
+        ):
+            raise ValueError("static false-negative count is inconsistent")
+        if self.person_activation != (self.predicted_person_count > 0):
+            raise ValueError("person activation disagrees with predictions")
+        if self.matched_person_count == 0 and self.mean_matched_iou is not None:
+            raise ValueError("matched IoU requires at least one match")
+        return self
+
+
+class StaticHomeGroupMetrics(ContractModel):
+    case_count: int = Field(ge=0)
+    ground_truth_person_count: int = Field(ge=0)
+    predicted_person_count: int = Field(ge=0)
+    matched_person_count: int = Field(ge=0)
+    false_positive_count: int = Field(ge=0)
+    false_negative_count: int = Field(ge=0)
+    detection_precision: float | None = Field(default=None, ge=0.0, le=1.0)
+    detection_recall: float | None = Field(default=None, ge=0.0, le=1.0)
+    person_absent_case_count: int = Field(ge=0)
+    person_absent_false_activation_cases: int = Field(ge=0)
+    person_absent_false_activation_rate: float | None = Field(
+        default=None, ge=0.0, le=1.0
+    )
+    multi_person_case_count: int = Field(ge=0)
+    multi_any_person_detected_cases: int = Field(ge=0)
+    multi_all_people_matched_cases: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def validate_metrics(self) -> "StaticHomeGroupMetrics":
+        expected_precision = (
+            round(self.matched_person_count / self.predicted_person_count, 6)
+            if self.predicted_person_count
+            else None
+        )
+        expected_recall = (
+            round(self.matched_person_count / self.ground_truth_person_count, 6)
+            if self.ground_truth_person_count
+            else None
+        )
+        expected_false_activation = (
+            round(
+                self.person_absent_false_activation_cases
+                / self.person_absent_case_count,
+                6,
+            )
+            if self.person_absent_case_count
+            else None
+        )
+        if self.detection_precision != expected_precision:
+            raise ValueError("static detection precision is inconsistent")
+        if self.detection_recall != expected_recall:
+            raise ValueError("static detection recall is inconsistent")
+        if self.person_absent_false_activation_rate != expected_false_activation:
+            raise ValueError("static false-activation rate is inconsistent")
+        if self.person_absent_false_activation_cases > self.person_absent_case_count:
+            raise ValueError("static false-activation cases exceed absent cases")
+        if self.multi_any_person_detected_cases > self.multi_person_case_count:
+            raise ValueError("multi-person detected cases exceed multi-person cases")
+        if self.multi_all_people_matched_cases > self.multi_person_case_count:
+            raise ValueError("multi-person complete cases exceed multi-person cases")
+        return self
+
+
+class StaticHomeVariantReport(ContractModel):
+    schema_version: str = "1.0"
+    variant_id: str
+    model_bindings: list[ModelBinding]
+    source_binding_license_corrections: list[str] = Field(default_factory=list)
+    case_count: int = Field(ge=0)
+    cases: list[StaticHomeCaseEvaluation]
+    overall: StaticHomeGroupMetrics
+    by_scenario: dict[str, StaticHomeGroupMetrics] = Field(default_factory=dict)
+    runtime_environment: dict[str, Any] = Field(default_factory=dict)
+    timing_ms: dict[str, float] = Field(default_factory=dict)
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_case_count(self) -> "StaticHomeVariantReport":
+        if self.case_count != len(self.cases):
+            raise ValueError("static variant case count disagrees with cases")
+        if self.overall.case_count != self.case_count:
+            raise ValueError("static overall case count disagrees with variant")
+        if any(case.variant_id != self.variant_id for case in self.cases):
+            raise ValueError("static case variant id disagrees with report")
+        return self
+
+
+class StaticHomeBenchmarkReport(ContractModel):
+    schema_version: str = "1.0"
+    suite_id: str
+    benchmark_version: str
+    evidence_level: EvidenceLevel = EvidenceLevel.E1
+    suite_manifest_sha256: str = Field(min_length=64, max_length=64)
+    source_manifest_sha256: str = Field(min_length=64, max_length=64)
+    model_binding_policy_sha256: str = Field(min_length=64, max_length=64)
+    pose_model_policy_sha256s: dict[str, str] = Field(default_factory=dict)
+    dataset_id: str
+    dataset_version: int = Field(ge=1)
+    annotation_license: str
+    required_image_license: str
+    matching_iou_threshold: float = Field(ge=0.0, le=1.0)
+    case_count: int = Field(ge=0)
+    variants: list[StaticHomeVariantReport]
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_case_count(self) -> "StaticHomeBenchmarkReport":
+        if not self.variants:
+            raise ValueError("static report must contain at least one variant")
+        if any(variant.case_count != self.case_count for variant in self.variants):
+            raise ValueError("static variant case count disagrees with report")
+        return self
+
+
 class SpeechBenchmarkCaseEvaluation(ContractModel):
     """Privacy-safe per-case ASR metrics; transcript text is deliberately absent."""
 

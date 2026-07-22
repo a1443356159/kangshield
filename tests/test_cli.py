@@ -121,3 +121,17 @@ def test_fall_adl_parser_defaults_to_fixed_three_variant_stress_run():
     assert args.torchvision_detection_confidence == 0.5
     assert args.torchvision_min_size == 800
     assert args.torchvision_max_size == 1333
+
+
+def test_static_home_parser_defaults_to_fixed_three_variant_stress_run():
+    args = build_parser().parse_args(
+        ["benchmark-static-home", "static-home-cases.json"]
+    )
+    assert args.command == "benchmark-static-home"
+    assert args.variant is None
+    assert args.model_binding_policy.name == "v1-m3-pose-models.json"
+    assert args.yolo_confidence == 0.35
+    assert args.rtmpose_detection_confidence == 0.05
+    assert args.torchvision_detection_confidence == 0.5
+    assert args.torchvision_min_size == 800
+    assert args.torchvision_max_size == 1333

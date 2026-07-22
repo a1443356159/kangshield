@@ -196,7 +196,7 @@ AppKey、AccessToken、设备验证码和设备序列号不得提交到仓库。
 | 多人/远距离姿态 | YOLO26n-pose + ByteTrack | 人体框、17 个 COCO 关键点、置信度、轨迹 | V1 对照；lying 42.86% 且有 AGPL/Enterprise 门，不进入 V2 默认主链路 |
 | 姿态精度候选 | YOLOX-m HumanArt + RTMPose-m HumanArt | 人体框、COCO-17 关键点、置信度、短时轨迹 | V1-R1 Conditional；lying 95.24%，但 C6c、fall-01 关键点、负样本和 Human-Art artifact 分发门仍 Open |
 | 姿态独立备选 | TorchVision Keypoint R-CNN COCO_V1 | 人体框、COCO-17、未校准 logit 质量代理、短时轨迹 | V1-R1 fallback/not selected；lying coverage 100% 但关键点门仅 4/21，COCO/ImageNet/权重分发仍 Open |
-| 跌倒时序 | 规则特征 | 框中心下降、宽高比、横卧/静止窗口、关键点质量与 fallback | V1-R1 G4 E1 已实现；真实 C6c、居家正负样本、多人策略和阈值仍 Open，不输出风险结论 |
+| 跌倒时序 | 规则特征 | 框中心下降、宽高比、横卧/静止窗口、关键点质量与 fallback | V1-R1 G4 E1 已实现；Open Images 静态子集只补 furniture/pet/multi-person 人物检测压力，真实 C6c、床上躺卧、时序多人策略和阈值仍 Open，不输出风险结论 |
 | 时序动作模型 | MMAction2 PoseC3D / ST-GCN 系列 | 骨架序列动作分类 | V1-R1 Defer；只有规则基线、目标设备和足够标注片段完成后才启动 |
 | 人脸几何 | MediaPipe Face Landmarker | 478 个 3D 人脸点、52 个 blendshape、变换矩阵 | V1-R1 Defer，不直接当 FACS AU |
 | FACS AU | OpenFace | AU presence/intensity、头姿、眼动等 | V1-R1 Defer；无 P0 任务、标签和许可终审 |
@@ -310,6 +310,8 @@ V1 不在没有参考设备的情况下声称心率、呼吸或睡眠分期准�
 V1-M3 姿态同集对比已经冻结模型、摘要、阈值和报告契约，见[姿态模型对比设计](v1-m3-pose-model-comparison.md)和[历史双模型报告](reports/v1-m3-pose-model-comparison.md)。HumanArt + RTMPose 保持准确率条件参考；REV-013 的 [Keypoint R-CNN 独立候选](reports/v1-m3-torchvision-keypointrcnn-candidate.md)虽达到 lying 21/21，但横卧关键点门仅 4/21，因此只保留 fallback。两条路线最终是否进入 V2 都取决于 C6c、负样本和分发 Review。
 
 V1-R1 G4 已把既有姿态事件转换为 box 横卧/下降/低运动、横卧持续、COCO-17 关键点质量门和显式 fallback reason，见 [G4 设计](v1-g4-fall-motion-features.md)和[正式 E1 报告](reports/v1-g4-fall-motion-features.md)。RTMPose 在 21 个 lying 采样帧中有 20 帧可用框、11 帧通过关键点门；Keypoint R-CNN 为 21 帧有框但只有 4 帧过门。CAUCAFall 又证明 gate-passed torso-horizontal 会出现在 no-fall kneel/walk。这些是特征覆盖与混淆证据，不是跌倒准确率；真实 C6c G4、居家负样本和事件决策仍未关闭，且本切片不生成 RiskAssessment 或告警。
+
+另行设计的 [Open Images 静态居家人物检测压力集](v1-g4-openimages-static-home-stress.md)固定 4 张家具无人、4 张宠物无人和 4 张室内多人图片，以人工验证 Person 负标签和 validation Person boxes 测 false activation / IoU 匹配。该结果只缩小静态人物检测缺口：没有视频时间、动作、床上躺卧、宠物移动或多人身份，因此不改变真实 G4 与事件决策的 Open 状态。
 
 V1-M3 语音同集对比已经完成，见 [语音模型对比设计](v1-m3-speech-model-comparison.md)和[正式报告](reports/v1-m3-speech-model-comparison.md)。FunASR 保留为普通话默认候选，Whisper small 不晋级；该结论只来自六条 clean FLEURS 普通话，不代表 C6c 远场、方言、老人或背景噪声效果。
 

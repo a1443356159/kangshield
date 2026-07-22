@@ -1,10 +1,11 @@
-.PHONY: test info-fixtures prepare-mm-models prepare-mm-smoke prepare-m2c-timing-fixture prepare-m2c-capture-fixture assess-m2c-capture-fixture submit-mm-smoke prepare-m2b-data submit-m2b-benchmark prepare-m3-pose-models submit-m3-pose-comparison prepare-m3-speech-models submit-m3-speech-comparison prepare-g4-caucafall submit-g4-adl-benchmark
+.PHONY: test info-fixtures prepare-mm-models prepare-mm-smoke prepare-m2c-timing-fixture prepare-m2c-capture-fixture assess-m2c-capture-fixture submit-mm-smoke prepare-m2b-data submit-m2b-benchmark prepare-m3-pose-models submit-m3-pose-comparison prepare-m3-speech-models submit-m3-speech-comparison prepare-g4-caucafall submit-g4-adl-benchmark prepare-g4-static-home submit-g4-static-home-benchmark
 
 PYTHON ?= python3
 KANG_VIDEO_INPUT ?= $(CURDIR)/data/raw/public-smoke/ultralytics-bus-replay.avi
 KANG_AUDIO_INPUT ?= $(CURDIR)/data/raw/public-smoke/funasr-asr-example-zh.wav
 KANG_M2B_CASES ?= $(CURDIR)/data/processed/v1-m2b/benchmark-cases.json
 KANG_G4_ADL_CASES ?= $(CURDIR)/data/processed/v1-g4-caucafall/fall-adl-cases.json
+KANG_G4_STATIC_HOME_CASES ?= $(CURDIR)/data/processed/v1-g4-openimages-static-home/static-home-cases.json
 KANG_M2C_CAPTURE_MANIFEST ?= $(CURDIR)/data/raw/public-smoke/v1-m2c-capture/capture-manifest.json
 
 test:
@@ -69,3 +70,12 @@ submit-g4-adl-benchmark:
 	$(PYTHON) scripts/prepare_v1_m3_pose_models.py --offline
 	PYTHONPATH=src $(PYTHON) scripts/prepare_v1_m3_torchvision_pose_model.py --offline
 	sbatch --export=ALL,KANG_FALL_ADL_CASES="$(KANG_G4_ADL_CASES)" scripts/slurm/v1_g4_fall_adl_benchmark.sbatch
+
+prepare-g4-static-home:
+	PYTHONPATH=src $(PYTHON) scripts/prepare_v1_g4_openimages_data.py
+
+submit-g4-static-home-benchmark:
+	test -f "$(KANG_G4_STATIC_HOME_CASES)"
+	$(PYTHON) scripts/prepare_v1_m3_pose_models.py --offline
+	PYTHONPATH=src $(PYTHON) scripts/prepare_v1_m3_torchvision_pose_model.py --offline
+	sbatch --export=ALL,KANG_STATIC_HOME_CASES="$(KANG_G4_STATIC_HOME_CASES)" scripts/slurm/v1_g4_static_home_benchmark.sbatch

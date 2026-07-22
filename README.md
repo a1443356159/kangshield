@@ -40,6 +40,7 @@
 - [V1-R1 G4 跌倒运动特征 E1 报告](docs/reports/v1-g4-fall-motion-features.md)
 - [V1-R1 G4 CAUCAFall ADL 压力集](docs/v1-g4-caucafall-adl-stress.md)
 - [V1-R1 G4 CAUCAFall ADL 压力报告](docs/reports/v1-g4-caucafall-adl-stress.md)
+- [V1-R1 G4 Open Images 静态居家人物检测压力集](docs/v1-g4-openimages-static-home-stress.md)
 
 ## V1 初步开发
 
@@ -139,7 +140,17 @@ kangshield-info benchmark-fall-adl \
   data/processed/v1-g4-caucafall/fall-adl-cases.json
 ```
 
-该命令对 12 段 clip-level no-fall ADL 顺序运行两个姿态变体，并按动作/光照汇总代理激活。它不训练或评测跌倒分类器；正式 E1 结果见 [压力集设计](docs/v1-g4-caucafall-adl-stress.md)和[压力报告](docs/reports/v1-g4-caucafall-adl-stress.md)。
+该命令对 12 段 clip-level no-fall ADL 顺序运行三个姿态变体，并按动作/光照汇总代理激活。它不训练或评测跌倒分类器；正式 E1 结果见 [压力集设计](docs/v1-g4-caucafall-adl-stress.md)和[压力报告](docs/reports/v1-g4-caucafall-adl-stress.md)。
+
+准备并运行静态居家人物检测压力集：
+
+```bash
+make prepare-g4-static-home
+kangshield-info benchmark-static-home \
+  data/processed/v1-g4-openimages-static-home/static-home-cases.json
+```
+
+该命令对固定 4 张家具无人、4 张宠物无人和 4 张室内多人 Open Images validation 图片各推理一次，关闭 tracking，并以 IoU 0.5 汇总人物框匹配与 person-absent false activation。它不是视频、跌倒或事件评测；来源、逐图 CC BY 2.0 审计、Google LLC / CC BY 4.0 标注归因和非目标见[静态压力集设计](docs/v1-g4-openimages-static-home-stress.md)。
 
 运行 V1-M3 同集语音对比：
 
