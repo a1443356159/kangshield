@@ -299,6 +299,28 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("configs/sleep/sdnl1-field-map.example.json"),
     )
 
+    distribution = subparsers.add_parser(
+        "assess-distribution-readiness",
+        help="Assess the fail-closed V2 competition bundle license and distribution gate",
+    )
+    distribution.add_argument(
+        "--policy",
+        type=Path,
+        default=Path("configs/v1-r1-distribution-readiness.json"),
+    )
+    distribution.add_argument(
+        "--repository-root",
+        type=Path,
+        default=Path("."),
+        help="KangShield checkout whose tracked evidence and required files are assessed",
+    )
+    distribution.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    distribution.add_argument(
+        "--require-ready",
+        action="store_true",
+        help="Exit 2 unless every submission distribution gate is ready",
+    )
+
     ezviz = subparsers.add_parser(
         "inspect-ezviz",
         help="Inspect and redact an EZVIZ SDK/API JSON snapshot",
@@ -1138,6 +1160,67 @@ def _assess_sleep_route_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def _assess_distribution_readiness_command(args: argparse.Namespace) -> int:
+    from .distribution_readiness import (
+        assess_distribution_readiness,
+        distribution_policy_asset,
+    )
+
+    with RunArtifacts(
+        args.runs_dir,
+        stage="v1-r1-distribution-readiness",
+        evidence_level=EvidenceLevel.E1,
+        configuration={
+            "command": "assess-distribution-readiness",
+            "policy_path_persisted": False,
+            "repository_root_persisted": False,
+            "require_ready": args.require_ready,
+            "legal_advice_provided": False,
+        },
+    ) as run:
+        with run.step("assess-distribution-readiness") as step:
+            policy_asset = distribution_policy_asset(args.policy)
+            run.record_asset(policy_asset)
+            report = assess_distribution_readiness(
+                policy_path=args.policy,
+                repository_root=args.repository_root,
+            )
+            output = run.write_report(
+                "distribution-readiness.json",
+                report,
+            )
+            step.outputs.append(run.relative(output))
+            run.manifest.configuration.update(
+                {
+                    "policy_sha256": report.policy_sha256,
+                    "profile_id": report.profile_id,
+                }
+            )
+            run.save_manifest()
+    _print_result(
+        run,
+        {
+            "decision": report.decision,
+            "submission_bundle_ready": report.submission_bundle_ready,
+            "source_matched": report.counts["source_matched"],
+            "source_total": report.counts["source_total"],
+            "required_file_missing": report.counts[
+                "required_file_missing"
+            ],
+            "decision_open": report.counts["decision_open"],
+            "asset_blocking": report.counts["asset_blocking"],
+            "gate_ready": report.counts["gate_ready"],
+            "gate_total": report.counts["gate_total"],
+            "legal_advice_provided": report.legal_advice_provided,
+            "risk_assessment_emitted": report.risk_assessment_emitted,
+            "alert_emitted": report.alert_emitted,
+        },
+    )
+    if args.require_ready and not report.submission_bundle_ready:
+        return 2
+    return 0
+
+
 def _inspect_ezviz_command(args: argparse.Namespace) -> int:
     with RunArtifacts(
         args.runs_dir,
@@ -1639,6 +1722,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _profile_sleep_command(args)
     if args.command == "assess-sleep-route":
         return _assess_sleep_route_command(args)
+    if args.command == "assess-distribution-readiness":
+        return _assess_distribution_readiness_command(args)
     if args.command == "inspect-ezviz":
         return _inspect_ezviz_command(args)
     if args.command == "run-multimodal":
