@@ -97,7 +97,7 @@ def build_parser() -> argparse.ArgumentParser:
     capture.add_argument(
         "--require-ready",
         action="store_true",
-        help="Exit 2 unless the complete real-device M2c Review gate is ready",
+        help="Exit 2 unless the complete real-device capture-bundle gate is ready",
     )
 
     sleep = subparsers.add_parser(
@@ -579,10 +579,12 @@ def _assess_m2c_capture_command(args: argparse.Namespace) -> int:
             "sleep_sample_ready_for_profiling": (
                 report.sleep_sample_ready_for_profiling
             ),
-            "m2c_ready_for_review": report.m2c_ready_for_review,
+            "capture_bundle_ready_for_review": (
+                report.capture_bundle_ready_for_review
+            ),
         },
     )
-    if args.require_ready and not report.m2c_ready_for_review:
+    if args.require_ready and not report.capture_bundle_ready_for_review:
         return 2
     return 0
 

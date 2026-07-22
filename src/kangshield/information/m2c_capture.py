@@ -1022,19 +1022,19 @@ def assess_m2c_capture(
         and target_sleep_ready
         and verified_sleep_exports >= 1
     )
-    m2c_ready = camera_matrix_complete and sleep_ready
+    capture_bundle_ready = camera_matrix_complete and sleep_ready
 
     if not real_evidence:
         decision = "tooling_only" if structural_camera_ready else "not_ready"
-    elif m2c_ready:
-        decision = "ready_for_review"
+    elif capture_bundle_ready:
+        decision = "capture_bundle_ready_for_review"
     elif camera_ready and sleep_ready:
         decision = "camera_retest_ready_matrix_incomplete"
     elif camera_ready:
         decision = "camera_retest_ready_sleep_pending"
     else:
         decision = "not_ready"
-    if m2c_ready:
+    if capture_bundle_ready:
         quality_status = QualityStatus.PASS
     elif decision == "tooling_only" or camera_ready or sleep_ready:
         quality_status = QualityStatus.PARTIAL
@@ -1085,7 +1085,7 @@ def assess_m2c_capture(
         camera_ready_for_model_retest=camera_ready,
         camera_matrix_complete=camera_matrix_complete,
         sleep_sample_ready_for_profiling=sleep_ready,
-        m2c_ready_for_review=m2c_ready,
+        capture_bundle_ready_for_review=capture_bundle_ready,
         decision=decision,
         quality_status=quality_status,
         issues=issues,

@@ -71,7 +71,7 @@ def test_e1_capture_fixture_exercises_full_structure_without_device_claim(tmp_pa
     assert report.camera_ready_for_model_retest is False
     assert report.camera_matrix_complete is False
     assert report.sleep_sample_ready_for_profiling is False
-    assert report.m2c_ready_for_review is False
+    assert report.capture_bundle_ready_for_review is False
     assert len(assessment.media_reports) == 10
     assert len(assessment.sleep_assets) == 1
 
@@ -166,11 +166,11 @@ def test_e2_complete_bundle_opens_review_gate_only_after_fixture_markers_removed
         source_type=SourceType.LOCAL_FILE,
     ).report
 
-    assert report.decision == "ready_for_review"
+    assert report.decision == "capture_bundle_ready_for_review"
     assert report.quality_status is QualityStatus.PASS
     assert report.camera_ready_for_model_retest is True
     assert report.camera_matrix_complete is True
     assert report.sleep_sample_ready_for_profiling is True
-    assert report.m2c_ready_for_review is True
+    assert report.capture_bundle_ready_for_review is True
     assert report.counts["duplicate_media_content_count"] == 0
     assert report.counts["error_count"] == 0

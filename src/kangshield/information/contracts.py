@@ -920,7 +920,7 @@ class M2cCaptureReadinessReport(ContractModel):
     camera_ready_for_model_retest: bool = False
     camera_matrix_complete: bool = False
     sleep_sample_ready_for_profiling: bool = False
-    m2c_ready_for_review: bool = False
+    capture_bundle_ready_for_review: bool = False
     decision: str
     quality_status: QualityStatus
     raw_paths_persisted: Literal[False] = False
