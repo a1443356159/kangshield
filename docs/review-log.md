@@ -733,7 +733,7 @@
 | 人工复核至少一个真实 clip 的开始/结束同步事件并形成 offset/drift | 待指定采集人 / Codex | 2026-08-01 | Open |
 | `camera_ready_for_model_retest=true` 后按冻结参数复跑三姿态与 FunASR | Codex | 2026-08-03 | Blocked on E2 capture bundle |
 | 获取真实 SDNL1 导出并依次运行 capture gate、profile 与 route gate | 待指定设备负责人 / Codex | 2026-08-01 | Open |
-| 建立标注抽查/双人一致性与事件级误触发/检出延迟口径 | 项目组 | 2026-08-03 | Open |
+| 建立双人一致性/裁决/事件级误触发与检出延迟 E1 工具口径 | Codex | 2026-07-22 | Done（REV-016；真实内容抽查与指标仍 Open） |
 
 ### 未决问题
 
@@ -793,3 +793,57 @@
 1. C6c 视频 person-absent 口径按每帧、每分钟激活还是持续事件计数，如何避免把单帧静态比例误搬到时序？
 2. 多人策略采用全体风险候选、区域主目标还是 track-aware 人工确认，怎样处理进出画与遮挡？
 3. 若低阈值 RTMPose 在 C6c 继续保持召回但产生更多 FP，应先做场景/时序过滤，还是重新训练许可清晰的 detector？
+
+---
+
+## REV-016 V1-R1 G4 双标注、裁决与事件评估工具 Review
+
+- 日期：2026-07-22
+- 状态：Accepted for E1 tooling slice；真实 C6c 事件指标与 V1-R1 milestone remain In progress
+- 参与人：项目组、Codex
+- 评审范围：独立动作区间、pairwise agreement、裁决、held-out 顺序、candidate episode 评测、来源血缘、事件指标、隐私与 Risk/Alert 边界
+- 输入材料：[事件评估设计](v1-g4-event-evaluation-readiness.md)、[正式 E1 报告](reports/v1-g4-event-evaluation-smoke.md)、实现提交 `b0b2e97`、正式 run `20260722T160819Z-854d8845`
+
+### 发现
+
+1. M2c capture/readiness 与 G4 feature 之间原先缺少事件评测层。本轮形成严格 bundle：capture manifest/readiness/clean assessor run、两份以上 independent annotation、adjudication、candidate-generator policy、三路 predictions/clean source runs 都以相对路径、大小和 SHA-256 绑定。
+2. 当前 policy 比较 `bend_pick`、`bed_lie`、`simulated_fall`；interval IoU 0.5、overall/fall pairwise F1 0.8、fall 平均绝对 onset 差 500 ms。正式 fixture 两份标注 5/5 匹配，overall/fall F1 均 1.0，fall onset 平均/最大差均 100 ms。
+3. Event matching 使用 candidate `detected_at` 与 adjudicated fall 一对一匹配，冻结 early 500 ms / late 2000 ms。父报告同时发布原始 TP/FP/FN、总暴露 false activations/hour、negative-clip activation 和 delay 摘要，避免只展示一个比例。
+4. Fixture 的 12 clip/36 秒包含 2 fall 与 10 negative。手工固定候选被准确还原为 RTMPose 2TP/1FP/0FN、Keypoint R-CNN 2/2/0、YOLO 1/1/1。它们只验证 scorer 公式，没有运行三种模型，不能进入模型比较。
+5. Candidate generation 与 evaluator 已分离。三路预测必须绑定同一 candidate-policy 摘要和各自 frozen model policy；本轮 candidate policy 明确为 synthetic/no-inference，未把横卧/下降/静止组合规则偷渡成最终跌倒判定。
+6. annotation、agreement、adjudication、minimum-data 和 provenance 五个工具门均 true；M2c camera gate 因 E1 synthetic 为 false，最终固定 `tooling_only`、`event_metrics_ready_for_review=false`。0 error、2 个 warning 都是预期证据边界。
+7. 父报告不含 annotation/candidate 时间、candidate ID、annotator/adjudicator ref、输入路径、bbox/keypoints/track ID；RiskAssessment 与 Alert 继续 Literal false。
+
+### 决定
+
+1. 接受 `FallEventAnnotationAgreement`、`FallEventCaseEvaluation`、`FallEventVariantEvaluation`、`FallEventEvaluationReadinessReport`、CLI 和 evaluation policy，作为 C6c E2 数据到位后的 M7 统一入口。
+2. 接受 v0.1.0 的 interval/onset agreement、one-to-one detection-time matching、总暴露 FP/hour 与 negative-clip activation 口径。修改 tolerance、去重 episode 语义或分母必须升级 policy/version 并全量重跑。
+3. 保持 candidate-generator policy 独立；只有其完成真实规则 Review 后才能生成可解释的 C6c candidate stream，evaluator 不负责设计或调参规则。
+4. E1 fixture 三行指标不得写入姿态模型选型、跌倒性能、C6c 域内表现或比赛宣传；本 Review 只关闭 scorer tooling 子门。
+5. `event_metrics_ready_for_review` 只表示真实指标可交人工 Review，不等于模型采用、RiskAssessment 设计完成或 Alert 授权。
+6. V1-R1 保持 In progress：真实 C6c 正负视频、内容抽查/裁决责任、真实 candidate policy/指标、多人 tracking、分发许可证和责任人仍 Open。
+
+### 验证
+
+- 自动化：85 passed；`pip check` 无 broken requirements；`compileall` 与 `git diff --check` 通过。
+- 正式执行：run `20260722T160819Z-854d8845`，commit `b0b2e97`、clean、completed、E1、fixture；scorer step 18 ms，15 个摘要化 SourceAsset。
+- 可重复性：独立生成两份完整 fixture，32/32 相对路径与 32/32 SHA-256 一致。
+- 输入：bundle `d68376b30b5ff9bec52a36d892a93f074c338647fb1ef812870d089c455aa8dd`；evaluation policy `91e35f8637ea2520e07f07b65f5f3fac2122fd399dd53bb921839594480283d8`；capture `8bf5af9ad0c08a6c65ef799d04fbe098f3937f9a1b2299f6167054157a815595`；candidate policy `dae72d3a967cd752ebc3100b13f04a073ff79bd4cd3ef3574322630c0082bfdc`。
+- 产物：formal manifest `3e064dd6df04d047236b6ad9b53202e4db97bd7a97ffd127e220a7c95f3ec75d`；readiness report `8cde985ce61970d5b86c7042400c351b98b0615fc0bc6b4812d6829380865915`。
+- 隐私：原始时间字段、candidate/annotator/adjudicator ref、相对/绝对路径、risk/alert true 均为 0 命中。
+
+### 行动项
+
+| 行动 | 负责人 | 截止日期 | 状态 |
+|---|---|---|---|
+| 按 REV-014 取得含 C11/C12、弯腰、床上躺卧和空场持续的 C6c E2 held-out 包 | 待指定采集人 | 2026-08-01 | Open |
+| 指定两名独立标注者与裁决人，完成内容抽查、访问控制和删除责任记录 | 项目组 | 2026-08-02 | Open |
+| 在不查看 held-out 输出的前提下设计并 Review 第一版真实 candidate-generator policy | Codex / 项目组 | 2026-08-02 | Blocked on E2 capture and owner decision |
+| 用同一 candidate policy 生成三路 clean candidate run 并执行真实 event evaluation | Codex | 2026-08-03 | Blocked on prior actions |
+| 将真实多人 tracking/身份切换策略与事件 episode 去重规则一起评审 | 项目组 | 2026-08-04 | Open |
+
+### 未决问题
+
+1. 真实 candidate episode 的触发点取首次满足规则、持续确认完成还是回溯 onset；三者会直接改变 delay 语义，必须在看 held-out 结果前冻结。
+2. 多人在同一 clip 中是每人独立 candidate、场景级 candidate，还是人工确认队列；当前单路 episode 契约尚未表达 person/track 归属。
+3. 比赛验收更关注每小时 FP、每夜/每日 FP，还是 negative-clip activation；C6c 真实暴露时长到位后再冻结对外主指标。

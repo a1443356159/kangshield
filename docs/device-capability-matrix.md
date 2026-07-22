@@ -48,6 +48,8 @@ V1-M2c 已完成 E1 容器轨道/PTS 探针及确定性回归夹具，见[设计
 
 REV-014 又完成了 E1 采集包/场景标注/held-out readiness gate，见[设计](v1-m2c-capture-readiness-gate.md)与[报告](reports/v1-m2c-capture-readiness-smoke.md)。正式 fixture 虽有 10/10 结构可用 clip，`camera_ready_for_model_retest`、`sleep_sample_ready_for_profiling` 和 `capture_bundle_ready_for_review` 均为 false；因此本能力矩阵仍不提升目标设备证据等级。
 
+REV-016 进一步完成双人标注一致性、裁决和事件误触发/检出延迟的 E1 scorer，见[设计](v1-g4-event-evaluation-readiness.md)与[报告](reports/v1-g4-event-evaluation-smoke.md)。其 12 clip/三 candidate stream 均为确定性 synthetic 输入，`capture_camera_gate_passed=false`、`event_metrics_ready_for_review=false`；同样不能证明 C6c 画面、模型或事件性能。
+
 ## 3. 睡眠仪能力
 
 官方商品页可确认的硬件事实：

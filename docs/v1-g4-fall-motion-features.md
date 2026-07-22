@@ -132,5 +132,5 @@ Keypoint R-CNN 后续在 URFD lying 为 21/21 有框，但只有 4/21 通过关�
 
 1. 对 C6c 白天/夜视、距离、遮挡、弯腰、坐下、床上躺卧和安全模拟跌倒复跑同一冻结配置。
 2. CAUCAFall 已补弯腰/坐下/跪地/行走和三档光照；Open Images 静态子集补 furniture/pet/multi-person 的人物检测压力。继续增加空房视频、床上躺卧、宠物移动和真实多人片段，多人出现时替换 largest-bbox 探索策略。
-3. 用人工 person-presence、动作区间和事件起点标注，另行冻结误触发、检出延迟和 track fragmentation 指标。
+3. 双人动作区间、裁决、误触发/小时和检出延迟的 E1 scorer 已在[事件评估就绪门](v1-g4-event-evaluation-readiness.md)冻结；真实 C6c 仍须先冻结 candidate policy 和内容抽查，再生成可 Review 指标。track fragmentation 继续作为独立特征/跟踪指标。
 4. 只有 G3/G4/G5 共同关闭后，V2-D1 才能设计 RiskAssessment；本 E1 FeatureEvent 不直接触发告警。

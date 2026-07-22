@@ -1,6 +1,6 @@
 # 康盾里程碑与验收门
 
-状态：Active v0.8
+状态：Active v0.9
 
 基准日期：2026-07-22
 
@@ -24,7 +24,7 @@
 | V1-M2b 公开真实场景固定集与对齐评测 | 07-22～07-23 | Done | URFD/FLEURS 固定集、批量 Pipeline、标签/CER/覆盖率与 Slurm 报告 | 六 case 在干净提交和 L40 上可重复完成，公开数据边界固定为 E1 |
 | V1-M2c 目标设备样本与时间基 | 07-22～08-01 | In progress | 容器时间戳探针、采集包/标注/held-out gate、C6c 音视频样本、睡眠样例 | 两个 E1 工具切片已验收；目标设备视频、音频、睡眠样例仍须形成 E2/E3 证据 |
 | V1-M3 模型快速对比 | 08-02～08-07 | Done | 姿态、VAD/ASR、睡眠字段的对比报告 | E1 姿态、语音与睡眠路线均可重复并完成采用/候选/放弃决定；真机门仍属 M2c |
-| V1-R1 探索 Review | 08-08～08-09 | In progress | V1 结论、淘汰项、G4 离线特征/ADL/静态人物检测压力、V2 输入清单 | E1 决策账本、G4 feature/fallback、CAUCAFall 与 Open Images 静态子门已冻结；真机视频、事件指标、许可证和负责人硬门关闭后验收 |
+| V1-R1 探索 Review | 08-08～08-09 | In progress | V1 结论、淘汰项、G4 离线特征/ADL/静态人物检测压力/事件评估、V2 输入清单 | E1 决策账本、G4 feature/fallback、公开压力与事件 scorer 子门已冻结；真机视频、真实候选/事件指标、许可证和负责人硬门关闭后验收 |
 | V2-D1 设计冻结 | 08-10～08-12 | Planned | V2 架构、Schema、测试矩阵、任务分工 | 跌倒主线、平台接入和演示脚本闭合 |
 | V2-M1 主链路实现 | 08-13～08-20 | Planned | 真实设备/回放、识别、风险、告警基础链路 | 一次跌倒场景可完整追踪 |
 | V2-M2 联合验收 | 08-21～08-28 | Planned | 前端处置、失败降级、指标报告 | 场景矩阵、误报、延迟和处置均有结果 |
@@ -53,7 +53,7 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 | V1-M2c 采集包就绪门 E1 工具 | `8838168` / `6928ac8` / `542bddf` / `6f1c02a` / `967e585` | `origin/main` | 2026-07-22 已验证 | manifest 1.1、场景/标注、文件/媒体、双同步事件、三模型 held-out 摘要、两级 readiness 与 REV-014；不代表取得真机样本 |
 | V1-R1 G4 Open Images 静态人物检测压力 | `40359c1` / `fad9491` / `c77525e` | `origin/main` | 2026-07-22 已验证 | 逐图 CC BY 2.0 / 标注 CC BY 4.0 归因、12-case r2、确定性准备/lock、三模型 L40 与 REV-015；只关闭静态 furniture/pet/multi-person 人物检测子门 |
 
-这里的“推送验证”只证明代码已到达远端。V1-M1 仍为 In progress，必须取得 C6c 与 CS-EP-SDNL1 的 E2/E3 证据后才能进入 Review/Done。V1-M2a 和 V1-M2b 的 Done 只关闭设备无关 E1 链路及公开固定集评测，不会提升真实设备证据等级。V1-M3 的姿态、语言和睡眠字段三个 E1 切片均已验收，因此仅在 E1 探索范围标记 Done；M2c 已有采集规程、容器时间戳工具和采集包 readiness gate，但仍没有真实 C6c 媒体或 SDNL1 字段证据。V1-R1 G4 的离线特征、CAUCAFall ADL 与 Open Images 静态人物检测压力也都只属于 E1，不能替代 C6c 正负视频、床上躺卧、多人 tracking 或跌倒风险/告警验收。
+这里的“推送验证”只证明代码已到达远端。V1-M1 仍为 In progress，必须取得 C6c 与 CS-EP-SDNL1 的 E2/E3 证据后才能进入 Review/Done。V1-M2a 和 V1-M2b 的 Done 只关闭设备无关 E1 链路及公开固定集评测，不会提升真实设备证据等级。V1-M3 的姿态、语言和睡眠字段三个 E1 切片均已验收，因此仅在 E1 探索范围标记 Done；M2c 已有采集规程、容器时间戳工具和采集包 readiness gate，但仍没有真实 C6c 媒体或 SDNL1 字段证据。V1-R1 G4 的离线特征、公开压力与双标注/裁决/事件 scorer 也都只属于 E1，不能替代 C6c 正负视频、真实候选策略/指标、床上躺卧、多人 tracking 或跌倒风险/告警验收。
 
 ## 4. 当前阶段任务
 
@@ -196,12 +196,13 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 - [x] 在干净提交 `eae5f56` 上完成 Keypoint R-CNN 三模型复跑；确认 no-fall ADL 中“关键点门通过 + torso-horizontal”也会激活，不得直接触发告警。
 - [x] 完成一个不依赖 HumanArt 的公开权重候选评测；因 lying gate 4/21 和 COCO/ImageNet 分发仍 Open，只保留 fallback。
 - [x] 在干净修正提交 `fad9491` / job `1766` 上完成 Open Images r2 静态家具无人、宠物无人和室内多人三模型压力；首轮标注异常 run 被拒绝，正式结果保持无风险/告警。
-- [ ] 使用 C6c 正负视频继续补空场持续、床上躺卧、宠物移动和真实多人 tracking，关闭真实 G4 后再决定多人策略、阈值与事件评测口径。
+- [x] 在干净提交 `b0b2e97` 上完成双人 interval/onset agreement、裁决、三 candidate stream TP/FP/FN、误触发/小时与 delay 的 E1 正式工具运行；fixture 指标不用于模型比较。
+- [ ] 使用 C6c 正负视频继续补空场持续、床上躺卧、宠物移动和真实多人 tracking，冻结真实候选策略后复用事件评估口径。
 - [ ] 用 E2/E3 证据把 C6c 与 SDNL1 从 Unknown 归类为 available、limited 或 blocked。
 - [ ] 决定 V2 最终姿态权重和项目分发许可证，生成第三方 NOTICE；HumanArt 与 Keypoint R-CNN 均未关闭该门。
 - [ ] 为硬门指定负责人和截止日期，并删除无法完成的 V2 能力声明。
 
-预 Review 见 [V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。G4 基础设计与证据见[跌倒运动特征设计](v1-g4-fall-motion-features.md)和[正式报告](reports/v1-g4-fall-motion-features.md)，扩展 ADL 子门见 [CAUCAFall 设计](v1-g4-caucafall-adl-stress.md)和[压力报告](reports/v1-g4-caucafall-adl-stress.md)，静态人物检测子门见 [Open Images 设计](v1-g4-openimages-static-home-stress.md)与[正式报告](reports/v1-g4-openimages-static-home-stress.md)。E1 工具与公开压力集完成不等于 V1-R1 Done；真机视频、床上躺卧/时序多人、最终姿态分发路线和责任人仍是验收门。
+预 Review 见 [V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。G4 基础设计与证据见[跌倒运动特征设计](v1-g4-fall-motion-features.md)和[正式报告](reports/v1-g4-fall-motion-features.md)，扩展 ADL 子门见 [CAUCAFall 设计](v1-g4-caucafall-adl-stress.md)和[压力报告](reports/v1-g4-caucafall-adl-stress.md)，静态人物检测子门见 [Open Images 设计](v1-g4-openimages-static-home-stress.md)与[正式报告](reports/v1-g4-openimages-static-home-stress.md)，事件工具子门见[事件评估设计](v1-g4-event-evaluation-readiness.md)与[初测报告](reports/v1-g4-event-evaluation-smoke.md)。E1 工具与公开压力集完成不等于 V1-R1 Done；真机视频、真实候选/事件指标、床上躺卧/时序多人、最终姿态分发路线和责任人仍是验收门。
 
 ## 5. 里程碑决策优先级
 
