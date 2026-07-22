@@ -66,3 +66,10 @@ def test_sleep_route_parser_defaults_to_fail_closed_fixture_inputs():
     assert args.source_type.value == "fixture"
     assert args.policy.name == "v1-sleep-route-policy.json"
     assert args.mapping_config.name == "sdnl1-field-map.example.json"
+
+
+def test_media_probe_parser_freezes_packet_scan_and_audio_gate_defaults():
+    args = build_parser().parse_args(["probe-media", "capture.mkv"])
+    assert args.command == "probe-media"
+    assert args.require_audio_track is False
+    assert args.max_packets_per_stream == 200_000

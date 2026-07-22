@@ -59,6 +59,17 @@ def build_parser() -> argparse.ArgumentParser:
     media.add_argument("--source-type", type=_source_type, default=SourceType.LOCAL_FILE)
     media.add_argument("--device-ref")
     media.add_argument("--elder-ref")
+    media.add_argument(
+        "--require-audio-track",
+        action="store_true",
+        help="Fail the media observation when an audio track cannot be verified",
+    )
+    media.add_argument(
+        "--max-packets-per-stream",
+        type=int,
+        default=200_000,
+        help="Maximum packets scanned for PTS/DTS statistics in each stream",
+    )
 
     sleep = subparsers.add_parser(
         "profile-sleep",
@@ -267,6 +278,8 @@ def _probe_media_command(args: argparse.Namespace) -> int:
         "command": "probe-media",
         "path_count": len(args.paths),
         "source_type": args.source_type.value,
+        "require_audio_track": args.require_audio_track,
+        "max_packets_per_stream": args.max_packets_per_stream,
     }
     with RunArtifacts(
         args.runs_dir,
@@ -283,6 +296,8 @@ def _probe_media_command(args: argparse.Namespace) -> int:
                     device_ref=args.device_ref,
                     elder_ref=args.elder_ref,
                     source_type=args.source_type,
+                    require_audio_track=args.require_audio_track,
+                    packet_scan_limit_per_stream=args.max_packets_per_stream,
                 )
                 run.record_asset(report.asset)
                 run.record_observation(report.observation)
@@ -293,6 +308,21 @@ def _probe_media_command(args: argparse.Namespace) -> int:
                         "asset_id": report.asset.asset_id,
                         "modality": report.asset.modality.value,
                         "quality_status": report.observation.quality_status.value,
+                        "audio_track_status": (
+                            report.container_timing.audio_track_status
+                            if report.container_timing
+                            else "unknown"
+                        ),
+                        "video_stream_count": (
+                            report.container_timing.video_stream_count
+                            if report.container_timing
+                            else 0
+                        ),
+                        "audio_stream_count": (
+                            report.container_timing.audio_stream_count
+                            if report.container_timing
+                            else 0
+                        ),
                     }
                 )
     _print_result(run, {"reports": reports})

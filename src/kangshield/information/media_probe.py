@@ -6,6 +6,7 @@ from pathlib import Path
 from statistics import mean
 from typing import Any
 
+from .container_timing import DEFAULT_PACKET_SCAN_LIMIT, probe_container_timing
 from .contracts import (
     EvidenceLevel,
     MediaProbeReport,
@@ -22,7 +23,7 @@ from .contracts import (
 from .privacy import safe_local_uri, sha256_file
 
 
-PROBE_VERSION = "media-probe-v0.1.0"
+PROBE_VERSION = "media-probe-v0.2.0"
 AUDIO_SUFFIXES = {".wav", ".wave"}
 VIDEO_SUFFIXES = {
     ".avi",
@@ -139,7 +140,6 @@ def _probe_video(
         "frame_count": frame_count if frame_count >= 0 else None,
         "duration_s": round(duration_s, 6) if duration_s is not None else None,
         "fourcc": _fourcc(capture.get(cv2.CAP_PROP_FOURCC)),
-        "audio_track_status": "not_inspected_by_opencv",
     }
 
     brightness_values: list[float] = []
@@ -181,13 +181,6 @@ def _probe_video(
             )
         )
 
-    issues.append(
-        QualityIssue(
-            code="audio_track_uninspected",
-            severity=Severity.INFO,
-            message="OpenCV metadata does not prove whether an audio track exists",
-        )
-    )
     return metadata, issues
 
 
@@ -197,6 +190,8 @@ def probe_media(
     device_ref: str | None = None,
     elder_ref: str | None = None,
     source_type: SourceType = SourceType.LOCAL_FILE,
+    require_audio_track: bool = False,
+    packet_scan_limit_per_stream: int = DEFAULT_PACKET_SCAN_LIMIT,
 ) -> MediaProbeReport:
     ensure_source_evidence_compatible(source_type, evidence_level)
     path = Path(path)
@@ -236,11 +231,45 @@ def probe_media(
             )
         ]
 
+    container_timing = None
+    if modality in {Modality.AUDIO, Modality.VIDEO}:
+        container_timing, timing_issues = probe_container_timing(
+            path,
+            packet_scan_limit_per_stream=packet_scan_limit_per_stream,
+        )
+        issues.extend(timing_issues)
+        if container_timing is not None:
+            technical["container_probe_backend"] = (
+                f"pyav-{container_timing.backend_version}"
+            )
+            technical["audio_track_status"] = container_timing.audio_track_status
+            technical["video_track_status"] = container_timing.video_track_status
+        elif modality is Modality.VIDEO:
+            technical["audio_track_status"] = "unknown"
+
+    if require_audio_track:
+        if container_timing is None:
+            issues.append(
+                QualityIssue(
+                    code="required_audio_track_unverified",
+                    severity=Severity.ERROR,
+                    message="A required audio track could not be verified",
+                )
+            )
+        elif container_timing.audio_track_status != "present":
+            issues.append(
+                QualityIssue(
+                    code="required_audio_track_missing",
+                    severity=Severity.ERROR,
+                    message="The container does not include the required audio track",
+                )
+            )
+
     error_count = sum(issue.severity is Severity.ERROR for issue in issues)
     warning_count = sum(issue.severity is Severity.WARNING for issue in issues)
     if error_count:
         quality_status = QualityStatus.FAIL
-    elif warning_count or modality is Modality.VIDEO:
+    elif warning_count:
         quality_status = QualityStatus.PARTIAL
     elif modality is Modality.UNKNOWN:
         quality_status = QualityStatus.UNKNOWN
@@ -258,6 +287,15 @@ def probe_media(
             "probe_error_count": error_count,
             "probe_warning_count": warning_count,
             "byte_size": asset.byte_size,
+            "container_stream_count": (
+                container_timing.stream_count if container_timing else 0
+            ),
+            "video_stream_count": (
+                container_timing.video_stream_count if container_timing else 0
+            ),
+            "audio_stream_count": (
+                container_timing.audio_stream_count if container_timing else 0
+            ),
         },
         missing_reasons=[
             issue.code
@@ -270,5 +308,6 @@ def probe_media(
         asset=asset,
         observation=observation,
         technical_metadata=technical,
+        container_timing=container_timing,
         issues=issues,
     )

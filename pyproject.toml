@@ -16,6 +16,7 @@ dependencies = [
 media = [
     "numpy>=1.26,<3",
     "opencv-python-headless>=4.10,<5",
+    "av==18.0.0",
 ]
 multimodal = [
     "numpy>=1.26,<3",

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -458,12 +458,74 @@ class RunManifest(ContractModel):
     issues: list[QualityIssue] = Field(default_factory=list)
 
 
+class MediaStreamTiming(ContractModel):
+    stream_index: int = Field(ge=0)
+    stream_type: Literal["video", "audio"]
+    codec_name: str | None = None
+    time_base: str | None = None
+    declared_start_pts: int | None = None
+    declared_start_ms: float | None = None
+    declared_duration_pts: int | None = None
+    declared_duration_ms: float | None = None
+    declared_frame_count: int | None = Field(default=None, ge=0)
+    packet_count: int = Field(ge=0)
+    packets_with_pts: int = Field(ge=0)
+    packets_with_dts: int = Field(ge=0)
+    missing_pts_count: int = Field(ge=0)
+    missing_dts_count: int = Field(ge=0)
+    negative_pts_count: int = Field(ge=0)
+    pts_backward_step_count: int = Field(ge=0)
+    dts_backward_step_count: int = Field(ge=0)
+    first_demux_pts: int | None = None
+    last_demux_pts: int | None = None
+    min_pts: int | None = None
+    max_pts: int | None = None
+    min_pts_ms: float | None = None
+    max_pts_ms: float | None = None
+    end_pts_ms: float | None = None
+    pts_span_ms: float | None = None
+    packet_duration_sum_ms: float | None = None
+    median_forward_pts_step_ms: float | None = None
+    max_forward_pts_step_ms: float | None = None
+    scan_truncated: bool = False
+    technical_metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class ContainerTimingReport(ContractModel):
+    schema_version: str = "1.0"
+    timing_version: str
+    backend: Literal["pyav"] = "pyav"
+    backend_version: str
+    format_names: list[str] = Field(default_factory=list)
+    container_start_ms: float | None = None
+    container_duration_ms: float | None = None
+    container_bit_rate: int | None = Field(default=None, ge=0)
+    metadata_key_count: int = Field(ge=0)
+    metadata_values_persisted: bool = False
+    source_path_persisted: bool = False
+    stream_count: int = Field(ge=0)
+    video_stream_count: int = Field(ge=0)
+    audio_stream_count: int = Field(ge=0)
+    video_track_status: Literal["present", "absent"]
+    audio_track_status: Literal["present", "absent"]
+    same_container_av: bool
+    can_measure_start_offset: bool
+    audio_minus_video_start_ms: float | None = None
+    audio_minus_video_end_ms: float | None = None
+    duration_delta_ms: float | None = None
+    drift_estimate_available: bool = False
+    packet_scan_limit_per_stream: int = Field(gt=0)
+    streams: list[MediaStreamTiming] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+
+
 class MediaProbeReport(ContractModel):
     schema_version: str = "1.0"
     probe_version: str
     asset: SourceAsset
     observation: Observation
     technical_metadata: dict[str, Any] = Field(default_factory=dict)
+    container_timing: ContainerTimingReport | None = None
     issues: list[QualityIssue] = Field(default_factory=list)
 
 

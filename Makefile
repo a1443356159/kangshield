@@ -1,4 +1,4 @@
-.PHONY: test info-fixtures prepare-mm-models prepare-mm-smoke submit-mm-smoke prepare-m2b-data submit-m2b-benchmark prepare-m3-pose-models submit-m3-pose-comparison prepare-m3-speech-models submit-m3-speech-comparison
+.PHONY: test info-fixtures prepare-mm-models prepare-mm-smoke prepare-m2c-timing-fixture submit-mm-smoke prepare-m2b-data submit-m2b-benchmark prepare-m3-pose-models submit-m3-pose-comparison prepare-m3-speech-models submit-m3-speech-comparison
 
 PYTHON ?= python3
 KANG_VIDEO_INPUT ?= $(CURDIR)/data/raw/public-smoke/ultralytics-bus-replay.avi
@@ -18,6 +18,9 @@ prepare-mm-models:
 
 prepare-mm-smoke:
 	$(PYTHON) scripts/prepare_public_smoke_inputs.py
+
+prepare-m2c-timing-fixture:
+	$(PYTHON) scripts/prepare_v1_m2c_timing_fixture.py --force
 
 submit-mm-smoke:
 	test -f "$(KANG_VIDEO_INPUT)"
