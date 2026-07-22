@@ -947,8 +947,8 @@
 
 | 行动 | 负责人 | 截止日期 | 状态 |
 |---|---|---|---|
-| 实现通用 `v1-g4-fall-feature-capture` producer，消费 frozen capture/pose 输出并写本桥接 feature-set/JSONL | Codex | 2026-07-24 | Open |
-| 实现真实 event bundle 的通用组装/摘要验证入口 | Codex | 2026-07-25 | Open |
+| 实现通用 `v1-g4-fall-feature-capture` producer，消费 frozen capture/pose 输出并写本桥接 feature-set/JSONL | Codex | 2026-07-24 | Closed by REV-019；L40 evidence tracked there |
+| 实现真实 event bundle 的通用组装/摘要验证入口 | Codex | 2026-07-25 | Closed by REV-020 |
 | 按 REV-014 取得 C6c E2 held-out capture，并指定独立标注/裁决责任人 | 待指定采集人 / 项目组 | 2026-08-02 | Open |
 | 对三路真实 clean feature run 原样执行 frozen candidate policy 与 REV-016 scorer | Codex | 2026-08-03 | Blocked on capture and annotation |
 | 评审多人 per-person/场景级 candidate 归属与跨 track 去重 | 项目组 | 2026-08-04 | Open |
@@ -958,6 +958,62 @@
 1. 通用 capture producer 是直接重放原始 clip，还是先消费一个独立 pose-capture run；必须保证 pose policy、feature policy 和 clip 时序只计算一次且可审计。
 2. 真实 bundle assembler 是否复制 derived-sensitive prediction 到受控 bundle，还是只允许同一受控根目录内引用；需要结合数据保留策略冻结。
 3. C6c 多人物场景是否继续 largest-bbox 场景级候选；本桥接保持现有语义，没有提前替项目组做身份策略决定。
+
+---
+
+## REV-019 G4 Capture Pose 到 Fall Feature Producer Review
+
+- 日期：2026-07-23
+- 状态：Accepted for E1 production-interface tooling；V1-R1 remains In progress
+- 参与人：项目组、Codex
+- 评审范围：capture/readiness 到真实姿态 backend、G4 frame feature、`FallFeatureCaptureSet`、tracker reset、来源/标签隔离、三模型绑定、隐私与 C6c 边界
+- 输入材料：[producer 设计](v1-g4-fall-feature-capture.md)、[正式 E1 报告](reports/v1-g4-fall-feature-capture.md)、实现/修复 `7a8dc23` / `b233abe` / `b4b72f7` / `243cef3` / `d1d4b5a` / `8b4b52d`、L40 job `1776`
+
+### 发现
+
+1. REV-018 已冻结 exporter 的 `FallFeatureCaptureSet` 输入，但当时三路 feature source 是预构造 fixture，没有从 capture media 执行真实 pose backend。本 producer 补齐“verified capture clip → pose event → G4 fall-motion frame → feature set/report”，不改变 candidate/evaluator 契约。
+2. `load_m2c_inference_context` 只向推理层暴露 opaque clip/scenario、duration、媒体 path/size/digest 和当前 variant policy；participant/operator、场景文字、expected-person、annotation window 与同步标签不进入 backend 或 extractor。
+3. Readiness report/run、capture/model/feature policy、媒体路径/大小/摘要在下游 run 前严格重验。fixture 必须 E1；真实输入还必须打开 E2 camera gate；dirty/unknown/不完整 assessor、不可用 clip 和 first-inference 顺序漂移均失败。
+4. 每个 clip 前强制 `backend.reset()`，逐采样帧先写 `video.pose_frame`，再调用现有 `FallMotionFeatureExtractor` 写 `video.fall_motion_frame`。精确 bbox/keypoints/track 仅留在 derived-sensitive run；父 report/set 只保存摘要与 artifact digest。
+5. YOLO 与 Keypoint R-CNN 的 tracking 在 pose binding 内声明；RTMPose 使用独立 `short_term_pose_tracking` binding。初版 producer 只接受 inline `tracking=true`，导致 RTMPose CPU preflight 在模型推理前被误拒；`b233abe` 接入 explicit 表示，`b4b72f7` 再冻结为“一个 inline 或一个 enabled explicit”的互斥门，同时拒绝无、混合或多个 tracker。
+6. Fake backend 集成验证 12 个 clip、180 帧、12 次 tracker reset，生成 feature set 后可被 REV-018 exporter 原样消费且 0 candidate。媒体/模型摘要漂移和任一 unusable clip 均在 run 前 fail closed。
+7. YOLO、RTMPose、Keypoint R-CNN 三个真实 CPU backend 已分别完成 12 clip / 180 frame preflight；synthetic timing clip 不含人物，因此 people/tracked 为 0，结果只验证 adapter 和 artifact，不是模型覆盖率。
+8. clean `d1d4b5a` / job `1776` 在同一 NVIDIA L40 上完成三个独立 run：均 completed、E1、0 issue、180 frame、0 people/tracked；replay RTF 为 0.088889～0.114637。0-person 是输入事实，只能验证 replay/backend/artifact。
+9. job `1769` 因 cuDNN 动态链接失败；job `1772` 虽功能完成，但 run/JSONL 为 `0755/0644`，两者均未被接受。`243cef3` 关闭 runtime 问题，`d1d4b5a` 关闭单个 run 内权限。正式 job `1776` 的三 run 树与 stdout 才通过 owner-only 门；RTMPose 的 Torch peak 0 不代表 ONNX Runtime 或整卡峰值。
+10. 三个 job `1776` feature set 随后由 clean `8b4b52d` 原样进入 exporter、assembler 和独立 scorer。`8b4b52d` 是审计发现 `--runs-dir` 根仍为 `0755` 后的修复；旧下游结果不通过事后 chmod 升级。正式三路均 0 candidate；owner-only bundle 16 个文件，provenance true、preflight 与 scorer report 同 SHA，decision 仍为 `tooling_only`。
+
+### 决定
+
+1. 接受 `v1-g4-fall-feature-capture` stage、单 variant run、每 clip tracker reset、pose/fall 双事件与 `FallFeatureCaptureSet`，作为 E1 production-interface tooling 基线。
+2. 冻结 label-blind inference context；producer 不得读取 annotation/adjudication、expected-person 或 candidate policy，也不得根据输出自动调阈值。
+3. 接受 inline/explicit 两种 tracking binding 表达，但必须恰好形成一个短时 tracking 能力；缺失或含糊 tracker 继续 fail closed。
+4. fixture producer 输出只能作为 E1 production-interface tooling。0-person synthetic 结果不得写成人物漏检、跌倒召回、模型排名或 C6c 性能。
+5. 真实执行顺序保持：M2c camera gate → 三路 clean feature producer → frozen candidate exporter → REV-020 assembler → REV-016 scorer。任何一步不得绕过上游 digest。
+6. 本层固定不执行 candidate、RiskAssessment 或 Alert；模型采用/许可证状态不改变，V1-R1 保持 In progress。
+
+### 验证
+
+- 自动化：最终代码 118 passed，tracker 定向回归 3 passed，权限/CLI/multimodal/producer 定向回归 26 passed；`compileall`、全部 shell/sbatch `bash -n`、`pip check` 与 `git diff --check` 通过。
+- Fake integration：12 clips、180 frames、12 resets，feature-set → exporter 兼容，0 candidate。
+- CPU real-backend preflight：YOLO / RTMPose / Keypoint R-CNN 均完成 12 clips / 180 frames；输入无人物，people/tracked 为 0。
+- L40：job `1776`；run `20260722T203258Z-6dbbf02b` / `20260722T203304Z-f054ad75` / `20260722T203311Z-1bbc5123`；均为 clean `d1d4b5a`、completed、E1、0 issue、12 clips / 180 frames，run/文件/stdout 权限为 `0700/0600/0600`。
+- 端到端工程链：clean `8b4b52d` candidate runs `20260722T204234Z-8c8c1b75` / `20260722T204234Z-7e1eca98` / `20260722T204234Z-135cad7f`；bundle `1126a3a274696aa930cd7d4d5dd808ee156bbc0ae95417b38b8f75bc03aa459b`；scorer `20260722T204309Z-8b5b09f3`，report/preflight `26b58c13b41ed1313082508ca91586c50b289c0e136e5b6361ecd41dfb9bc3e9`。
+- 隐私：三 producer 聚合产物及下游 aggregate 对本地路径、用户名、精确姿态与 Risk/Alert true 均 0 命中；exact feature/prediction/annotation 留在 ignored 或 owner-only 边界。
+
+### 行动项
+
+| 行动 | 负责人 | 截止日期 | 状态 |
+|---|---|---|---|
+| 完成三真实 backend L40 clean smoke 与正式报告 | Codex | 2026-07-23 | Closed；owner-only job `1776` |
+| 将三路 clean feature set 原样送入 REV-018 exporter | Codex | 2026-07-24 | Closed for E1 tooling；3 clean candidate runs |
+| 用 REV-020 assembler 组装 exporter 输出并复跑 REV-016 scorer | Codex | 2026-07-24 | Closed for E1 tooling；preflight/scorer identical |
+| 取得 C6c E2 held-out capture 与独立 annotation/adjudication | 待指定采集人 / 项目组 | 2026-08-02 | Open |
+
+### 未决问题
+
+1. 真实多人 clip 是否继续 largest-bbox 场景级单目标，还是升级 per-track feature set；当前 producer 保留既有单主目标 G4 语义。
+2. 真实长视频按 clip reset 可避免跨场景身份污染，但连续直播的 tracker/session reset 条件仍需 V2-D1 冻结。
+3. 三模型在真实 C6c 上若产生不同有效帧数，先按哪个 upstream quality gate 判定“可评分”；不能用 event 结果反向修改 held-out 门。
 
 ---
 
@@ -998,7 +1054,7 @@
 
 | 行动 | 负责人 | 截止日期 | 状态 |
 |---|---|---|---|
-| 使用通用 capture producer 完成三姿态 clean feature/candidate run | Codex | 2026-07-24 | In progress；job `1769` |
+| 使用通用 capture producer 完成三姿态 clean feature/candidate run | Codex | 2026-07-24 | Closed for E1 tooling by REV-019；job `1776` + clean `8b4b52d` candidate runs |
 | 取得 C6c E2 held-out capture，并冻结独立标注/裁决责任人 | 待指定采集人 / 项目组 | 2026-08-02 | Open |
 | 对真实三路 candidate 调用 assembler 与原 scorer，不手工改写 bundle | Codex | 2026-08-03 | Blocked on capture and annotation |
 | 冻结真实 derived-sensitive prediction/bundle 的保留、访问和删除责任 | 项目组 | 2026-08-03 | Open |
@@ -1008,3 +1064,105 @@
 1. 比赛环境中 owner-only bundle 的物理根目录、备份与删除责任由谁承担？
 2. derived-sensitive prediction 是否保留完整比赛周期，还是 scorer 后只保留摘要与审计 receipt？
 3. 多人 per-person/场景级 candidate 语义改变时，prediction schema 与 assembler 是否需要新版本；不能在现有版本中静默扩展。
+
+---
+
+## REV-021 V1-M2a 同容器音轨 PTS Adapter Review
+
+- 日期：2026-07-23
+- 状态：Accepted for offline same-container E1 tooling；真实 C6c 音轨仍 Open
+- 参与人：项目组、Codex
+- 评审范围：同容器音轨解码、PTS 起点对齐、SpeechBackend 时间语义、来源去重、CLI/Slurm、故障门、隐私与 C6c 边界
+- 输入材料：[多模态 Pipeline](v1-multimodal-pipeline.md)、[同容器初测报告](reports/v1-m2a-same-container-audio-smoke.md)、实现/修复 `8c6df2d` / `15406db` / `eca6231` / `243cef3` / `195c966` / `d1d4b5a`、CPU run `20260722T190551Z-29f7f25c`、L40 job `1777`
+
+### 发现
+
+1. REV-004/M2a 只支持独立 video + PCM WAV，共享零点明确属于 synthetic harness；REV-009 已 Reject 其作为真实同步依据。REV-010 虽能测同容器 track/PTS，却尚未把音轨送入 VAD/ASR，真实摄像头适配仍断在 probe 与 SpeechBackend 之间。
+2. 新路径要求同一 resolved container，复用 `ContainerTimingReport.audio_minus_video_start_ms`，再由 PyAV 解码唯一音轨、下混/重采样至 16 kHz。音频晚开始时保留 timeline start，早开始时裁掉视频零点之前的样本，包 PTS gap 以静音保留。
+3. 缺/多音轨、多视频轨、起点不可测、packet 缺 PTS、scan truncated、音频 PTS 逆序或无重叠窗口均 fail closed。Pipeline 不自行选择轨道，也不回退为 common zero。
+4. `MultimodalPipelineReport` 新增兼容默认字段 `input_layout`、`same_container_av`、`audio_start_offset_ms`，并校验同容器必须只有一个 asset identity。Run ledger 相应只登记 1 个 SourceAsset、1 个 Observation 和 1 个 container probe。
+5. bitexact 准备器把既有公开视频/WAV 合成 FFV1 + PCM16 Matroska，固定 +250 ms 起点。相同输入两次输出 SHA-256 均为 `c989405d3c4b8cacb3418df919da6530335399b33f3e5e52b9bb307e48dcad80`；这是 engineered E1 alignment，不是自然同步。
+6. clean CPU run `20260722T190551Z-29f7f25c` 在真实 YOLO/FunASR 后端上得到 25/25 有人姿态帧、100 个实例、1 个 VAD/转写段和 6 个窗口。容器 offset 为 +250 ms，两个语言 FeatureEvent 均落在视频轴 `1130–5445 ms`；报告不复制 20 字转写。
+7. CPU processing RTF 0.615406、cold-start RTF 6.750615；只说明模型常驻后的离线处理快于媒体时长。离线 replay 不包含取流、网络、缓冲和断流恢复。
+8. 单个起点 offset 和首尾 duration delta 都不能估计 capture clock drift。C6c 是否开放带音频流、实际 codec/time base 与两次同步事件仍是 M2c E2/E3 门。
+9. L40 预运行暴露了三类工程失败：`/tmp` worktree 不在计算节点共享文件系统；本地模型绝对目录曾进入 manifest；derived-sensitive JSONL 曾继承默认 `0644`。前两项由 `243cef3` / `195c966` 关闭，`d1d4b5a` 将 run/子目录与 JSON/JSONL 固定为 `0700`/`0600`，旧 run 不手工改权限冒充新证据。
+10. clean `d1d4b5a` / job `1777` 在 L40 上 completed/0 issue；功能与 PTS 投影和 CPU run 逐字段一致，processing/cold-start RTF 为 0.413989/6.808901。run 树、JSON/JSONL 和 stdout 为 `0700/0600/0600`，聚合路径/文本隐私扫描 0 命中。
+
+### 决定
+
+1. 接受 `same_container_pts` 作为真实录制 A/V 的唯一多模态文件入口 seam；该决定只覆盖离线 E1 tooling，不证明 C6c 开放音轨或自然 capture clock。
+2. 保留 `separate_files_synthetic_common_zero` 只用于历史 public benchmark/单元测试；不得将该布局写成自然音视频同步或 C6c 能力。
+3. 冻结 fail-closed timing gate、单 asset/observation provenance 和 SpeechBackend-relative/Pipeline-shifted 的时间责任。模型后端不得读取容器或自行补 offset。
+4. `audio_start_offset_ms` 保存 probe 的有符号原值；FeatureEvent 使用 16 kHz sample-grid 后的非负 timeline start。修改精度或 drift 表达必须升级契约。
+5. Slurm 必须显式绑定 submit checkout `src/` 和 source type，避免 editable install 与 manifest code version 分叉。
+6. 本轮不改变 YOLO/RTMPose/Keypoint R-CNN 或 FunASR 的 V2 候选/许可证状态，也不授权 RiskAssessment/Alert。
+
+### 验证
+
+- 自动化：118 passed；权限/CLI/multimodal/producer 定向回归 26 passed；`compileall`、全部 shell/sbatch `bash -n`、`pip check` 与 `git diff --check` 通过。
+- 准备器：50 视频帧、88,747 个 16 kHz sample、250 ms offset、28,741,707 bytes；两次输出逐字节一致。
+- CPU run：`eca6231`、clean、completed、E1、0 issue；manifest `7e82b911b94134a0c5da0e1aecc7fc229b4c108911411df6c1c03d2931d3d32a`；pipeline report `7ebe3d49d5bcfe9be0760f3af0461ddc6e5324a9c849e4f379d6e2b5f9b7a784`。
+- 隐私：manifest/report/probe/asset/observation 对绝对路径、用户名、原始文件名与完整转写 0 命中；敏感文本只在 ignored FeatureEvent。
+- L40：job `1777`，run `20260722T203326Z-8421f5b9`，clean `d1d4b5a`、completed、E1、0 issue；manifest `a69792c502d2a7e631011816b7a0f3e447e33ad6a715ea8f654556c7164ef357`，pipeline report `6925fe9b1cba2a2d1400cf5659a7310f6daebfb7d32629ab019393e8cb4d68dd`，processing/cold RTF 0.413989/6.808901，Torch allocator peak 2,128.785 MB；该 peak 不冒充整进程/整卡峰值。
+
+### 行动项
+
+| 行动 | 负责人 | 截止日期 | 状态 |
+|---|---|---|---|
+| 完成 L40 正偏移真实后端 smoke 并核对 clean provenance/owner-only 权限 | Codex | 2026-07-23 | Closed；job `1777` |
+| 取得 C6c 原始同容器或平台可靠同步导出 | 待指定采集人 | 2026-08-01 | Open |
+| 对真实容器人工定位两次拍手/击板，计算 offset/drift 并与 PTS 对照 | 项目组 / Codex | 2026-08-02 | Blocked on capture |
+| 加入远场、电视背景和夜间真实音频，按冻结 FunASR 口径报告 CER/VAD | 项目组 / Codex | 2026-08-04 | Blocked on capture/transcript |
+
+### 未决问题
+
+1. C6c SDK/回放最终返回单复用容器、分离 elementary stream，还是只开放视频；三者决定 LiveTransport adapter 形态，但不能改变核心时间契约。
+2. 真实长录制需要按多长窗口做 drift 重估；当前离线一次 start offset 不表达动态 clock correction。
+3. 若平台重封装时丢弃原 PTS，是要求本地录制保留，还是按 G2 预案分开展示视频与语言；必须在 V2-D1 前决定。
+
+---
+
+## REV-022 V1 Run Artifact 与 Slurm Provenance/Permission Review
+
+- 日期：2026-07-23
+- 状态：Accepted for V1 file-artifact seam；V2 service ACL design remains Open
+- 参与人：项目组、Codex
+- 评审范围：共享 checkout、CUDA runtime、manifest 本地路径、run/JSONL/Slurm stdout 权限、失败证据处置与 V2 继承边界
+- 输入材料：修复提交 `243cef3` / `195c966` / `d1d4b5a` / `8b4b52d`，失败/拒绝 jobs `1769` / `1771` / `1772` / `1773` / `1774`，正式 jobs `1776` / `1777`
+
+### 发现
+
+1. `/tmp` worktree 只存在于提交节点，compute node 无法进入该 workdir；job `1771` 在脚本执行前退出。Slurm 正式执行必须来自计算节点可见的共享 checkout，不能仅凭登录节点 Git clean 推断可运行。
+2. ONNX Runtime CUDA provider 已注册并不等于 session 能建立。job `1769` 的 YOLO 子 run 成功，RTMPose 才暴露 cuDNN 9 未进入动态链接路径；失败后没有静默回退 CPU，也没有把单路成功冒充三路证据。
+3. job `1773` 功能完成，但 Slurm 传入的绝对 `pose_model` 被原样写进 manifest。`195c966` 只保存公开文件名与 `pose_model_path_persisted=false`；model digest 继续由 ModelBinding 承担。
+4. 原子 JSON 由临时文件产生时已为 `0600`，但追加 JSONL 与目录曾继承默认 umask 为 `0644/0755`。其中 `features.jsonl` 可包含 bbox/keypoints/track 与完整转写，因此功能成功也不能通过正式隐私门。
+5. `d1d4b5a` 将每个 run 及 `reports/logs/artifacts` 强制为 `0700`，`append_jsonl` 使用 `os.open(..., 0600)` 并校正既有目标模式；两条正式 Slurm 脚本同时设置 `umask 077` 并把 stdout 收紧为 `0600`。
+6. jobs `1776` / `1777` 通过后，本地下游复跑又暴露 `RunArtifacts` 只加固 run 子树、未加固新建 `--runs-dir` 根目录。首次结果根目录为 `0755` 并被拒绝；`8b4b52d` 将根目录也强制为 `0700`，用全新路径复跑 candidate/scorer 后通过，旧结果未通过 chmod 升级。
+
+### 决定
+
+1. 冻结 V1 本地运行的 owner-only 基线：`--runs-dir` 根、run 及子目录 `0700`，JSON/JSONL `0600`；正式 Slurm stdout `0600`。不得以 home 目录当前为 `0700` 代替文件自身权限。
+2. 权限或路径隐私门失败的旧 run 保留为诊断证据，但不能手工 chmod 后升级成原始正式证据；必须在修复后的 clean commit 上重跑。
+3. Slurm 脚本必须绑定 shared submit checkout 的 `src/`、显式 source type、离线模型缓存和可加载的 cuDNN runtime。任何 CUDA provider fallback 都必须失败，而非记录为 GPU run。
+4. 本轮只冻结 V1 文件式 artifact seam。V2 对象存储、数据库与日志平台必须另行定义 service identity、ACL、审计、备份、留存和删除责任。
+
+### 验证
+
+- 自动化：118 passed；权限/CLI/multimodal/producer 定向 26 passed；`compileall`、全部 shell/sbatch `bash -n`、`pip check` 与 `git diff --check` 通过。
+- CUDA runtime：`libcudnn.so.9` 可由 venv Python 发现并加载；ONNX Runtime provider `ldd` 无 unresolved dependency。
+- Owner-only formal reruns：job `1776` 三路 producer 与 job `1777` 同容器 run 均 clean `d1d4b5a`、completed/0 issue；run 树、全部 JSON/JSONL、stdout 与 aggregate path scan 通过。
+- 下游根目录复跑：clean `8b4b52d` 的三 candidate run、16-file bundle 和独立 scorer 均通过全树 `0700/0600`；scorer report 与 assembler preflight SHA-256 同为 `26b58c13b41ed1313082508ca91586c50b289c0e136e5b6361ecd41dfb9bc3e9`。
+
+### 行动项
+
+| 行动 | 负责人 | 截止日期 | 状态 |
+|---|---|---|---|
+| 完成 producer、同容器与下游全链 owner-only clean rerun | Codex | 2026-07-23 | Closed；jobs `1776` / `1777` + clean `8b4b52d` downstream |
+| 在 V2-D1 定义对象存储/数据库/日志 ACL、审计和删除责任 | 项目组 | 2026-08-12 | Open |
+| 将其他正式 Slurm 入口逐项迁移到同一 stdout/shared-checkout preflight | Codex | 2026-08-12 | Open；本轮只加固两条当前入口 |
+
+### 未决问题
+
+1. 比赛部署是否继续使用单用户文件系统，还是切换服务账户与对象存储？
+2. Slurm stdout 是否保留到 V1-R1 结束，还是验收摘要完成后删除；需要数据保留责任人决定。
+3. 是否为所有下游 source-run validator 增加 POSIX mode gate，还是由统一 artifact registry/receipt 负责；V2-D1 前必须选定单一责任层。

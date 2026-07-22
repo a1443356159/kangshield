@@ -1,6 +1,6 @@
 # 开发与证据晋级流程
 
-状态：Active v0.6
+状态：Active v0.7
 
 ## 1. 开发顺序
 
@@ -158,7 +158,7 @@ sacct -j <job_id> --format=JobID,State,ExitCode,Elapsed,NodeList
 
 首次运行前执行 `make PYTHON=.venv/bin/python prepare-mm-container-smoke`。该准备器消费已下载的公开 video/WAV，以 bitexact Matroska 固定 250 ms 音轨 PTS 偏移；提交 target 默认显式记录 `source_type=fixture` 和 6 秒上限，不会把工程构造的对齐升级成自然同步证据。
 
-脚本会清除指向 `127.0.0.1` 的代理变量，避免计算节点尝试连接登录节点本地代理。权重和运行目录不进入 Git；报告必须保存权重摘要和 Slurm job_id。
+脚本会清除指向 `127.0.0.1` 的代理变量，避免计算节点尝试连接登录节点本地代理；从 Python NVIDIA runtime 包显式发现并验证 cuDNN 9，避免 ONNX Runtime 注册了 CUDA provider 却在建 session 时静默回退。Slurm submit/workdir 必须位于计算节点可见的共享目录，不能从仅登录节点可见的 `/tmp` worktree 提交。权重和运行目录不进入 Git；runs 根/run/子目录、JSON/JSONL 与 Slurm stdout 分别固定为 `0700/0700/0600/0600`，报告必须保存权重摘要和 Slurm job_id。
 
 ### V1-M2b 公开固定集
 
@@ -290,6 +290,7 @@ V1-R1 的当前采用/候选/放弃状态见 [探索收敛与 V2 输入清单](v
 22. Feature set 的 capture/model/feature-policy、clip order/duration、observation、摘要/大小/frame count 是否全部通过。
 23. Candidate prediction/source run 是否绑定同一 frozen candidate policy 和准确的 `candidate_events_sha256`，且 generated time 位于 run 内。
 24. Export summary 是否不含时间、窗口、candidate/track/observation ID 或本地路径，Risk/Alert 是否仍为 false。
+25. 正式 runs 根/run/子目录、JSON/JSONL 与 Slurm stdout 是否分别保持 `0700`、`0600` 与 `0600`；任一权限漂移时是否拒绝旧 run 并用新路径重跑，而非手工改权限后冒充原始证据。
 
 快速检查：
 

@@ -58,7 +58,7 @@ readiness 文件包含的采集质量事实只用于上述门控；pose backend 
 | `rtmpose-m-humanart` | YOLOX + RTMPose + IoU tracker | detector/pose binding 按 capture 内 policy 校正并核验 |
 | `torchvision-keypointrcnn` | TorchVision + IoU tracker | 权重、框架、预处理和许可证 binding 按独立 policy 核验 |
 
-三个 backend 都必须输出 COCO-17、启用 tracking、提供 digest-bound pose model，并在每个独立 clip 前 reset tracker。阈值由 CLI 显式记录；本 producer 不自动搜索或根据输出调参。
+三个 backend 都必须输出 COCO-17、提供 digest-bound pose model，并且恰好形成一个短时 tracking 能力：可以由 pose binding 内联声明，也可以由唯一启用的 `short_term_pose_tracking` binding 提供；缺失或含糊绑定均拒绝。每个独立 clip 前必须 reset tracker。阈值由 CLI 显式记录；本 producer 不自动搜索或根据输出调参。
 
 每个采样帧先落一条 `video.pose_frame`，保留 bbox/keypoints/track 等 derived-sensitive 调试证据；随后复用冻结的 `FallMotionFeatureExtractor` 生成 `video.fall_motion_frame`。逐 clip G4 stream 单独写入 `artifacts/fall-motion-NNN.jsonl`，同时写入 run 级 `features.jsonl`。原媒体只登记安全 URI，不复制到 run。
 
@@ -82,7 +82,7 @@ readiness 文件包含的采集质量事实只用于上述门控；pose backend 
 
 ### 4.3 Run provenance
 
-stage 固定为 `v1-g4-fall-feature-capture`。manifest 必须绑定 capture/readiness/assessor/model/feature policy 摘要、sample FPS、feature version 和输出 report/set 摘要。所有逐 clip stream 与两个报告都进入 artifacts；重复媒体内容只登记一个 SourceAsset。
+stage 固定为 `v1-g4-fall-feature-capture`。manifest 必须绑定 capture/readiness/assessor/model/feature policy 摘要、sample FPS、feature version 和输出 report/set 摘要。所有逐 clip stream 与两个报告都进入 artifacts；重复媒体内容只登记一个 SourceAsset。runs 根、run/子目录固定 `0700`，JSON/JSONL 与 Slurm stdout 固定 `0600`；权限不满足的旧 run 不得通过 Review。
 
 ## 5. 命令与 Slurm 入口
 
@@ -118,6 +118,7 @@ Slurm job 在同一张 L40 上为三个 variant 分别启动独立进程，离�
 4. 父报告/source ledger 不泄漏本地路径、annotation window、bbox/keypoints；
 5. 三个真实 backend 在 L40 上完成 clean E1 run；
 6. 全量测试、compileall、shell syntax、pip check 与 diff check 通过。
+7. runs 根/run/子目录、聚合 JSON、derived-sensitive JSONL 与 Slurm stdout 通过 `0700/0600` 权限审计。
 
 ## 7. 真实 C6c 推进顺序
 

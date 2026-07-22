@@ -117,6 +117,8 @@ runs/<run_id>/
 └── artifacts/
 ```
 
+`RunArtifacts` 是该目录的唯一写入口：用户传入的 runs 根、run 与子目录均固定为 owner-only `0700`，原子 JSON 和追加 JSONL 固定为 `0600`。尤其是 bbox/keypoints/track 和完整转写所在的 derived-sensitive JSONL，不依赖宿主机默认 umask。
+
 这样可以在没有数据库和消息队列的情况下验证：
 
 - 同一输入是否得到稳定输出。

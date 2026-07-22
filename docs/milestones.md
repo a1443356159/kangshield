@@ -1,6 +1,6 @@
 # 康盾里程碑与验收门
 
-状态：Active v1.0
+状态：Active v1.1
 
 基准日期：2026-07-23
 
@@ -111,9 +111,9 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 - [x] 权重 SHA-256、许可证、环境、峰值显存与性能口径。
 - [x] Slurm 离线模型缓存与代理隔离。
 - [x] 18 项自动化测试和干净提交 L40 smoke。
-- [x] 同容器单音轨解码、16 kHz 重采样、PTS offset 事件平移、单来源 provenance 与 fail-closed timing gate。
+- [x] 同容器单音轨解码、16 kHz 重采样、PTS offset 事件平移、单来源 provenance 与 fail-closed timing gate；owner-only L40 job `1777` 与 CPU 功能/PTS 投影一致。
 
-证据见 [V1-M2a 多模态 Pipeline 初测报告](reports/v1-m2a-multimodal-smoke.md)。V1-M2b 先把公开真实人物录制扩展成固定评测集；C6c 音视频时间基和受控居家样本仍由 V1-M2c 验收，不允许用公开数据代替。
+证据见 [V1-M2a 多模态 Pipeline 初测报告](reports/v1-m2a-multimodal-smoke.md)和[同容器音轨 PTS 对齐报告](reports/v1-m2a-same-container-audio-smoke.md)。V1-M2b 先把公开真实人物录制扩展成固定评测集；C6c 音视频时间基和受控居家样本仍由 V1-M2c 验收，不允许用公开数据代替。
 
 ### V1-M2b：公开真实场景固定集与对齐评测
 
@@ -204,12 +204,15 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 - [x] 在干净提交 `b0b2e97` 上完成双人 interval/onset agreement、裁决、三 candidate stream TP/FP/FN、误触发/小时与 delay 的 E1 正式工具运行；fixture 指标不用于模型比较。
 - [x] 在查看未来 C6c held-out 输出前冻结首版 label-blind candidate episode 状态机；在干净提交 `dc6cace` 上复用 URFD/CAUCAFall 三路 G4 特征完成 54 项 E1 公开压力，结果如实保留 YOLO/RTMPose 漏候选与 RTMPose 行走负候选。
 - [x] 在干净提交 `a57b8ee` 上将 capture-bound `FallFeatureCaptureSet`、公共 event prediction、strict source provenance 和 `export-fall-candidates` 接到 REV-016 scorer；三路 rule-bearing E1 fixture 与 run `20260722T172634Z-59174d4c` 已验证真实状态机到 evaluator 的接口，未使用模型推理。
+- [x] 实现 capture/readiness → 三真实姿态 backend → pose/G4 feature producer；owner-only L40 job `1776` 与 clean `8b4b52d` exporter → assembler → scorer 已完成全链验证；输入无人物，因此只关闭 production-interface tooling 子门。
+- [x] 实现 event evaluation bundle assembler 的 `0700/0600` staging、strict preflight 与原子发布，并由独立 scorer 验证 report 逐字节一致。
+- [x] 将 `--runs-dir` 根、run/子目录、JSON/JSONL 与两条正式 Slurm stdout 收紧为 `0700/0700/0600/0600`；绝对模型目录不进入同容器 manifest，权限漂移旧 run 不作为正式证据。
 - [ ] 使用 C6c 正负视频继续补空场持续、床上躺卧、宠物移动和真实多人 tracking，按已冻结 policy 生成真实候选并复用事件评估口径。
 - [ ] 用 E2/E3 证据把 C6c 与 SDNL1 从 Unknown 归类为 available、limited 或 blocked。
 - [ ] 决定 V2 最终姿态权重和项目分发许可证，生成第三方 NOTICE；HumanArt 与 Keypoint R-CNN 均未关闭该门。
 - [ ] 为硬门指定负责人和截止日期，并删除无法完成的 V2 能力声明。
 
-预 Review 见 [V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。G4 基础设计与证据见[跌倒运动特征设计](v1-g4-fall-motion-features.md)和[正式报告](reports/v1-g4-fall-motion-features.md)，扩展 ADL 子门见 [CAUCAFall 设计](v1-g4-caucafall-adl-stress.md)和[压力报告](reports/v1-g4-caucafall-adl-stress.md)，静态人物检测子门见 [Open Images 设计](v1-g4-openimages-static-home-stress.md)与[正式报告](reports/v1-g4-openimages-static-home-stress.md)，候选生成子门见[episode 设计](v1-g4-fall-event-candidates.md)与[公开压力报告](reports/v1-g4-fall-candidate-public-stress.md)，生产桥接见 [Capture Feature 到 Candidate 导出](v1-g4-candidate-export-bridge.md)，事件工具子门见[事件评估设计](v1-g4-event-evaluation-readiness.md)与[初测报告](reports/v1-g4-event-evaluation-smoke.md)。E1 工具与公开压力集完成不等于 V1-R1 Done；真机视频、真实候选/事件指标、床上躺卧/时序多人、最终姿态分发路线和责任人仍是验收门。
+预 Review 见 [V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。G4 基础设计与证据见[跌倒运动特征设计](v1-g4-fall-motion-features.md)和[正式报告](reports/v1-g4-fall-motion-features.md)，扩展 ADL 子门见 [CAUCAFall 设计](v1-g4-caucafall-adl-stress.md)和[压力报告](reports/v1-g4-caucafall-adl-stress.md)，静态人物检测子门见 [Open Images 设计](v1-g4-openimages-static-home-stress.md)与[正式报告](reports/v1-g4-openimages-static-home-stress.md)，候选生成子门见[episode 设计](v1-g4-fall-event-candidates.md)与[公开压力报告](reports/v1-g4-fall-candidate-public-stress.md)，生产链见 [Capture Feature Producer](v1-g4-fall-feature-capture.md)、[Candidate 导出](v1-g4-candidate-export-bridge.md)和 [Event Bundle Assembler](v1-g4-event-bundle-assembly.md)，事件工具子门见[事件评估设计](v1-g4-event-evaluation-readiness.md)与[初测报告](reports/v1-g4-event-evaluation-smoke.md)。E1 工具与公开压力集完成不等于 V1-R1 Done；真机视频、真实候选/事件指标、床上躺卧/时序多人、最终姿态分发路线和责任人仍是验收门。
 
 ## 5. 里程碑决策优先级
 

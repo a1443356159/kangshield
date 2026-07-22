@@ -1,6 +1,6 @@
 # 信息侧模块详细技术路线
 
-状态：Implementation Baseline v0.8
+状态：Implementation Baseline v0.9
 
 更新时间：2026-07-23
 
@@ -189,6 +189,7 @@ runs/<run_id>/
 4. 默认不把原始媒体复制进 runs。
 5. reports 不保存 accessToken、AppKey、验证码、设备序列号或真实姓名。
 6. runs 默认被 Git 忽略。
+7. 用户传入的 runs 根、每个 run 及其 `reports/logs/artifacts` 子目录固定 `0700`，JSON/JSONL 固定 `0600`；权限漂移的运行不得作为正式证据。
 
 ## 7. 开发路径
 

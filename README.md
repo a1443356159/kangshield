@@ -20,6 +20,7 @@
 - [V1 信息采集与模型探索](docs/v1-information-acquisition.md)
 - [V1 视频与语言多模态 Pipeline](docs/v1-multimodal-pipeline.md)
 - [V1-M2a 多模态 Pipeline 初测报告](docs/reports/v1-m2a-multimodal-smoke.md)
+- [V1-M2a 同容器音轨 PTS 对齐初测报告](docs/reports/v1-m2a-same-container-audio-smoke.md)
 - [V1-M2b 公开真实场景固定集与对齐评测](docs/v1-m2b-public-dataset-benchmark.md)
 - [V1-M2b 公开固定集初测报告](docs/reports/v1-m2b-public-dataset-benchmark.md)
 - [V1-M3 姿态模型对比设计](docs/v1-m3-pose-model-comparison.md)
@@ -48,6 +49,10 @@
 - [V1-R1 G4 跌倒候选 episode 公开压力报告](docs/reports/v1-g4-fall-candidate-public-stress.md)
 - [V1-R1 G4 Capture Feature 到 Candidate 导出桥接](docs/v1-g4-candidate-export-bridge.md)
 - [V1-R1 G4 Candidate Export Bridge E1 报告](docs/reports/v1-g4-candidate-export-bridge.md)
+- [V1-R1 G4 Capture Pose 到 Fall Feature Producer](docs/v1-g4-fall-feature-capture.md)
+- [V1-R1 G4 Capture Fall Feature Producer E1 报告](docs/reports/v1-g4-fall-feature-capture.md)
+- [V1-R1 G4 Event Evaluation Bundle Assembler](docs/v1-g4-event-bundle-assembly.md)
+- [V1-R1 G4 Event Bundle Assembly E1 报告](docs/reports/v1-g4-event-bundle-assembly.md)
 
 ## V1 初步开发
 

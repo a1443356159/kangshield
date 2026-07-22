@@ -1,6 +1,6 @@
 # V1 视频与语言多模态采集 Pipeline
 
-状态：Implemented Baseline v0.4；同容器 PTS 路径已实现；V1-R1 决策已同步
+状态：Implemented Baseline v0.5；同容器 PTS/owner-only 路径已实现；V1-R1 决策已同步
 
 更新时间：2026-07-23
 
@@ -77,6 +77,7 @@ src/kangshield/information/
 - `pose_backend` 和 `speech_backend` 只返回结构化 Python 对象，不写文件、不输出风险。
 - `multimodal_pipeline` 负责把后端输出转换成公共契约并对齐。
 - `artifacts` 是运行目录的唯一写入口。
+- runs 根、run 目录及子目录固定 `0700`，JSON/JSONL 固定 `0600`；完整转写与姿态坐标不依赖默认 umask。
 - CLI 负责模型构造和运行参数，不承载推理逻辑。
 
 ## 5. 数据契约
@@ -212,7 +213,7 @@ Slurm 脚本请求 1 张 L40、8 CPU、20 分钟，并强制从本地缓存加�
 
 前七项关闭的是“设备无关链路与同容器实现”，后三项属于 V1 真实数据和模型对比，不得由 synthetic/public smoke 替代。
 
-历史独立 video/WAV 的 Slurm 结果见 [V1-M2a 初测报告](reports/v1-m2a-multimodal-smoke.md)；同容器 PTS、真实后端 CPU 与待完成 L40 证据见[同容器音轨初测报告](reports/v1-m2a-same-container-audio-smoke.md)。
+历史独立 video/WAV 的 Slurm 结果见 [V1-M2a 初测报告](reports/v1-m2a-multimodal-smoke.md)；同容器 PTS、真实后端 CPU 与 owner-only L40 证据见[同容器音轨初测报告](reports/v1-m2a-same-container-audio-smoke.md)。
 
 ## 9. 官方依据
 

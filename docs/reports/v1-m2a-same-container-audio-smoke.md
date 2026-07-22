@@ -1,6 +1,6 @@
 # V1-M2a 同容器音轨 PTS 对齐初测报告
 
-状态：CPU 真实后端功能证据 Passed；L40 job `1771` Pending
+状态：CPU 功能与 owner-only L40 E1 证据 Passed；真实 C6c 音轨仍 Open
 
 日期：2026-07-23
 
@@ -13,6 +13,10 @@
 - `8c6df2d`：`AudioBuffer.start_ms`、PyAV 单音轨解码/重采样、PTS gap 静音保留、正负 offset 裁剪、Pipeline/CLI/report 契约与故障门；
 - `15406db`：Slurm 强制使用提交 checkout 的 `src/`，并显式传递 `source_type`；
 - `eca6231`：bitexact 250 ms 公开 A/V 夹具准备器与可重复性测试。
+- `243cef3`：Slurm 显式发现并验证 Python NVIDIA runtime 中的 cuDNN 9；
+- `195c966`：manifest 只记录公开模型文件名，不保存本机模型目录；
+- `d1d4b5a`：run/子目录固定 `0700`，JSON/JSONL 与正式 Slurm stdout 固定 `0600`。
+- `8b4b52d`：进一步将所有 CLI 的 `--runs-dir` 根目录固定为 `0700`；本 job 的 runs 根已由 Slurm 预创建为 `0700`。
 
 入口保持两种布局：
 
@@ -82,9 +86,27 @@
 | 语言分支 | 657.712 ms；RTF 0.118571 |
 | 姿态首帧 / 稳态均值 | 963.081 / 42.111 ms |
 
-CPU processing 小于媒体时长，但冷启动明显不适合演示时即时拉起。该结果只验证功能与粗略容量；L40 job `1771` 将单独提供 GPU 口径。
+CPU processing 小于媒体时长，但冷启动明显不适合演示时即时拉起。该结果只验证功能与粗略容量；L40 结果必须另列，不能用设备名替换真实 RTF。
 
-## 6. 产物摘要与隐私
+## 6. Clean L40 真实后端运行
+
+job `1777` 在 clean `d1d4b5a`、NVIDIA L40、driver `580.105.08` 上重跑同一 bitexact 输入，47 秒完成且退出码为 0。run 为 completed/0 issue；单 asset/observation、PTS 与功能投影和 CPU 基线逐字段一致，manifest 只保存模型 basename 且 `pose_model_path_persisted=false`：
+
+| 项目 | L40 正式值 |
+|---|---:|
+| run_id / code | `20260722T203326Z-8421f5b9` / `d1d4b5a` |
+| 模型加载 / processing / cold total | 37,090.485 / 2,401.139 / 39,491.624 ms |
+| processing / cold-start RTF | 0.413989 / 6.808901 |
+| 视频姿态 wall / RTF | 1,052.840 ms / 0.181524 |
+| 语言 wall / RTF | 514.782 ms / 0.092804 |
+| 姿态首帧 / 稳态均值 | 632.488 / 12.167 ms |
+| Torch allocator peak | 2,128.785 MB* |
+
+`*` 这是 Torch allocator 的峰值，不是 Python 进程 RSS、FunASR 全部分配或整卡峰值。模型常驻后的 processing 快于媒体时长，但约 37 秒模型加载仍使 cold-start 不适合演示时即时拉起。run 根/子目录、全部 JSON/JSONL 与 Slurm stdout 分别通过 `0700/0600/0600` 审计。
+
+失败恢复记录不作为正式结果：job `1771` 从计算节点不可见的 `/tmp` worktree 提交，未进入脚本；job `1773` 功能完成但 manifest 暴露绝对模型目录；job `1774` 关闭路径泄漏后功能完成，但进一步审计发现 derived-sensitive JSONL 仍受默认 umask 影响为 `0644`。三次均未被升级为正式 L40 证据。
+
+## 7. 产物摘要与隐私
 
 | 产物 | SHA-256 |
 |---|---|
@@ -98,9 +120,21 @@ CPU processing 小于媒体时长，但冷启动明显不适合演示时即时�
 
 manifest、probe、pipeline report、SourceAsset 与 Observation 对本机绝对路径、用户名、原始文件名和完整转写做了 0 命中扫描。完整转写只在被 Git 忽略的 `derived_sensitive` FeatureEvent 中；仓库不提交媒体、run 或模型权重。
 
-## 7. 自动化验证
+L40 正式 run 的对应摘要如下；敏感转写内容未复制到本报告：
 
-- 全量：117 passed；
+| 产物 | SHA-256 |
+|---|---|
+| manifest | `a69792c502d2a7e631011816b7a0f3e447e33ad6a715ea8f654556c7164ef357` |
+| container probe | `9dd645eb7af41fa4fbb541c467a79a73f2faa114a22807e43e525822153fa782` |
+| pipeline report | `6925fe9b1cba2a2d1400cf5659a7310f6daebfb7d32629ab019393e8cb4d68dd` |
+| source assets | `321ec20c01b4ec2250dc7137ea0b982fc34c7797910612893ad135c827afed91` |
+| observations | `9805581be61d8f143dd4a94c49a76011b9faab47586bd273fb970a34d937bc62` |
+| sensitive features | `a124b07388f5379f32b5e9032864b78eb41de7fc21a27879e6e0948d57057a71` |
+| multimodal windows | `b6c3d198ff566b71ced23e18d7245a89943691bbf127128119fbf99aec688da2` |
+
+## 8. 自动化验证
+
+- 全量：118 passed；
 - `compileall`、全部 shell/sbatch `bash -n`、`pip check` 与 `git diff --check` 通过；
 - 正偏移：+250 ms 起点、16 kHz、max-duration 截断和 FeatureEvent 平移；
 - 负偏移：裁掉视频零点前样本；
@@ -108,10 +142,9 @@ manifest、probe、pipeline report、SourceAsset 与 Observation 对本机绝对
 - fail-closed：0/2 音轨、缺 PTS、扫描截断、音频 PTS 逆序、CLI 缺失/冲突选择；
 - provenance：同容器只写一份 asset/observation/probe，Slurm 显式绑定 submit checkout。
 
-## 8. 尚未关闭
+## 9. 尚未关闭
 
-1. job `1771` 完成前，不发布 L40 processing/cold-start 结果。
-2. 本轮是 public/engineered E1，不提升 C6c 能力等级；仍需真实同意的原始容器或可靠同步导出。
-3. 容器 PTS 只证明文件内时间语义；真实 G2 必须人工定位至少两个同步事件，计算 offset/drift。
-4. 离线文件 replay 不包含萤石鉴权、取流、网络抖动、缓冲、断流恢复或直播延迟。
-5. YOLO/RTMPose/Keypoint R-CNN 的最终比赛选择与权重分发门不因本轮改变。
+1. 本轮是 public/engineered E1，不提升 C6c 能力等级；仍需真实同意的原始容器或可靠同步导出。
+2. 容器 PTS 只证明文件内时间语义；真实 G2 必须人工定位至少两个同步事件，计算 offset/drift。
+3. 离线文件 replay 不包含萤石鉴权、取流、网络抖动、缓冲、断流恢复或直播延迟。
+4. YOLO/RTMPose/Keypoint R-CNN 的最终比赛选择与权重分发门不因本轮改变。

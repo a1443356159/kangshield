@@ -4,7 +4,7 @@
 
 基准日期：2026-07-23
 
-证据快照：截至 `f5bb761` 的 V1-M1～V1-M3 报告、许可证 fail-closed 修正 `f4aa1c5`、G4 离线特征实现 `782026b`、CAUCAFall ADL 压力实现 `336bbe9`、Keypoint R-CNN 候选实现 `eae5f56` / G4 派生接入 `d956203`、Open Images 静态人物检测实现 `40359c1` / 标注审计修正 `fad9491`、双标注/裁决/事件评估工具 `b0b2e97`，以及首版 candidate episode 生成器 `dc6cace`
+证据快照：截至 `f5bb761` 的 V1-M1～V1-M3 报告、许可证 fail-closed 修正 `f4aa1c5`、G4 离线特征实现 `782026b`、CAUCAFall ADL 压力实现 `336bbe9`、Keypoint R-CNN 候选实现 `eae5f56` / G4 派生接入 `d956203`、Open Images 静态人物检测实现 `40359c1` / 标注审计修正 `fad9491`、双标注/裁决/事件评估工具 `b0b2e97`、首版 candidate episode 生成器 `dc6cace`、capture producer `7a8dc23` / tracker 修复与加固 `b233abe` / `b4b72f7`、event bundle assembler `7b64719`，同容器音轨 adapter `8c6df2d` / bitexact smoke `eca6231` / 路径脱敏 `195c966`，以及 owner-only artifact 修复 `d1d4b5a` / `8b4b52d`
 
 ## 1. Review 目标与状态语义
 
@@ -30,12 +30,12 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 | 切片 | 最高证据 | Review 结果 | 仍未证明 |
 |---|---|---|---|
 | V1-M1 采集骨架 | E1 fixture | 契约、运行目录、媒体/睡眠/萤石快照探针可用 | 两台目标设备任何真实开发能力 |
-| V1-M2a 多模态链路 | E1 public/synthetic | 视频、音频、姿态、VAD/ASR、窗口和报告链路可重复 | 自然音视频同步、C6c 取流和端到端直播延迟 |
+| V1-M2a 多模态链路 | E1 public/synthetic | 独立 WAV harness 与同容器 PTS/16 kHz/VAD-ASR/窗口链路均可重复；owner-only L40 job `1777` 已通过 | 自然 capture clock、C6c 取流和端到端直播延迟 |
 | V1-M2b 固定集 | E1 public | 6 case、170 视频帧、137 参考字符的批量评测可重复 | 目标机位精度、人物负样本误报和自然跨模态对齐 |
 | V1-M3 姿态 | E1 public | HumanArt + RTMPose 为准确率条件参考；Keypoint R-CNN 仅保留 fallback | C6c 场景、困难横卧关键点、两条权重路线的许可证/分发终审 |
 | V1-M3 语音 | E1 public | FunASR 保留普通话候选；Whisper small 不晋级主链路 | C6c 远场、方言、电视/噪声和人工 VAD 指标 |
 | V1-M3 睡眠 | E1 fixture | 不选模型；采用无值 profiler + fail-closed route gate | SDNL1 真实字段、单位、时间、缺失与准确率 |
-| V1-R1 G4 跌倒运动/候选/事件评估 | E1 public/fixture | box/keypoint 时序特征、label-blind candidate episode、CAUCAFall/Open Images 压力和双标注/裁决/event scorer 均可重复；不生成风险/告警 | C6c 正负视频、空场持续、床上躺卧、宠物移动、多人 tracking、冻结策略的目标域候选与真实事件指标 |
+| V1-R1 G4 跌倒运动/候选/事件评估 | E1 public/fixture | box/keypoint 时序特征、label-blind candidate episode、公开压力与双标注/裁决/event scorer 均可重复；job `1776` 三姿态 producer 到 clean owner-only scorer 全链已通过；不生成风险/告警 | C6c 正负视频、空场持续、床上躺卧、宠物移动、多人 tracking、冻结策略的目标域候选与真实事件指标 |
 
 ## 3. 工程与数据路线决策账本
 
@@ -51,6 +51,8 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 | R1-D08 | E0～E4 证据、脱敏和受控媒体引用 | Adopt | 多轮隐私扫描未发现报告级密钥、身份、全文或健康值泄漏 | 真机数据仍须独立完成同意、留存和访问审计 |
 | R1-D09 | 双人标注、裁决与外部 candidate event evaluator | Adopt as tooling contract | REV-016 已验证 interval/onset agreement、held-out provenance、TP/FP/FN、误触发/小时与 delay，fixture 永远不能开真实门 | 真实 C6c 必须先冻结裁决与 candidate policy；`event_metrics_ready_for_review` 不授权 Risk/Alert |
 | R1-D10 | Label-blind fall candidate episode 状态机 | Conditional implementation baseline | REV-017 在查看 C6c held-out 输出前冻结 transition/settled、回溯、release、refractory 与 track/gap reset；54 项公开开发压力可重复 | C6c 首轮必须原样使用 policy；公开数据上的 0/3、1/3、3/3 不用于最终选型或准确率宣传 |
+| R1-D11 | 同容器音轨 PTS → 16 kHz SpeechBackend adapter | Adopt as offline adapter seam | +250 ms bitexact E1 A/V 上完成真实 YOLO/FunASR、事件平移、单来源 ledger 与 fail-closed timing gate | 真实录制必须保留容器 PTS；单一 start offset 不表达 drift，也不证明平台开放音轨 |
+| R1-D12 | V1 run artifact owner-only 权限 | Adopt | `d1d4b5a` 将 run/子目录固定为 `0700`、JSON/JSONL 与两条正式 Slurm stdout 固定为 `0600`；`8b4b52d` 继续将 `--runs-dir` 根固定为 `0700`；权限漂移的早期 run 被拒绝并用新路径重跑 | V2 对象存储/数据库必须提供同等或更强的访问控制、审计与留存，不得依赖宿主默认 umask |
 
 ## 4. 模型与提取器决策账本
 
@@ -108,7 +110,9 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 | 输入 | 冻结内容 | 来源 |
 |---|---|---|
 | 证据与运行契约 | E0～E4、SourceAsset、Observation、FeatureEvent、RunManifest | V1-M1/M2a |
+| 本地运行权限 | `--runs-dir` 根、run/子目录 `0700`，JSON/JSONL `0600`，Slurm stdout `0600`；同容器 run 的模型本地目录不入 manifest | R1-D12 |
 | 离线回放与评测边界 | PoseBackend、SpeechBackend、固定 case、隐私安全汇总 | V1-M2b/M3 |
+| 同容器音轨 adapter | 单 A/V asset、严格 track/PTS gate、16 kHz PCM、signed start offset 与 Pipeline 统一时间平移 | REV-010 / REV-021 |
 | 姿态候选配置 | 5 fps、RTMPose detector conf 0.05；Keypoint R-CNN conf 0.5 / resize 800～1333；COCO-17 与分数语义分开记录 | REV-006 / REV-013 |
 | 跌倒运动特征契约 | box-only、关键点质量门、同 track 历史、fallback reason、无风险/告警硬约束；单一横卧框或 gate-passed torso-horizontal 均不得直接告警；静态 person detection 结果不得冒充事件指标 | REV-011 / REV-012 / REV-013 / REV-015 |
 | 跌倒候选生成契约 | transition 600 ms + 近期下降、settled 1200 ms + low-motion、gap/track reset、release 600 ms、refractory 3000 ms；label-blind，精确窗口只进 derived-sensitive FeatureEvent | REV-017 |
@@ -132,7 +136,7 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 
 ## 9. 不等待真机的下一开发顺序
 
-1. `[E1 tools done，REV-010/014]` 使用 PyAV 实现容器与逐轨时间基探针，并把采集包、标注、双事件与三模型 held-out 冻结成可执行 gate；下一步直接把同一命令用于 C6c 原始包，而不是再临时定义口径或把 synthetic 结果当真机结论。
+1. `[E1 tools done，REV-010/014/021]` 使用 PyAV 实现容器与逐轨时间基探针、同容器音轨到 16 kHz/VAD-ASR 的 PTS adapter，并把采集包、标注、双事件与三模型 held-out 冻结成可执行 gate；下一步直接把同一命令用于 C6c 原始包，而不是再临时定义口径或把 synthetic 结果当真机结论。
 2. `[E1 tools done，REV-011/012/015/016/017]` 已实现仅离线输出的跌倒特征层、首版 label-blind candidate episode、CAUCAFall/Open Images 压力支路，以及双标注/裁决/事件 scorer；保持不输出 RiskAssessment 或 Alert。
 3. 当前下一步是按 REV-014 采集 C01～C12；空场、家具遮挡、床上躺卧和安全模拟跌倒已进入标签契约，宠物移动和真实多人 tracking 作为扩展视频负样本继续 Open。C6c 首轮必须原样使用 REV-017 policy，再复用 REV-016 口径生成事件指标。
 4. `[E1 comparison done，REV-013]` 已评测非 Human-Art 的 Keypoint R-CNN；因 lying gate 4/21 和权重分发仍 Open，只保留 fallback。下一步不再横向增加 checkpoint，而是进入 C6c held-out 与自有训练路线判断。
