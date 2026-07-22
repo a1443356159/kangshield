@@ -1,6 +1,6 @@
 # V1-M3 语音模型同集对比设计
 
-状态：Implemented，等待干净提交的 L40 正式运行与 Review
+状态：Accepted for V1-M3 speech slice
 
 基准日期：2026-07-22
 
@@ -112,4 +112,4 @@ make submit-m3-speech-comparison
 - FunASR 开发预检原样复现 `9/137 = 0.065693`、3/6 exact；Whisper 固定参数预检为 `32/137 = 0.233577`、0/6 exact。该早期信号显示 Whisper small 在 clean Mandarin 切片上明显较差，因此不做同集调参，只等待 L40 复现和错误类别 Review。
 - 两个 2 秒全零 PCM 探针均为 0 字符；14 份开发态 manifests 对应的 16 份 report 中，完整参考与完整假设文本泄漏计数均为 0。
 
-正式 L40 结果、失败样本和晋级决定将在干净提交运行后写入 `docs/reports/v1-m3-speech-model-comparison.md` 和 Review log。
+干净提交 `270fdc1` 已由 Slurm job `1761` 在 L40 上完成：FunASR 为 `9/137 = 0.065693`，Whisper small 为 `32/137 = 0.233577`，两个静音探针均通过。正式证据、性能和“不晋级 Whisper 为普通话主链路”的决定见 [V1-M3 语音模型同集对比报告](reports/v1-m3-speech-model-comparison.md)与 REV-007。

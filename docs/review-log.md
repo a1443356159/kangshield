@@ -324,3 +324,54 @@
 1. C6c 实际夜视和目标机位下，fall-01 类型横卧是否仍只能得到低质量关键点？
 2. 低至 0.05 的人物阈值在空场、家具和宠物场景会产生多少误报？
 3. box-only fallback 与关键点分支怎样组合，才能提高召回而不把弯腰、躺床当成跌倒？
+
+---
+
+## REV-007 V1-M3 语音模型同集对比 Review
+
+- 日期：2026-07-22
+- 状态：Accepted for V1-M3 speech slice
+- 参与人：项目组、Codex
+- 评审范围：普通话 CER、静音误转写、性能/显存、隐私与 V2 候选状态
+- 输入材料：[V1-M3 语音设计](v1-m3-speech-model-comparison.md)、[同集对比报告](reports/v1-m3-speech-model-comparison.md)、提交 `270fdc1`、Slurm job `1761`
+
+### 发现
+
+1. FunASR 在同一 audio-only runner 上复现 V1-M2b 的 `9/137 = 6.57%` 和 3/6 exact，证明新对比链路没有改变 baseline CER 口径。
+2. Whisper small 为 `32/137 = 23.36%` 和 0/6 exact，较 baseline 劣化 16.788 个百分点；6/6 case 的编辑数都更高，不是单个离群句造成。
+3. 两 variant 对 2 秒全零 PCM 都返回 0 segment、0 字符；这不能替代真实房间噪声、电视和非语音事件的误激活测试。
+4. Whisper model load 2.51 秒、Torch peak 1,411 MiB，优于 FunASR 的 35.05 秒和 2,099 MiB；但 warm inference RTF 0.089950 慢于 0.037648。两者都达到当前单路实时要求。
+5. Whisper segment coverage 较高不是 VAD 优势证据，因为它是集成解码段，FunASR 使用独立 FSMN-VAD，固定集没有共同人工 VAD 标签。
+6. female/male 切片各只有三条且句子不同，只能作为错误定位线索，不能形成 gender 公平性结论。
+
+### 决定
+
+1. FunASR FSMN-VAD + SeACo Paraformer + CT-Punc 保留为 V2 普通话默认候选，最终采用仍受 C6c V1-M2c 门约束。
+2. Whisper small 不晋级普通话主链路；保留 adapter 和固定权重，只有新多语种、方言、噪声或 C6c held-out 证据才重开。
+3. 不在当前六条上继续调 beam、prompt、语言或后处理并回报同集提升；任何新候选先冻结新评测集和决定规则。
+4. V1-M3 语言切片验收通过；完整 V1-M3 保持 In progress，等待睡眠字段路线关闭。
+5. 报告继续只保存字符数、编辑数和聚合，完整转写只留在受控且被 Git 忽略的 FeatureEvent。
+
+### 验证
+
+- 自动化：35 passed；`pip check` 无 broken requirements。
+- Slurm：job `1761`，`COMPLETED`，exit `0:0`，NVIDIA L40，elapsed 00:00:55。
+- 代码：`270fdc1`；parent + 12 child manifests 全部 completed、`code_dirty=false`。
+- 准确率：FunASR 9/137，Whisper 32/137；差 +23 edits / +16.788 pp。
+- 静音：两个 variant 均 0 segment、0 字符。
+- 隐私：15 份 JSON report 和 Slurm 日志均未出现完整参考或完整假设文本。
+
+### 行动项
+
+| 行动 | 负责人 | 截止日期 | 状态 |
+|---|---|---|---|
+| 按 M2c 规程采集 C6c 授权普通话、方言、电视背景、距离和静音/噪声样本 | 待指定 | 2026-08-01 | Open |
+| 为真实设备集增加人工 VAD 区间或语音存在标签，分开评测 VAD 与 ASR | 待指定 | 2026-08-03 | Open |
+| 完成 FunASR 模型、Whisper 权重和比赛分发条款审查 | 待指定 | 2026-08-09 | Open |
+| 在 V1-R1 前关闭 CS-EP-SDNL1 睡眠字段采用/接口保留/放弃决定 | 待指定 | 2026-08-09 | Open |
+
+### 未决问题
+
+1. C6c 麦克风在 1/3/5 米、电视背景和夜间环境下，FunASR 的 VAD 漏检、误激活和 CER 分别是多少？
+2. 实际目标人群是否存在足够多的方言或中英混说，使多语种候选的价值超过当前普通话准确率损失？
+3. V2 是否允许常驻加载 FunASR，还是需要进程预热/模型服务来隐藏约 35 秒冷启动？

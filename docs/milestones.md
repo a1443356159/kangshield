@@ -44,7 +44,7 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 | V1-M2b 公开固定集评测 | `93f7d09` / `e9355e3` | `origin/main` | 2026-07-22 已验证 | 固定 URFD/FLEURS 子集、可重复准备、六 case 标签/CER/覆盖率和 L40 证据；明确只属于 E1 |
 | V1-M3 姿态同集对比 / M2c 采集准备 | `0674be9` / `3c1dc32` | `origin/main` | 2026-07-22 已验证 | HumanArt + RTMPose ONNX 链路、L40 同集报告、条件候选决定，以及 C6c/睡眠仪采集规程；不代表 M2c 已取得实机证据 |
 
-这里的“推送验证”只证明代码已到达远端。V1-M1 仍为 In progress，必须取得 C6c 与 CS-EP-SDNL1 的 E2/E3 证据后才能进入 Review/Done。V1-M2a 和 V1-M2b 的 Done 只关闭设备无关 E1 链路及公开固定集评测，不会提升真实设备证据等级。V1-M3 当前只验收姿态切片；M2c 只有模板和规程，没有真实媒体或睡眠字段证据。
+这里的“推送验证”只证明代码已到达远端。V1-M1 仍为 In progress，必须取得 C6c 与 CS-EP-SDNL1 的 E2/E3 证据后才能进入 Review/Done。V1-M2a 和 V1-M2b 的 Done 只关闭设备无关 E1 链路及公开固定集评测，不会提升真实设备证据等级。V1-M3 已验收姿态和语言两个 E1 切片，仍等待睡眠字段路线；M2c 只有模板和规程，没有真实媒体或睡眠字段证据。
 
 ## 4. 当前阶段任务
 
@@ -137,7 +137,7 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 - [x] 在干净提交 `0674be9` 上完成 L40 双 variant 对比（job `1760`）。
 - [x] Review 横卧覆盖、fall-01 关键点质量和性能；候选有条件进入 V2，许可证门仍 Open。
 
-设计见 [V1-M3 姿态模型对比](v1-m3-pose-model-comparison.md)，实测证据见 [同集对比报告](reports/v1-m3-pose-model-comparison.md)。姿态切片完成不等于整个 V1-M3 Done；ASR 对照和睡眠字段路线仍需在 V1-R1 前形成采用/候选/放弃结论。
+设计见 [V1-M3 姿态模型对比](v1-m3-pose-model-comparison.md)，实测证据见 [同集对比报告](reports/v1-m3-pose-model-comparison.md)。姿态与下述语言切片完成仍不等于整个 V1-M3 Done；睡眠字段路线需在 V1-R1 前形成采用/接口保留/放弃结论。
 
 当前语言切片：
 
@@ -145,10 +145,10 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 - [x] 固定 `zh/transcribe`、beam 5、temperature 0 和现有字符归一化/CER 口径。
 - [x] 实现 audio-only 双 variant、privacy-safe case/aggregate 契约和 2 秒全零静音探针。
 - [x] 完成 35 项自动化测试、全部权重离线校验及两个 variant 各自六 case + 静音 CPU 开发预检；baseline 复现 `9/137`。
-- [ ] 在干净提交的 L40 上复现 FunASR `9/137` 并完成 Whisper 六 case 正式对比。
-- [ ] Review CER、静音失败、性能和真实设备缺口，形成 V2 语言候选决定。
+- [x] 在干净提交 `270fdc1` 的 L40 上复现 FunASR `9/137` 并完成 Whisper 六 case 正式对比（job `1761`）。
+- [x] Review CER、静音、性能和真实设备缺口；FunASR 保留默认候选，Whisper small 不晋级普通话主链路。
 
-语言切片设计见 [V1-M3 语音模型同集对比](v1-m3-speech-model-comparison.md)。开发预检不作为正式里程碑证据；完整 V1-M3 仍需关闭语言 Review 与睡眠字段路线。
+语言切片设计见 [V1-M3 语音模型同集对比](v1-m3-speech-model-comparison.md)，正式证据见 [同集对比报告](reports/v1-m3-speech-model-comparison.md)。语言切片已通过 Review；完整 V1-M3 仍需关闭睡眠字段路线。
 
 每个候选模型必须记录：
 
