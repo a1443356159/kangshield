@@ -123,6 +123,31 @@ def build_parser() -> argparse.ArgumentParser:
         help="Exit 2 unless real E2+ event metrics are ready for review",
     )
 
+    candidate_export = subparsers.add_parser(
+        "export-fall-candidates",
+        help=(
+            "Convert one capture-bound G4 feature set into candidate events "
+            "for the held-out evaluator"
+        ),
+    )
+    candidate_export.add_argument("capture_manifest", type=Path)
+    candidate_export.add_argument("feature_set", type=Path)
+    candidate_export.add_argument("source_feature_run_manifest", type=Path)
+    candidate_export.add_argument(
+        "--policy",
+        type=Path,
+        default=Path("configs/v1-g4-event-candidate-policy.json"),
+    )
+    candidate_export.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    candidate_export.add_argument(
+        "--evidence-level", type=_evidence, default=EvidenceLevel.E1
+    )
+    candidate_export.add_argument(
+        "--allow-dirty-source",
+        action="store_true",
+        help="Allow a dirty upstream G4 feature run for development only",
+    )
+
     sleep = subparsers.add_parser(
         "profile-sleep",
         help="Discover JSON/CSV sleep-export fields without persisting values",
@@ -801,6 +826,39 @@ def _assess_event_evaluation_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def _export_fall_candidates_command(args: argparse.Namespace) -> int:
+    from .fall_candidate_export import run_fall_candidate_export
+
+    run, prediction, summary = run_fall_candidate_export(
+        capture_manifest_path=args.capture_manifest,
+        feature_set_path=args.feature_set,
+        source_feature_run_manifest_path=args.source_feature_run_manifest,
+        policy_path=args.policy,
+        runs_dir=args.runs_dir,
+        evidence_level=args.evidence_level,
+        allow_dirty_source=args.allow_dirty_source,
+    )
+    _print_result(
+        run,
+        {
+            "variant_id": prediction.variant_id,
+            "clip_count": summary.clip_count,
+            "input_frame_count": summary.input_frame_count,
+            "activated_clip_count": summary.activated_clip_count,
+            "candidate_episode_count": summary.candidate_episode_count,
+            "prediction": str(
+                run.reports_dir / "fall-candidate-predictions.json"
+            ),
+            "summary": str(
+                run.reports_dir / "fall-candidate-export-summary.json"
+            ),
+            "risk_assessment_emitted": summary.risk_assessment_emitted,
+            "alert_emitted": summary.alert_emitted,
+        },
+    )
+    return 0
+
+
 def _assess_sleep_route_command(args: argparse.Namespace) -> int:
     from .sleep_route import assess_sleep_route
 
@@ -1316,6 +1374,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _assess_m2c_capture_command(args)
     if args.command == "assess-event-evaluation":
         return _assess_event_evaluation_command(args)
+    if args.command == "export-fall-candidates":
+        return _export_fall_candidates_command(args)
     if args.command == "profile-sleep":
         return _profile_sleep_command(args)
     if args.command == "assess-sleep-route":

@@ -76,6 +76,7 @@ src/kangshield/information/
 ├── pose_backend.py       # YOLO26n-pose + ByteTrack 适配器
 ├── fall_features.py      # 跌倒运动代理、关键点质量门与离线评测
 ├── fall_candidates.py    # 无标签候选状态机、来源门与公开压力汇总
+├── fall_candidate_export.py # capture-bound G4 特征到 evaluator prediction
 ├── speech_backend.py     # FunASR VAD/ASR/标点和词面标签
 ├── multimodal_pipeline.py # 特征落盘、时间窗对齐和性能报告
 ├── dataset_preparation.py # 公开固定源校验、媒体转换、case/lock
@@ -309,6 +310,18 @@ kangshield-info assess-event-evaluation <event-evaluation-bundle.json>
 ```
 
 bundle 同时绑定 M2c capture/readiness 与 clean assessor run、两份以上独立动作区间、裁决真值、一个 candidate-generator policy，以及三姿态 variant 的 candidate episode/clean source run。评测器不运行候选规则，只做 interval agreement 和 `simulated_fall` 一对一匹配，发布 TP/FP/FN、precision/recall/F1、总暴露 false activations/hour、negative-clip activation rate 与 detection-delay 摘要。E1 确定性夹具只验证公式，真实全部 clip、camera、标注、裁决、最低数据和 provenance 门关闭前 `event_metrics_ready_for_review=false`。完整契约见[事件评估就绪门](v1-g4-event-evaluation-readiness.md)。
+
+capture-bound G4 特征先通过显式桥接导出 evaluator 输入：
+
+```text
+kangshield-info export-fall-candidates \
+  <capture-manifest.json> \
+  <fall-feature-capture-set.json> \
+  <feature-source-run/manifest.json> \
+  --policy configs/v1-g4-event-candidate-policy.json
+```
+
+该命令不读 annotation/adjudication，只读取 capture 的安全索引、逐 clip `video.fall_motion_frame` 和冻结策略；它校验上游 run、artifact、摘要、variant/model/feature policy、clip order/duration、observation、时间轴和 derived-sensitive 标记，输出 evaluator 直接消费的公开 `FallCandidatePredictionSet` 与 `v1-g4-fall-event-candidates` source run。精确窗口不进入 timestamp-free summary，风险和告警仍为 false。设计见 [G4 Candidate Export Bridge](v1-g4-candidate-export-bridge.md)。
 
 ## 8. 模型接入路线
 

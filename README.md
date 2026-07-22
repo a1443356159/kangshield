@@ -46,6 +46,7 @@
 - [V1-R1 G4 事件评估 E1 初测报告](docs/reports/v1-g4-event-evaluation-smoke.md)
 - [V1-R1 G4 跌倒候选 episode 设计](docs/v1-g4-fall-event-candidates.md)
 - [V1-R1 G4 跌倒候选 episode 公开压力报告](docs/reports/v1-g4-fall-candidate-public-stress.md)
+- [V1-R1 G4 Capture Feature 到 Candidate 导出桥接](docs/v1-g4-candidate-export-bridge.md)
 
 ## V1 初步开发
 
@@ -100,6 +101,15 @@ make PYTHON=.venv/bin/python assess-g4-event-evaluation-fixture
 ```
 
 该链路只对外部 candidate episode 做一致性、TP/FP/FN、误触发/小时和 delay 评分，不生成跌倒候选或告警。Fixture 固定为 `tooling_only`；真实 E2+ capture/clip、标注、裁决、最低数据和来源门全部通过后，才可能发布 `event_metrics_ready_for_review`。详细口径见[事件评估就绪门](docs/v1-g4-event-evaluation-readiness.md)。
+
+生成并评估真实状态机参与的 G4 export bridge E1 回归夹具：
+
+```bash
+make PYTHON=.venv/bin/python prepare-g4-candidate-export-fixture
+make PYTHON=.venv/bin/python assess-g4-candidate-export-fixture
+```
+
+该链路创建三路 capture-bound synthetic feature source，真实运行冻结 candidate 状态机并导出 evaluator 直接消费的 prediction/source run。它验证生产接口和 fail-closed provenance，不代表姿态模型或 C6c 事件性能。契约见 [G4 Candidate Export Bridge](docs/v1-g4-candidate-export-bridge.md)。
 
 设备无关的视频 + 语言回放链路：
 
@@ -167,6 +177,18 @@ kangshield-info benchmark-fall-candidates \
 ```
 
 该命令只在 label-blind 生成完成后读取公开标签做 E1 汇总；精确候选窗口留在被忽略的 derived-sensitive FeatureEvent。公开开发集结果不能作为 C6c 准确率或独立泛化证据，也不会产生风险或告警。冻结语义见[候选 episode 设计](docs/v1-g4-fall-event-candidates.md)，正式结果见[公开压力报告](docs/reports/v1-g4-fall-candidate-public-stress.md)。
+
+从一份 capture-bound G4 feature source 导出 event evaluator 输入：
+
+```bash
+kangshield-info export-fall-candidates \
+  <capture-manifest.json> \
+  <fall-feature-capture-set.json> \
+  <feature-source-run/manifest.json> \
+  --policy configs/v1-g4-event-candidate-policy.json
+```
+
+输出包含精确、derived-sensitive 的 `fall-candidate-predictions.json`、timestamp-free 汇总和严格绑定六项 scorer 摘要的 candidate source manifest。命令不读标签、不计算风险或告警；真实使用顺序见[导出桥接设计](docs/v1-g4-candidate-export-bridge.md)。
 
 准备并运行静态居家人物检测压力集：
 

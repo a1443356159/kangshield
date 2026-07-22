@@ -1,4 +1,4 @@
-.PHONY: test info-fixtures prepare-mm-models prepare-mm-smoke prepare-m2c-timing-fixture prepare-m2c-capture-fixture assess-m2c-capture-fixture prepare-g4-event-evaluation-fixture assess-g4-event-evaluation-fixture submit-mm-smoke prepare-m2b-data submit-m2b-benchmark prepare-m3-pose-models submit-m3-pose-comparison prepare-m3-speech-models submit-m3-speech-comparison prepare-g4-caucafall submit-g4-adl-benchmark benchmark-g4-fall-candidates prepare-g4-static-home submit-g4-static-home-benchmark
+.PHONY: test info-fixtures prepare-mm-models prepare-mm-smoke prepare-m2c-timing-fixture prepare-m2c-capture-fixture assess-m2c-capture-fixture prepare-g4-event-evaluation-fixture assess-g4-event-evaluation-fixture prepare-g4-candidate-export-fixture assess-g4-candidate-export-fixture submit-mm-smoke prepare-m2b-data submit-m2b-benchmark prepare-m3-pose-models submit-m3-pose-comparison prepare-m3-speech-models submit-m3-speech-comparison prepare-g4-caucafall submit-g4-adl-benchmark benchmark-g4-fall-candidates prepare-g4-static-home submit-g4-static-home-benchmark
 
 PYTHON ?= python3
 KANG_VIDEO_INPUT ?= $(CURDIR)/data/raw/public-smoke/ultralytics-bus-replay.avi
@@ -8,6 +8,7 @@ KANG_G4_ADL_CASES ?= $(CURDIR)/data/processed/v1-g4-caucafall/fall-adl-cases.jso
 KANG_G4_STATIC_HOME_CASES ?= $(CURDIR)/data/processed/v1-g4-openimages-static-home/static-home-cases.json
 KANG_M2C_CAPTURE_MANIFEST ?= $(CURDIR)/data/raw/public-smoke/v1-m2c-capture/capture-manifest.json
 KANG_G4_EVENT_BUNDLE ?= $(CURDIR)/data/raw/public-smoke/v1-g4-event-evaluation/event-evaluation-bundle.json
+KANG_G4_CANDIDATE_EXPORT_BUNDLE ?= $(CURDIR)/data/raw/public-smoke/v1-g4-candidate-export/event-evaluation-bundle.json
 KANG_G4_URFD_YOLO_RUN ?=
 KANG_G4_URFD_RTMPOSE_RUN ?=
 KANG_G4_URFD_KEYPOINTRCNN_RUN ?=
@@ -43,6 +44,13 @@ prepare-g4-event-evaluation-fixture: prepare-m2c-timing-fixture
 assess-g4-event-evaluation-fixture:
 	test -f "$(KANG_G4_EVENT_BUNDLE)"
 	PYTHONPATH=src $(PYTHON) -m kangshield.information.cli assess-event-evaluation "$(KANG_G4_EVENT_BUNDLE)" --source-type fixture --evidence-level E1
+
+prepare-g4-candidate-export-fixture: prepare-m2c-timing-fixture
+	PYTHONPATH=src:. $(PYTHON) scripts/prepare_v1_g4_candidate_export_fixture.py --force
+
+assess-g4-candidate-export-fixture:
+	test -f "$(KANG_G4_CANDIDATE_EXPORT_BUNDLE)"
+	PYTHONPATH=src $(PYTHON) -m kangshield.information.cli assess-event-evaluation "$(KANG_G4_CANDIDATE_EXPORT_BUNDLE)" --source-type fixture --evidence-level E1
 
 submit-mm-smoke:
 	test -f "$(KANG_VIDEO_INPUT)"

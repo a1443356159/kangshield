@@ -8,6 +8,7 @@ from kangshield.information.contracts import (
     EvidenceLevel,
     FallCandidateCaseStressEvaluation,
     FallCandidatePublicStressReport,
+    FallEventCandidatePolicy,
     FallKeypointGate,
     FallMotionFrameValue,
     RunManifest,
@@ -188,6 +189,37 @@ def test_generator_rejects_unordered_frames():
         )
 
 
+def test_rule_bearing_fixture_is_allowed_but_scorer_only_fixture_is_not():
+    real = load_fall_candidate_policy(CANDIDATE_POLICY)
+    fixture = real.model_copy(
+        update={
+            "policy_id": "rule-bearing-fixture",
+            "fixture": True,
+            "review_status": "fixture_only",
+        }
+    )
+    assert generate_fall_candidate_episodes(
+        [_frame(0, 0), _frame(1, 200)],
+        duration_ms=1000,
+        case_ref="fixture",
+        policy=fixture,
+    ) == []
+
+    scorer_only = FallEventCandidatePolicy(
+        policy_id="scorer-only-fixture",
+        fixture=True,
+        input_fall_feature_policy_sha256="0" * 64,
+        decision_logic_summary="Fixed predictions only",
+    )
+    with pytest.raises(ValueError, match="missing generation rules"):
+        generate_fall_candidate_episodes(
+            [_frame(0, 0)],
+            duration_ms=1000,
+            case_ref="scorer-only",
+            policy=scorer_only,
+        )
+
+
 def test_source_provenance_gate_rejects_dirty_or_wrong_stage(tmp_path):
     run_dir = tmp_path / "source-run"
     dirty = RunManifest(
@@ -233,4 +265,3 @@ def test_public_report_contract_has_no_exact_candidate_or_track_fields():
     }
     assert forbidden.isdisjoint(FallCandidateCaseStressEvaluation.model_fields)
     assert forbidden.isdisjoint(FallCandidatePublicStressReport.model_fields)
-

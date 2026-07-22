@@ -539,11 +539,16 @@ class FallEventCandidatePolicy(ContractModel):
         if self.fixture:
             if self.review_status != "fixture_only":
                 raise ValueError("fixture candidate policy must remain fixture_only")
-            return self
-        if self.review_status != "e1_exploratory_frozen":
+            if any(rule is not None for rule in rules) and any(
+                rule is None for rule in rules
+            ):
+                raise ValueError("fixture candidate policy rules must be all or none")
+        elif self.review_status != "e1_exploratory_frozen":
             raise ValueError("non-fixture candidate policy must be E1 frozen")
-        if any(rule is None for rule in rules):
+        elif any(rule is None for rule in rules):
             raise ValueError("non-fixture candidate policy requires all rules")
+        if all(rule is None for rule in rules):
+            return self
         assert self.transition_rule is not None
         assert self.settled_rule is not None
         if (
@@ -1057,6 +1062,182 @@ class FallCandidatePublicStressReport(ContractModel):
             for variant in self.variants
         ):
             raise ValueError("candidate report source policy binding disagrees")
+        return self
+
+
+class FallFeatureClipStream(ContractModel):
+    """One capture clip's derived-sensitive G4 frame stream."""
+
+    scenario_id: str = Field(min_length=1)
+    duration_ms: int = Field(gt=0)
+    observation_id: str = Field(min_length=1)
+    relative_path: str = Field(min_length=1)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    byte_size: int = Field(gt=0)
+    frame_count: int = Field(gt=0)
+
+    @model_validator(mode="after")
+    def validate_relative_path(self) -> "FallFeatureClipStream":
+        parts = self.relative_path.split("/")
+        if (
+            self.relative_path.startswith("/")
+            or "\\" in self.relative_path
+            or any(part in {"", ".", ".."} for part in parts)
+        ):
+            raise ValueError("fall feature clip path must be normalized and relative")
+        return self
+
+
+class FallFeatureCaptureSet(ContractModel):
+    """Capture-bound index produced by a generic G4 feature run."""
+
+    schema_version: Literal["1.0"] = "1.0"
+    feature_set_id: str = Field(min_length=3)
+    fixture: bool
+    evidence_level: EvidenceLevel
+    variant_id: str = Field(min_length=1)
+    source_run_id: str = Field(min_length=1)
+    capture_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    model_policy_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    fall_feature_policy_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    feature_version: str = Field(min_length=1)
+    generated_at: datetime
+    labels_read_during_generation: Literal[False] = False
+    clip_count: int = Field(ge=1)
+    clips: list[FallFeatureClipStream] = Field(min_length=1)
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_feature_set(self) -> "FallFeatureCaptureSet":
+        if self.generated_at.utcoffset() is None:
+            raise ValueError("fall feature set generated_at requires a timezone")
+        if self.fixture and self.evidence_level is not EvidenceLevel.E1:
+            raise ValueError("fixture fall feature set must remain E1")
+        if self.clip_count != len(self.clips):
+            raise ValueError("fall feature set clip count disagrees")
+        for values, label in (
+            ([clip.scenario_id for clip in self.clips], "scenario ids"),
+            ([clip.relative_path for clip in self.clips], "paths"),
+            ([clip.observation_id for clip in self.clips], "observation ids"),
+        ):
+            if len(values) != len(set(values)):
+                raise ValueError(f"fall feature set {label} must be unique")
+        return self
+
+
+class FallCandidatePredictionEvent(ContractModel):
+    candidate_id: str = Field(min_length=1)
+    start_ms: int = Field(ge=0)
+    end_ms: int = Field(gt=0)
+    detected_at_ms: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def validate_candidate(self) -> "FallCandidatePredictionEvent":
+        if self.end_ms <= self.start_ms:
+            raise ValueError("candidate event end must be after start")
+        if not self.start_ms <= self.detected_at_ms <= self.end_ms:
+            raise ValueError("candidate detection time must be inside its episode")
+        return self
+
+
+class FallCandidatePredictionClip(ContractModel):
+    scenario_id: str = Field(min_length=1)
+    duration_ms: int = Field(gt=0)
+    candidates: list[FallCandidatePredictionEvent] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_candidates(self) -> "FallCandidatePredictionClip":
+        ids = [candidate.candidate_id for candidate in self.candidates]
+        if len(ids) != len(set(ids)):
+            raise ValueError("candidate ids must be unique within a clip")
+        if any(candidate.end_ms > self.duration_ms for candidate in self.candidates):
+            raise ValueError("candidate event exceeds clip duration")
+        ordered = sorted(
+            (candidate.start_ms, candidate.end_ms)
+            for candidate in self.candidates
+        )
+        if any(
+            next_start < current_end
+            for (_, current_end), (next_start, _) in zip(
+                ordered,
+                ordered[1:],
+                strict=False,
+            )
+        ):
+            raise ValueError("deduplicated candidate episodes cannot overlap")
+        return self
+
+
+class FallCandidatePredictionSet(ContractModel):
+    """Exact candidate stream consumed by the held-out event evaluator."""
+
+    schema_version: Literal["1.0"] = "1.0"
+    prediction_set_id: str = Field(min_length=3)
+    variant_id: str = Field(min_length=1)
+    source_run_id: str = Field(min_length=1)
+    capture_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    model_policy_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    fall_feature_policy_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    candidate_generator_policy_sha256: str = Field(
+        pattern=r"^[0-9a-f]{64}$"
+    )
+    generated_at: datetime
+    clips: list[FallCandidatePredictionClip] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_prediction_set(self) -> "FallCandidatePredictionSet":
+        if self.generated_at.utcoffset() is None:
+            raise ValueError("prediction generated_at requires a timezone")
+        ids = [clip.scenario_id for clip in self.clips]
+        if len(ids) != len(set(ids)):
+            raise ValueError("prediction scenario ids must be unique")
+        return self
+
+
+class FallCandidateExportSummary(ContractModel):
+    """Timestamp-free summary for one capture-bound candidate source run."""
+
+    schema_version: Literal["1.0"] = "1.0"
+    exporter_version: str
+    fixture: bool
+    evidence_level: EvidenceLevel
+    capture_ref: str
+    variant_id: str
+    source_feature_run_id: str
+    source_feature_run_manifest_sha256: str = Field(
+        pattern=r"^[0-9a-f]{64}$"
+    )
+    source_feature_set_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    model_policy_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    fall_feature_policy_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    candidate_generator_policy_sha256: str = Field(
+        pattern=r"^[0-9a-f]{64}$"
+    )
+    candidate_events_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    clip_count: int = Field(ge=1)
+    input_frame_count: int = Field(ge=1)
+    activated_clip_count: int = Field(ge=0)
+    candidate_episode_count: int = Field(ge=0)
+    transition_trigger_count: int = Field(ge=0)
+    settled_trigger_count: int = Field(ge=0)
+    source_paths_persisted: Literal[False] = False
+    candidate_windows_persisted_in_summary: Literal[False] = False
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_counts(self) -> "FallCandidateExportSummary":
+        if self.activated_clip_count > self.clip_count:
+            raise ValueError("activated clip count exceeds clip count")
+        if self.candidate_episode_count != (
+            self.transition_trigger_count + self.settled_trigger_count
+        ):
+            raise ValueError("candidate export trigger counts disagree")
+        if self.candidate_episode_count < self.activated_clip_count:
+            raise ValueError("candidate count is below activated clip count")
         return self
 
 

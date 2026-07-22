@@ -93,6 +93,8 @@ G4 事件评估支路位于 M2c/M3 与 M7 之间：“严格 capture/readiness �
 
 G4 candidate-generator 位于 frame feature 与事件 evaluator 之间：“同 track 下降历史 + 横卧持续/低运动 → 状态机确认 → release/refractory 去重 episode”。生成 API 不接收标签；精确 episode 只进入 derived-sensitive run feature，公开压力父报告只保存激活、路径计数和 delay 摘要。策略在查看 C6c held-out 输出前冻结，公开 URFD/CAUCAFall 复用结果只属于 E1 开发压力，不能作为目标设备或独立泛化证据。
 
+G4 capture export bridge 把开发状态机接到真实事件 evaluator，而不让两侧私下约定 JSON：“capture manifest + capture-bound `FallFeatureCaptureSet` + clean feature source run → 逐 clip 摘要/时间轴校验 → frozen candidate state machine → `FallCandidatePredictionSet` + clean candidate source run”。prediction 使用 evaluator 的公开契约，candidate run configuration 绑定 capture/model/feature/candidate policy 与 prediction SHA-256；时间戳、candidate ID 和窗口只留在 derived-sensitive prediction，timestamp-free summary 不保存路径或窗口。当前 E1 rule-bearing fixture 已验证三 variant 端到端接口，真实 C6c feature producer 与数据仍 Open。
+
 ## 5. V1 运行形态
 
 V1 采用一次运行一个目录的离线流水线：

@@ -92,11 +92,15 @@ class _OpenEpisode:
     trigger_path: str
 
 
-def load_fall_candidate_policy(path: Path) -> FallEventCandidatePolicy:
+def load_fall_candidate_policy(
+    path: Path,
+    *,
+    allow_fixture: bool = False,
+) -> FallEventCandidatePolicy:
     policy = FallEventCandidatePolicy.model_validate_json(
         Path(path).read_text(encoding="utf-8")
     )
-    if policy.fixture:
+    if policy.fixture and not allow_fixture:
         raise ValueError("public candidate generation requires a non-fixture policy")
     return policy
 
@@ -112,7 +116,10 @@ def generate_fall_candidate_episodes(
 
     if duration_ms <= 0:
         raise ValueError("candidate input duration must be positive")
-    if policy.fixture or policy.review_status != "e1_exploratory_frozen":
+    if policy.fixture:
+        if policy.review_status != "fixture_only":
+            raise ValueError("fixture candidate generation requires fixture-only review")
+    elif policy.review_status != "e1_exploratory_frozen":
         raise ValueError("candidate generation requires a frozen non-fixture policy")
     transition = policy.transition_rule
     settled = policy.settled_rule

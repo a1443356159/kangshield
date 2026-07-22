@@ -8,7 +8,7 @@
 
 ## 1. 目标与边界
 
-本模块补齐 M2c 采集和 G4 特征之间的评测缺口：验证两份以上独立动作区间标注、计算标注一致性、绑定裁决真值，并对外部生成的跌倒候选事件计算 TP/FP/FN、recall、误触发和检出延迟。
+本模块补齐 M2c 采集和 G4 特征之间的评测缺口：验证两份以上独立动作区间标注、计算标注一致性、绑定裁决真值，并对外部生成的跌倒候选事件计算 TP/FP/FN、recall、误触发和检出延迟。外部候选现由 [G4 Candidate Export Bridge](v1-g4-candidate-export-bridge.md) 按公开 prediction 契约生成；evaluator 本身仍不执行候选规则。
 
 它不生成候选事件、不定义横卧/下降/静止如何合成跌倒，也不调姿态阈值。候选生成逻辑必须作为独立策略文件进入 bundle，其 SHA-256 同时绑定预测文件和来源 run。这样可以先把评测框架打通，又不把 synthetic fixture 的固定候选伪装成比赛版判定规则。
 
@@ -57,7 +57,7 @@ M2c capture manifest + readiness report + clean assessor run
 | Candidate-generator policy | 声明候选是去重后的 event episode；保存决策逻辑摘要和 G4 feature policy 摘要 |
 | Independent annotation sets | 每份覆盖相同 clip，保存动作区间、certainty、独立 annotator ref 和冻结时间 |
 | Adjudication | 绑定全部 annotation SHA-256、最终区间和争议已解决状态 |
-| Variant predictions + source runs | 每个姿态 variant 一份候选 episode 和一份 clean/completed 来源 run |
+| Variant predictions + source runs | 每个姿态 variant 一份公共 `FallCandidatePredictionSet` 和一份 clean/completed 来源 run |
 
 当前策略要求三个 held-out variant：`yolo26n-pose`、`rtmpose-m-humanart` 和 `torchvision-keypointrcnn`。预测流必须使用同一个 candidate-generator policy SHA-256；这样三者的指标才属于同一事件规则口径。
 
@@ -168,10 +168,19 @@ kangshield-info assess-event-evaluation \
 
 `--require-ready` 在 gate 未开时返回 2，但成功完成的评估 run 仍为 `completed`。当前 E1 fixture 固定 12 clip、2 个 fall、10 个 negative clip，并人为放置可手算的 TP/FP/FN；它只验证 scorer，不使用模型推理，也不代表任何候选的真实性能。
 
+另有 rule-bearing bridge fixture，它从 synthetic G4 frame stream 真实执行 candidate generator/exporter，再交给同一 scorer：
+
+```bash
+make PYTHON=.venv/bin/python prepare-g4-candidate-export-fixture
+make PYTHON=.venv/bin/python assess-g4-candidate-export-fixture
+```
+
+两种 fixture 分工不同：前者固定候选以验证评分公式和边界，后者验证 feature-set/source-run 到 prediction/source-run 的生产接口。两者都不提供模型或 C6c 性能证据。
+
 ## 9. 真实 C6c 到位后的执行顺序
 
 1. 先用 REV-014 流程得到 `camera_ready_for_model_retest=true` 的冻结包，并纳入 C11/C12 安全模拟跌倒及 hard negatives。
 2. 在首次推理前冻结最终裁决标签和 `first_inference_at`；不得看三模型输出后修改窗口。
-3. 用待 Review 的同一 candidate-generator policy 从三姿态来源生成去重 event episode；来源 run 写齐六项摘要。
+3. 用三个 clean `v1-g4-fall-feature-capture` run 和同一 candidate-generator policy 调用 `export-fall-candidates`，生成去重 episode；来源 run 自动写齐六项 scorer 摘要与上游 feature provenance。
 4. 运行本 evaluator，先 Review 双人一致性、裁决和来源门，再解释模型差异。
 5. 若要修改组合逻辑、refractory、early/late tolerance 或样本口径，升级 policy/version 并重新跑全部 variant，不覆盖历史结果。

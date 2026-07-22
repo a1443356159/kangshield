@@ -23,11 +23,12 @@ flowchart LR
     C --> D[public E1 stress aggregator]
     E[URFD phase sidecar] --> D
     F[CAUCAFall action-level no-fall] --> D
-    C -. future export .-> G[G4 event evaluator]
+    C --> X[capture-bound export bridge]
+    X --> G[G4 event evaluator]
     G --> H[TP/FP/FN and delay after E2 annotation/adjudication]
 ```
 
-候选生成与事件评分继续分离。`event_evaluation.py` 不运行本策略，只校验外部 candidate-policy 摘要；后续 C6c 三路预测必须绑定同一 policy digest。
+候选生成与事件评分继续分离。`event_evaluation.py` 不运行本策略，只校验外部 candidate-policy 摘要；capture-bound export bridge 已把 feature/source-run 校验、真实状态机调用和 scorer prediction 契约接通，后续 C6c 三路预测必须绑定同一 policy digest。完整接口见 [G4 Candidate Export Bridge](v1-g4-candidate-export-bridge.md)。
 
 ## 3. 冻结策略
 
@@ -64,7 +65,7 @@ flowchart LR
 
 `FallEventCandidatePolicy` 同时兼容既有 synthetic fixture policy 与本轮非 fixture 策略：
 
-- fixture 必须保持 `review_status=fixture_only`，可以不含真实规则；
+- fixture 必须保持 `review_status=fixture_only`；scorer-only fixture 可以完全不含规则，但不能运行 generator；rule-bearing fixture 必须一次提供完整三组规则；
 - 非 fixture 必须为 `e1_exploratory_frozen`，且 transition、settled、state-machine 三组规则完整；
 - 生成阶段固定 `source_label_access=forbidden_during_generation`。
 
@@ -138,6 +139,18 @@ make PYTHON=.venv/bin/python benchmark-g4-fall-candidates
 
 默认拒绝 dirty source。`--allow-dirty-source` 只用于开发排错，不能形成正式证据。
 
+对于 capture-bound G4 feature source，使用独立导出命令生成 REV-016 scorer 的 prediction/source run：
+
+```bash
+kangshield-info export-fall-candidates \
+  <capture-manifest.json> \
+  <fall-feature-capture-set.json> \
+  <feature-source-run/manifest.json> \
+  --policy configs/v1-g4-event-candidate-policy.json
+```
+
+该命令不读取 annotation/adjudication；它严格绑定 capture/model/feature/candidate policy、逐 clip JSONL 和上游 run，并输出公共 `FallCandidatePredictionSet`。fixture、真实输入和隐私边界见 [导出桥接设计](v1-g4-candidate-export-bridge.md)。
+
 ## 9. 验收与下一门
 
 本子门完成条件：
@@ -148,6 +161,6 @@ make PYTHON=.venv/bin/python benchmark-g4-fall-candidates
 - 正式报告如实记录漏候选和负样本候选，不以开发集选择最终模型；
 - 风险与告警始终为 false。
 
-它不会关闭以下 V1-R1 门：C6c E2 正负/床上躺卧/空场持续、多人物身份策略、双人标注与裁决、真实事件指标、最终模型许可证和 RiskAssessment/Alert 设计。下一步是在不修改本 policy 的前提下，从 C6c clean feature run 导出三路 candidate stream，再交给既有事件 evaluator。
+它不会关闭以下 V1-R1 门：C6c E2 正负/床上躺卧/空场持续、多人物身份策略、双人标注与裁决、真实事件指标、最终模型许可证和 RiskAssessment/Alert 设计。通用 candidate export 已完成；下一步是实现 capture-bound G4 feature producer。C6c 到位后按冻结 policy 生成三路 clean feature/candidate run，再交给既有事件 evaluator。
 
 正式 E1 结果见[跌倒候选 episode 公开压力报告](reports/v1-g4-fall-candidate-public-stress.md)。

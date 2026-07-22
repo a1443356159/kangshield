@@ -209,6 +209,18 @@ kangshield-info benchmark-fall-candidates \
 
 生成阶段只接收 `FallMotionFrameValue`；URFD phase 与 CAUCAFall action label 在全部 episode 生成后才进入汇总。精确候选窗口只留在被忽略的 derived-sensitive FeatureEvent，父报告不发布 candidate/track/路径。策略、来源门和口径见[跌倒候选 episode 设计](v1-g4-fall-event-candidates.md)。
 
+真实 capture-bound feature run 不走公开数据专用 parent/child loader，而使用公共导出桥接：
+
+```bash
+kangshield-info export-fall-candidates \
+  <capture-manifest.json> \
+  <fall-feature-capture-set.json> \
+  <feature-source-run/manifest.json> \
+  --policy configs/v1-g4-event-candidate-policy.json
+```
+
+feature source 必须是 clean/completed、代码版本已知、stage 为 `v1-g4-fall-feature-capture`，并把 feature set 与每个 clip JSONL 列入 artifacts。导出器在创建 candidate run 前校验 capture/model/feature/policy 摘要、held-out 时间、clip order/duration、observation、frame count、时间轴和 privacy。产出的 prediction/source run 可直接进入 REV-016 bundle；详细契约见 [G4 Candidate Export Bridge](v1-g4-candidate-export-bridge.md)。
+
 家具/宠物人物负标签与多人框采用独立的 Open Images 静态 suite，不把图片重复成视频：
 
 ```bash
@@ -261,6 +273,10 @@ V1-R1 的当前采用/候选/放弃状态见 [探索收敛与 V2 输入清单](v
 18. 每张 Open Images 图片是否保留作者、标题、原始 landing page、CC BY 2.0 URL、未改动声明和复审日期；比赛提交前是否计划逐图重审。
 19. 静态 runner 是否关闭 tracking，parent/case report 是否无预测坐标、绝对路径、逐图作者信息及 risk/alert true。
 20. 静态 false activation 与 IoU box 指标是否只按人物检测解释，没有外推到视频、床上躺卧、跌倒事件或目标 C6c。
+21. Capture G4 feature source 是否为 `v1-g4-fall-feature-capture`、clean/completed、代码版本已知，并绑定 feature-set 与全部 JSONL artifact。
+22. Feature set 的 capture/model/feature-policy、clip order/duration、observation、摘要/大小/frame count 是否全部通过。
+23. Candidate prediction/source run 是否绑定同一 frozen candidate policy 和准确的 `candidate_events_sha256`，且 generated time 位于 run 内。
+24. Export summary 是否不含时间、窗口、candidate/track/observation ID 或本地路径，Risk/Alert 是否仍为 false。
 
 快速检查：
 

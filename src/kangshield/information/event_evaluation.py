@@ -14,6 +14,9 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 from .contracts import (
     EVIDENCE_RANK,
     EvidenceLevel,
+    FallCandidatePredictionClip,
+    FallCandidatePredictionEvent,
+    FallCandidatePredictionSet,
     FallEventAnnotationAgreement,
     FallEventCandidatePolicy,
     FallEventCaseEvaluation,
@@ -173,70 +176,6 @@ class _Adjudication(_StrictModel):
         return self
 
 
-class _CandidateEvent(_StrictModel):
-    candidate_id: str = Field(min_length=1)
-    start_ms: int = Field(ge=0)
-    end_ms: int = Field(gt=0)
-    detected_at_ms: int = Field(ge=0)
-
-    @model_validator(mode="after")
-    def validate_candidate(self) -> "_CandidateEvent":
-        if self.end_ms <= self.start_ms:
-            raise ValueError("candidate event end must be after start")
-        if not self.start_ms <= self.detected_at_ms <= self.end_ms:
-            raise ValueError("candidate detection time must be inside its episode")
-        return self
-
-
-class _PredictionClip(_StrictModel):
-    scenario_id: str = Field(min_length=1)
-    duration_ms: int = Field(gt=0)
-    candidates: list[_CandidateEvent] = Field(default_factory=list)
-
-    @model_validator(mode="after")
-    def validate_candidates(self) -> "_PredictionClip":
-        ids = [candidate.candidate_id for candidate in self.candidates]
-        if len(ids) != len(set(ids)):
-            raise ValueError("candidate ids must be unique within a clip")
-        if any(candidate.end_ms > self.duration_ms for candidate in self.candidates):
-            raise ValueError("candidate event exceeds clip duration")
-        ordered = sorted(
-            (candidate.start_ms, candidate.end_ms)
-            for candidate in self.candidates
-        )
-        if any(
-            next_start < current_end
-            for (_, current_end), (next_start, _) in zip(
-                ordered,
-                ordered[1:],
-                strict=False,
-            )
-        ):
-            raise ValueError("deduplicated candidate episodes cannot overlap")
-        return self
-
-
-class _PredictionSet(_StrictModel):
-    schema_version: Literal["1.0"]
-    prediction_set_id: str = Field(min_length=3)
-    variant_id: str = Field(min_length=1)
-    source_run_id: str = Field(min_length=1)
-    capture_manifest_sha256: str = Field(pattern=SHA256_PATTERN)
-    model_policy_sha256: str = Field(pattern=SHA256_PATTERN)
-    fall_feature_policy_sha256: str = Field(pattern=SHA256_PATTERN)
-    candidate_generator_policy_sha256: str = Field(pattern=SHA256_PATTERN)
-    generated_at: datetime
-    clips: list[_PredictionClip] = Field(min_length=1)
-
-    @model_validator(mode="after")
-    def validate_prediction_set(self) -> "_PredictionSet":
-        _require_aware(self.generated_at, field="prediction generated_at")
-        ids = [clip.scenario_id for clip in self.clips]
-        if len(ids) != len(set(ids)):
-            raise ValueError("prediction scenario ids must be unique")
-        return self
-
-
 class _RequiredVariant(_StrictModel):
     variant_id: str = Field(min_length=1)
     model_policy_sha256: str = Field(pattern=SHA256_PATTERN)
@@ -353,7 +292,7 @@ def _asset(
 
 
 def _validate_clip_set(
-    clips: list[_AnnotatedClip] | list[_PredictionClip],
+    clips: list[_AnnotatedClip] | list[FallCandidatePredictionClip],
     context: M2cEventContext,
     *,
     kind: str,
@@ -526,7 +465,7 @@ def _percentile(values: list[float], quantile: float) -> float | None:
 
 def _match_candidates(
     ground_truth: list[_Interval],
-    candidates: list[_CandidateEvent],
+    candidates: list[FallCandidatePredictionEvent],
     *,
     max_early_ms: int,
     max_late_ms: int,
@@ -558,7 +497,7 @@ def _match_candidates(
 
 
 def _variant_evaluation(
-    prediction: _PredictionSet,
+    prediction: FallCandidatePredictionSet,
     source_run: RunManifest,
     adjudication: _Adjudication,
     context: M2cEventContext,
@@ -1017,7 +956,7 @@ def assess_fall_event_evaluation(
         )
         prediction = _load_json(
             prediction_path,
-            _PredictionSet,
+            FallCandidatePredictionSet,
             kind="candidate events",
         )
         source_run = _load_json(
