@@ -92,6 +92,7 @@ def test_fall_feature_parser_defaults_to_candidate_and_clean_source():
     assert args.variant == "rtmpose-m-humanart"
     assert args.config.name == "v1-g4-fall-features.json"
     assert args.model_binding_policy.name == "v1-m3-pose-models.json"
+    assert args.torchvision_policy.name == "v1-m3-torchvision-pose-model.json"
     assert args.allow_dirty_source is False
 
 

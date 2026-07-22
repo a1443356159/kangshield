@@ -653,6 +653,37 @@ def correct_model_bindings(
     return corrected, corrections
 
 
+def validate_torchvision_model_bindings(
+    bindings: list[ModelBinding],
+    *,
+    policy_path: Path,
+) -> list[ModelBinding]:
+    from .torchvision_pose_backend import (
+        TORCHVISION_KEYPOINT_RCNN_SHA256,
+        TORCHVISION_MODEL_ARTIFACT_LICENSE,
+        load_torchvision_pose_policy,
+    )
+
+    load_torchvision_pose_policy(policy_path)
+    policy_digest = sha256_file(Path(policy_path))
+    corrected = [binding.model_copy(deep=True) for binding in bindings]
+    matches = [
+        binding
+        for binding in corrected
+        if binding.task in {"human_pose_estimation", "human_pose_tracking"}
+    ]
+    if len(matches) != 1:
+        raise ValueError("Keypoint R-CNN source must expose exactly one pose binding")
+    pose = matches[0]
+    if pose.model_digest != TORCHVISION_KEYPOINT_RCNN_SHA256:
+        raise ValueError("Keypoint R-CNN source weight digest is not frozen")
+    if pose.license != TORCHVISION_MODEL_ARTIFACT_LICENSE:
+        raise ValueError("Keypoint R-CNN source artifact license must remain fail closed")
+    if pose.configuration.get("license_policy_sha256") != policy_digest:
+        raise ValueError("Keypoint R-CNN source policy binding digest is not frozen")
+    return corrected
+
+
 def _source_asset(
     path: Path,
     *,
@@ -793,11 +824,15 @@ def run_fall_feature_benchmark(
     variant_id: str,
     config_path: Path,
     model_binding_policy_path: Path,
+    torchvision_policy_path: Path = Path(
+        "configs/v1-m3-torchvision-pose-model.json"
+    ),
     allow_dirty_source: bool = False,
 ) -> tuple[RunArtifacts, FallFeatureBenchmarkReport]:
     benchmark_cases_path = Path(benchmark_cases_path).resolve()
     config_path = Path(config_path).resolve()
     model_binding_policy_path = Path(model_binding_policy_path).resolve()
+    torchvision_policy_path = Path(torchvision_policy_path).resolve()
     config = load_fall_feature_config(config_path)
     suite, cases = load_benchmark_cases(benchmark_cases_path)
     context = _load_source_context(
@@ -816,11 +851,20 @@ def run_fall_feature_benchmark(
     source_case_ids = [case.case_id for case in variant.cases]
     if source_case_ids != expected_case_ids:
         raise ValueError("source pose cases do not match the benchmark case order")
-    bindings, corrections = correct_model_bindings(
-        variant.model_bindings,
-        variant_id=variant_id,
-        policy_path=model_binding_policy_path,
-    )
+    if variant_id == "torchvision-keypointrcnn":
+        selected_policy_path = torchvision_policy_path
+        bindings = validate_torchvision_model_bindings(
+            variant.model_bindings,
+            policy_path=selected_policy_path,
+        )
+        corrections: list[str] = []
+    else:
+        selected_policy_path = model_binding_policy_path
+        bindings, corrections = correct_model_bindings(
+            variant.model_bindings,
+            variant_id=variant_id,
+            policy_path=selected_policy_path,
+        )
     expected_pose_digest = _pose_binding_digest(
         bindings,
         config.expected_keypoint_layout,
@@ -829,7 +873,7 @@ def run_fall_feature_benchmark(
     report_digest = sha256_file(context.report_path)
     source_manifest_digest = sha256_file(context.manifest_path)
     config_digest = sha256_file(config_path)
-    policy_digest = sha256_file(model_binding_policy_path)
+    policy_digest = sha256_file(selected_policy_path)
     configuration = {
         "command": "benchmark-fall-features",
         "benchmark_id": suite["benchmark_id"],
@@ -889,7 +933,7 @@ def run_fall_feature_benchmark(
                     PrivacyLevel.AGGREGATE,
                 ),
                 (
-                    model_binding_policy_path,
+                    selected_policy_path,
                     "pose_model_binding_policy",
                     Modality.UNKNOWN,
                     PrivacyLevel.AGGREGATE,
@@ -1102,7 +1146,20 @@ def run_fall_feature_benchmark(
                 "largest_bbox_selection_is_not_multi_person_identity_tracking",
                 "temporal_features_reset_on_missing_or_changed_track_ids",
                 "thresholds_are_frozen_e1_proxies_and_not_target_device_validated",
-                "humanart_model_artifact_distribution_remains_blocked_pending_review",
+                *(
+                    [
+                        "humanart_model_artifact_distribution_remains_blocked_pending_review"
+                    ]
+                    if variant_id == "rtmpose-m-humanart"
+                    else []
+                ),
+                *(
+                    [
+                        "torchvision_weight_distribution_remains_blocked_pending_review"
+                    ]
+                    if variant_id == "torchvision-keypointrcnn"
+                    else []
+                ),
             ],
         )
         with run.step("write-fall-feature-benchmark-report") as step:

@@ -245,7 +245,11 @@ def build_parser() -> argparse.ArgumentParser:
     fall_benchmark.add_argument("--runs-dir", type=Path, default=Path("runs"))
     fall_benchmark.add_argument(
         "--variant",
-        choices=("yolo26n-pose", "rtmpose-m-humanart"),
+        choices=(
+            "yolo26n-pose",
+            "rtmpose-m-humanart",
+            "torchvision-keypointrcnn",
+        ),
         default="rtmpose-m-humanart",
     )
     fall_benchmark.add_argument(
@@ -257,6 +261,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--model-binding-policy",
         type=Path,
         default=Path("configs/v1-m3-pose-models.json"),
+    )
+    fall_benchmark.add_argument(
+        "--torchvision-policy",
+        type=Path,
+        default=Path("configs/v1-m3-torchvision-pose-model.json"),
     )
     fall_benchmark.add_argument(
         "--allow-dirty-source",
@@ -795,6 +804,7 @@ def _benchmark_fall_features_command(args: argparse.Namespace) -> int:
         variant_id=args.variant,
         config_path=args.config,
         model_binding_policy_path=args.model_binding_policy,
+        torchvision_policy_path=args.torchvision_policy,
         allow_dirty_source=args.allow_dirty_source,
     )
     lying = report.by_posture_phase["lying"]

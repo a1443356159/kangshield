@@ -24,6 +24,7 @@ from kangshield.information.fall_features import (
     FallMotionFeatureExtractor,
     run_fall_feature_benchmark,
     summarize_fall_features,
+    validate_torchvision_model_bindings,
 )
 from kangshield.information.privacy import sha256_file
 
@@ -33,6 +34,9 @@ FALL_CONFIG = PROJECT_ROOT / "configs" / "v1-g4-fall-features.json"
 POSE_POLICY = PROJECT_ROOT / "configs" / "v1-m3-pose-models.json"
 POSE_DIGEST = "12e1b9fcbcd867c3fb6d8f4d509cf1d8c5373df5e529676e32f6dd888758316c"
 DETECTOR_DIGEST = "3dea6513388889f0fff4b77bf7a26013600321b9eb9ceb0e9a400a82572f5f23"
+TORCHVISION_POLICY = (
+    PROJECT_ROOT / "configs" / "v1-m3-torchvision-pose-model.json"
+)
 
 
 def _keypoints(*, score: float = 0.9, horizontal: bool = False) -> list[list[float]]:
@@ -98,6 +102,36 @@ def test_fall_feature_config_rejects_semantic_drift():
         )
     with pytest.raises(ValidationError, match="shoulders 5/6"):
         FallFeatureConfig(required_keypoint_indices=[0, 1, 2, 3])
+
+
+def test_torchvision_fall_source_requires_frozen_fail_closed_binding():
+    policy_digest = sha256_file(TORCHVISION_POLICY)
+    binding = ModelBinding(
+        task="human_pose_tracking",
+        backend="torchvision-keypoint-rcnn",
+        model_name="keypointrcnn_resnet50_fpn_coco-fc266e95.pth",
+        model_digest=(
+            "fc266e953d2b302cdcbb9ae66f71f6b0d4649928bf02dc573961e361e4918926"
+        ),
+        license="model-artifact-license-review-required",
+        device="cuda:0",
+        configuration={
+            "keypoint_layout": "COCO-17",
+            "license_policy_sha256": policy_digest,
+        },
+    )
+
+    validated = validate_torchvision_model_bindings(
+        [binding], policy_path=TORCHVISION_POLICY
+    )
+    assert validated[0].model_digest == binding.model_digest
+
+    drifted = binding.model_copy(deep=True)
+    drifted.license = "BSD-3-Clause"
+    with pytest.raises(ValueError, match="license must remain fail closed"):
+        validate_torchvision_model_bindings(
+            [drifted], policy_path=TORCHVISION_POLICY
+        )
 
 
 def test_box_only_fallback_and_keypoint_geometry_are_explicit():
