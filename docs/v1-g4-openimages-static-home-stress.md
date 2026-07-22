@@ -1,6 +1,6 @@
 # V1-R1 G4 Open Images 静态居家人物检测压力集
 
-状态：Implemented；等待干净提交上的 L40 三模型正式运行
+状态：Implemented revision r2；等待修正提交上的 L40 三模型正式运行
 
 基准日期：2026-07-22
 
@@ -37,7 +37,7 @@ Open Images 页面列出的标注由 Google LLC 以 CC BY 4.0 提供，下载页
 4. 任一 landing page、作者、标题、license link、源字节数或 SHA-256 漂移即拒绝准备或评测；
 5. 比赛提交、演示媒体展示或再分发前必须逐图重新审计，当前检查不能永久替代交付时审计。
 
-源清单位于 `configs/v1-g4-openimages-static-home-negative.json`，SHA-256 为 `36a06059cea6a104fa545c6f1a9ccd2a2046e768c0521bde5aa9ae509ca33feb`。
+源清单位于 `configs/v1-g4-openimages-static-home-negative.json`，suite ID 为 `v1-g4-openimages-static-home-negative-12-r2`，SHA-256 为 `434126ff0919dabed9ee40d702d71993fd8b5866d6c46162fa1441c8c2acfcd0`。
 
 ## 4. 固定选择
 
@@ -47,7 +47,9 @@ Open Images 页面列出的标注由 Google LLC 以 CC BY 4.0 提供，下载页
 | `person_absent_pet` | 4 | Person 人工验证负标签；Cat/Dog 正标签；人工确认画面无人 |
 | `multi_person_indoor` | 4 | Person 人工验证正标签；2～4 个 validation Person 框；人工确认可见多人 |
 
-12 张图均为 Open Images validation、零旋转、唯一 image ID、唯一像素摘要。多人子集的总 Person 真值框数为 13。选择过程是一次人工视觉筛选，不是双人一致性标注；它只减少明显的场景错配，不能消除 Open Images 标注遗漏、训练集重叠或选择偏差。
+12 张图均为 Open Images validation、零旋转、唯一 image ID、唯一像素摘要。多人子集的总 Person 真值框数为 11。选择过程是一次人工视觉筛选，不是双人一致性标注；它只减少明显的场景错配，不能消除 Open Images 标注遗漏、训练集重叠或选择偏差。
+
+首轮 r1 在 job `1765` 后进行困难 case 视觉复核，发现 `oi-multi-wheelchair-occlusion` 有一个明显可见人物未被 Person 框覆盖，会把模型的正确检出误计为 FP。该 run 被拒绝作为正式指标，图片也未通过修正版的“可见人数等于框数 + 框逐一视觉对齐”门。r2 用两名远距离人物与两个框一致的室内会议室图片替换它；两版以不同 suite ID 和 source digest 隔离，不能合并统计。
 
 ## 5. 准备链路与确定性产物
 
@@ -72,9 +74,9 @@ make PYTHON=.venv/bin/python prepare-g4-static-home
 
 | 产物 | SHA-256 |
 |---|---|
-| `static-home-cases.json` | `e7db73dcfad8682854936c7db07891763a80b17ea090f6fc448a921e07cc3df6` |
-| `attribution.json` | `202b9d262f5b913271238ba189ed8ce25b3e4bdd67f17ecd37fa7336e84cbaff` |
-| `dataset-lock.json` | `8019384e93b155a662f9b911cca1323e35b38214940c49d426e056c553ae4d76` |
+| `static-home-cases.json` | `e62b34dbf093253e240bf780a85105caaf0ade09e722415a85136ba330340470` |
+| `attribution.json` | `fbcbec44f0276e09f6567d2c00d5c4cae0a9529de59ebf8e6e10c4f072e55efd` |
+| `dataset-lock.json` | `7568e4b8c49f4e8629a151c9dd05d2ff67ff08a030b1e84ec16bfa8c647b3f94` |
 
 `data/raw` 与 `data/processed` 均不入 Git；Git 只保存冻结清单、准备器、契约、测试和说明。
 

@@ -26,7 +26,7 @@ SOURCE_MANIFEST = (
 def test_static_home_source_manifest_freezes_license_and_scenarios():
     manifest = load_static_home_source_manifest(SOURCE_MANIFEST)
 
-    assert manifest["suite_id"] == "v1-g4-openimages-static-home-negative-12"
+    assert manifest["suite_id"] == "v1-g4-openimages-static-home-negative-12-r2"
     assert manifest["dataset"]["annotation_license"] == "CC-BY-4.0"
     assert manifest["dataset"]["required_image_license"] == "CC-BY-2.0"
     assert len(manifest["cases"]) == 12
@@ -39,6 +39,11 @@ def test_static_home_source_manifest_freezes_license_and_scenarios():
         case["license_page_audit"]["status"] == "passed"
         for case in manifest["cases"]
     )
+    assert all(
+        case["manual_review"]["visible_person_count"]
+        == case["expected_person_box_count"]
+        for case in manifest["cases"]
+    )
 
 
 def test_static_home_source_manifest_rejects_license_page_drift(tmp_path):
@@ -48,6 +53,16 @@ def test_static_home_source_manifest_rejects_license_page_drift(tmp_path):
     atomic_write_json(drifted, payload)
 
     with pytest.raises(ValueError, match="license-page audit"):
+        load_static_home_source_manifest(drifted)
+
+
+def test_static_home_source_manifest_rejects_visual_box_mismatch(tmp_path):
+    payload = json.loads(SOURCE_MANIFEST.read_text(encoding="utf-8"))
+    payload["cases"][-1]["manual_review"]["visible_person_count"] += 1
+    drifted = tmp_path / "visual-drifted.json"
+    atomic_write_json(drifted, payload)
+
+    with pytest.raises(ValueError, match="visual person count"):
         load_static_home_source_manifest(drifted)
 
 
@@ -105,7 +120,11 @@ def _build_fixture_manifest(tmp_path: Path) -> tuple[Path, dict[str, bytes]]:
         person_confidence = 1 if scenario == "multi_person_indoor" else 0
         person_count = 2 if scenario == "multi_person_indoor" else 0
         findings = (
-            ["multiple_visible_people", "indoor_scene"]
+            [
+                "multiple_visible_people",
+                "annotation_boxes_align_with_visible_people",
+                "indoor_scene",
+            ]
             if scenario == "multi_person_indoor"
             else [
                 "no_visible_person",
@@ -151,6 +170,10 @@ def _build_fixture_manifest(tmp_path: Path) -> tuple[Path, dict[str, bytes]]:
                     "status": "passed",
                     "reviewed_on": "2026-07-22",
                     "method": "single_reviewer_visual_screening",
+                    "visible_person_count": person_count,
+                    "person_box_alignment": (
+                        "passed" if person_count else "not_applicable"
+                    ),
                     "findings": findings,
                 },
             }
@@ -276,7 +299,7 @@ def _build_fixture_manifest(tmp_path: Path) -> tuple[Path, dict[str, bytes]]:
         )
     manifest = {
         "schema_version": "1.0",
-        "suite_id": "v1-g4-openimages-static-home-negative-12",
+        "suite_id": "v1-g4-openimages-static-home-negative-12-r2",
         "evidence_level": "E1",
         "dataset": {
             "dataset_id": "open-images-v7",

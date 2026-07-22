@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "suite_id": "v1-g4-openimages-static-home-negative-12",
+  "suite_id": "v1-g4-openimages-static-home-negative-12-r2",
   "evidence_level": "E1",
   "dataset": {
     "dataset_id": "open-images-v7",
@@ -104,6 +104,8 @@
         "status": "passed",
         "reviewed_on": "2026-07-22",
         "method": "single_reviewer_visual_screening",
+        "visible_person_count": 0,
+        "person_box_alignment": "not_applicable",
         "findings": [
           "no_visible_person",
           "indoor_furniture_scene"
@@ -145,6 +147,8 @@
         "status": "passed",
         "reviewed_on": "2026-07-22",
         "method": "single_reviewer_visual_screening",
+        "visible_person_count": 0,
+        "person_box_alignment": "not_applicable",
         "findings": [
           "no_visible_person",
           "indoor_furniture_scene"
@@ -194,6 +198,8 @@
         "status": "passed",
         "reviewed_on": "2026-07-22",
         "method": "single_reviewer_visual_screening",
+        "visible_person_count": 0,
+        "person_box_alignment": "not_applicable",
         "findings": [
           "no_visible_person",
           "indoor_furniture_scene"
@@ -239,6 +245,8 @@
         "status": "passed",
         "reviewed_on": "2026-07-22",
         "method": "single_reviewer_visual_screening",
+        "visible_person_count": 0,
+        "person_box_alignment": "not_applicable",
         "findings": [
           "no_visible_person",
           "indoor_furniture_scene"
@@ -284,6 +292,8 @@
         "status": "passed",
         "reviewed_on": "2026-07-22",
         "method": "single_reviewer_visual_screening",
+        "visible_person_count": 0,
+        "person_box_alignment": "not_applicable",
         "findings": [
           "no_visible_person",
           "pet_visible"
@@ -329,6 +339,8 @@
         "status": "passed",
         "reviewed_on": "2026-07-22",
         "method": "single_reviewer_visual_screening",
+        "visible_person_count": 0,
+        "person_box_alignment": "not_applicable",
         "findings": [
           "no_visible_person",
           "pet_visible"
@@ -374,6 +386,8 @@
         "status": "passed",
         "reviewed_on": "2026-07-22",
         "method": "single_reviewer_visual_screening",
+        "visible_person_count": 0,
+        "person_box_alignment": "not_applicable",
         "findings": [
           "no_visible_person",
           "pet_visible"
@@ -415,6 +429,8 @@
         "status": "passed",
         "reviewed_on": "2026-07-22",
         "method": "single_reviewer_visual_screening",
+        "visible_person_count": 0,
+        "person_box_alignment": "not_applicable",
         "findings": [
           "no_visible_person",
           "pet_visible"
@@ -460,8 +476,11 @@
         "status": "passed",
         "reviewed_on": "2026-07-22",
         "method": "single_reviewer_visual_screening",
+        "visible_person_count": 3,
+        "person_box_alignment": "passed",
         "findings": [
           "multiple_visible_people",
+          "annotation_boxes_align_with_visible_people",
           "indoor_scene"
         ]
       }
@@ -505,8 +524,11 @@
         "status": "passed",
         "reviewed_on": "2026-07-22",
         "method": "single_reviewer_visual_screening",
+        "visible_person_count": 2,
+        "person_box_alignment": "passed",
         "findings": [
           "multiple_visible_people",
+          "annotation_boxes_align_with_visible_people",
           "indoor_scene"
         ]
       }
@@ -546,24 +568,27 @@
         "status": "passed",
         "reviewed_on": "2026-07-22",
         "method": "single_reviewer_visual_screening",
+        "visible_person_count": 4,
+        "person_box_alignment": "passed",
         "findings": [
           "multiple_visible_people",
+          "annotation_boxes_align_with_visible_people",
           "indoor_scene"
         ]
       }
     },
     {
-      "case_id": "oi-multi-wheelchair-occlusion",
+      "case_id": "oi-multi-conference-room-distance",
       "scenario": "multi_person_indoor",
-      "image_id": "09e094375efab7fe",
-      "path": "openimages-v7/validation/09e094375efab7fe.jpg",
-      "url": "https://open-images-dataset.s3.amazonaws.com/validation/09e094375efab7fe.jpg",
-      "byte_size": 364094,
-      "sha256": "4a8235504fad018485b2d4e2ecb96f435c20301228c2a2a42f2e1bff4e5fee06",
+      "image_id": "21977851c6ca69ad",
+      "path": "openimages-v7/validation/21977851c6ca69ad.jpg",
+      "url": "https://open-images-dataset.s3.amazonaws.com/validation/21977851c6ca69ad.jpg",
+      "byte_size": 74495,
+      "sha256": "0b2eb93a4b32d3eea24cdeb48d833241f8ba86a4f65a09e3bd5140b0e416c206",
       "width": 1024,
       "height": 768,
       "expected_person_label_confidence": 1,
-      "expected_person_box_count": 4,
+      "expected_person_box_count": 2,
       "required_positive_labels": [
         {
           "mid": "/m/01mzpv",
@@ -572,10 +597,10 @@
       ],
       "license": "CC-BY-2.0",
       "license_url": "https://creativecommons.org/licenses/by/2.0/",
-      "original_landing_url": "https://www.flickr.com/photos/johovac/2756964116",
-      "author_profile_url": "https://www.flickr.com/people/johovac/",
-      "author": "Ed S. Johovac",
-      "title": "Dialysis 1",
+      "original_landing_url": "https://www.flickr.com/photos/adamraoof/8914062703/",
+      "author_profile_url": "https://www.flickr.com/people/adamraoof/",
+      "author": "Adam Raoof",
+      "title": "IMG_20130601_135139",
       "rotation_degrees": 0,
       "license_page_audit": {
         "status": "passed",
@@ -587,9 +612,13 @@
         "status": "passed",
         "reviewed_on": "2026-07-22",
         "method": "single_reviewer_visual_screening",
+        "visible_person_count": 2,
+        "person_box_alignment": "passed",
         "findings": [
           "multiple_visible_people",
-          "indoor_scene"
+          "annotation_boxes_align_with_visible_people",
+          "indoor_scene",
+          "distant_people"
         ]
       }
     }

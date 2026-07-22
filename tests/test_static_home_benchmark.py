@@ -149,7 +149,7 @@ def _build_suite(tmp_path: Path) -> Path:
         attribution_path,
         {
             "schema_version": "1.0",
-            "suite_id": "v1-g4-openimages-static-home-negative-12",
+            "suite_id": "v1-g4-openimages-static-home-negative-12-r2",
             "source_manifest_sha256": source_digest,
             "annotation_license": "CC-BY-4.0",
             "annotation_license_url": (
@@ -169,7 +169,7 @@ def _build_suite(tmp_path: Path) -> Path:
         suite_path,
         {
             "schema_version": "1.0",
-            "suite_id": "v1-g4-openimages-static-home-negative-12",
+            "suite_id": "v1-g4-openimages-static-home-negative-12-r2",
             "evidence_level": "E1",
             "source_manifest_sha256": source_digest,
             "dataset": {
@@ -253,7 +253,7 @@ def _build_suite(tmp_path: Path) -> Path:
         root / "dataset-lock.json",
         {
             "schema_version": "1.0",
-            "suite_id": "v1-g4-openimages-static-home-negative-12",
+            "suite_id": "v1-g4-openimages-static-home-negative-12-r2",
             "source_manifest_sha256": source_digest,
             "source_files": sorted(source_files, key=lambda item: item["path"]),
             "processed_files": sorted(

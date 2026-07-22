@@ -27,7 +27,7 @@ EXPECTED_IMAGE_LICENSE_URL = "https://creativecommons.org/licenses/by/2.0/"
 EXPECTED_IMAGE_URL_PREFIX = (
     "https://open-images-dataset.s3.amazonaws.com/validation/"
 )
-EXPECTED_SUITE_ID = "v1-g4-openimages-static-home-negative-12"
+EXPECTED_SUITE_ID = "v1-g4-openimages-static-home-negative-12-r2"
 PERSON_MID = "/m/01g317"
 CONTEXT_CLASSES = {
     "/m/03ssj5": "Bed",
@@ -195,6 +195,16 @@ def _validate_case(item: dict[str, Any]) -> None:
         raise ValueError("static home case did not pass manual visual review")
     if manual_review.get("method") != "single_reviewer_visual_screening":
         raise ValueError("static home manual review method is not frozen")
+    visible_person_count = manual_review.get("visible_person_count")
+    if visible_person_count != person_box_count:
+        raise ValueError(
+            "static home visual person count disagrees with annotation boxes"
+        )
+    expected_alignment = (
+        "not_applicable" if scenario.startswith("person_absent") else "passed"
+    )
+    if manual_review.get("person_box_alignment") != expected_alignment:
+        raise ValueError("static home visual person-box alignment did not pass")
     findings = manual_review.get("findings")
     if not isinstance(findings, list) or not all(
         isinstance(value, str) and value for value in findings
@@ -207,6 +217,11 @@ def _validate_case(item: dict[str, Any]) -> None:
     )
     if required_finding not in findings:
         raise ValueError("static home manual review contradicts the scenario")
+    if (
+        scenario == "multi_person_indoor"
+        and "annotation_boxes_align_with_visible_people" not in findings
+    ):
+        raise ValueError("static home person boxes lack visual alignment review")
 
 
 def load_static_home_source_manifest(path: Path) -> dict[str, Any]:
