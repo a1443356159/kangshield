@@ -91,8 +91,12 @@ def test_capture_pose_binding_accepts_inline_or_explicit_tracking():
         configuration={"enabled": True},
     )
     assert _pose_binding([separated_pose, tracker]) == separated_pose
-    with pytest.raises(ValueError, match="enable tracking"):
+    with pytest.raises(ValueError, match="exactly one"):
         _pose_binding([separated_pose])
+    with pytest.raises(ValueError, match="exactly one"):
+        _pose_binding([inline, tracker])
+    with pytest.raises(ValueError, match="exactly one"):
+        _pose_binding([separated_pose, tracker, tracker.model_copy(deep=True)])
 
 
 def _prepare_capture(tmp_path: Path) -> tuple[Path, Path, Path, Path]:

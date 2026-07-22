@@ -206,8 +206,10 @@ def _pose_binding(bindings: list[ModelBinding]) -> ModelBinding:
         if binding.task == "short_term_pose_tracking"
         and binding.configuration.get("enabled") is True
     ]
-    if not inline_tracking and len(explicit_trackers) != 1:
-        raise ValueError("capture backend must enable tracking")
+    if int(inline_tracking) + len(explicit_trackers) != 1:
+        raise ValueError(
+            "capture backend must expose exactly one inline or explicit tracker"
+        )
     return pose
 
 
