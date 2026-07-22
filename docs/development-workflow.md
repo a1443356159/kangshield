@@ -74,6 +74,17 @@ kangshield-info profile-sleep sleep-export.json \
 
 报告只保留字段路径、类型和计数，不保留字段值。自动映射只是候选，必须确认单位、时间粒度和含义。
 
+对照《监测方案》形成 fail-closed 路线报告：
+
+```bash
+kangshield-info assess-sleep-route sleep-export.json \
+  --evidence-level E2 \
+  --source-type sdk_export \
+  --mapping-config local-confirmed-sdnl1-map.json
+```
+
+mapping 标记 `confirmed` 仍不够：输入和 mapping 都必须达到 E2，且 source path、单位、时间、值域和缺失语义完整，才会得到 `ready_for_adapter`。该命令不输出标准化数值；多夜派生仍需连续覆盖 Review。设计见 [V1-M3 睡眠字段路线](v1-m3-sleep-field-route.md)。
+
 ### 萤石快照分析
 
 ```bash

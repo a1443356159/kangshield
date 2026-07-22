@@ -77,6 +77,8 @@ V1-M3 在 M3/M7 之间增加“同一 PoseBackend 契约 → 视频-only variant
 
 语言切片沿用相同边界：“同一 SpeechBackend 契约 → audio-only variant runner → CER/静音/性能对比”。FunASR 与 Whisper 都只返回 SpeechSegment；参考文本仅由 M7 评测器读取，提取器不能读取或调参。逐句转写停留在被忽略的 child FeatureEvent，case/variant/父报告只包含字符计数和聚合指标。
 
+睡眠切片不选择模型，而在 M1/M3 之间设置 fail-closed schema gate：“无值字段 profile → 监测需求 policy + 人工 mapping → route assessment”。E1/fixture 只能生成 candidate；只有 E2/E3、单位/时间/值域/缺失语义完整的单字段可以授权后续 adapter。多夜节律派生在连续覆盖审计前保持禁用，避免把商品能力或字段名误写成标准医学指标。
+
 ## 5. V1 运行形态
 
 V1 采用一次运行一个目录的离线流水线：

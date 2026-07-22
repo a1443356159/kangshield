@@ -218,6 +218,15 @@ kangshield-info profile-sleep <json-or-csv>
 - 候选不自动转为标准指标，必须人工确认单位和语义。
 - 对 token、serial、name、phone、id 等字段只记录存在性，不记录值。
 
+字段发现之后运行路线 gate：
+
+```text
+kangshield-info assess-sleep-route <json-or-csv> \
+  --mapping-config <candidate-or-confirmed-map.json>
+```
+
+它用绑定《监测方案》摘要的 policy 将字段分成 direct-if-exposed、multi-night derived 和 not-assumed，并逐项检查 evidence、source path、单位、时间、值域及缺失语义。route report 不包含值；`ready_for_adapter` 也只授权后续单字段 adapter，不能解释为设备已验收或指标准确。
+
 ### 7.3 萤石 SDK/API 快照分析
 
 命令目标：

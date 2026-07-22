@@ -494,6 +494,53 @@ class SleepProfileReport(ContractModel):
     issues: list[QualityIssue] = Field(default_factory=list)
 
 
+class SleepFieldRouteAssessment(ContractModel):
+    canonical_field: str
+    monitoring_indicators: list[str] = Field(default_factory=list)
+    priority: str
+    route: str
+    candidate_source_paths: list[str] = Field(default_factory=list)
+    mapping_status: str | None = None
+    status: str
+    can_standardize: bool = False
+    required_confirmations: list[str] = Field(default_factory=list)
+    missing_confirmations: list[str] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+
+
+class SleepDerivedRouteAssessment(ContractModel):
+    indicator_id: str
+    monitoring_indicators: list[str] = Field(default_factory=list)
+    required_canonical_fields: list[str] = Field(default_factory=list)
+    missing_required_fields: list[str] = Field(default_factory=list)
+    minimum_nights: int = Field(ge=1)
+    status: str
+    calculation_enabled: bool = False
+    limitations: list[str] = Field(default_factory=list)
+
+
+class SleepRouteAssessmentReport(ContractModel):
+    schema_version: str = "1.0"
+    route_version: str
+    device_model: str
+    evidence_level: EvidenceLevel
+    profile_asset_id: str
+    profile_asset_sha256: str = Field(min_length=64, max_length=64)
+    policy_version: str
+    policy_sha256: str = Field(min_length=64, max_length=64)
+    policy_source_sha256: str = Field(min_length=64, max_length=64)
+    mapping_config_sha256: str = Field(min_length=64, max_length=64)
+    mapping_config_fixture_only: bool
+    direct_fields: list[SleepFieldRouteAssessment]
+    not_assumed_fields: list[SleepFieldRouteAssessment]
+    derived_indicators: list[SleepDerivedRouteAssessment]
+    counts: dict[str, int] = Field(default_factory=dict)
+    decision: str
+    values_persisted: bool = False
+    issues: list[QualityIssue] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+
+
 class DeviceSummary(ContractModel):
     device_ref: str
     model: str | None = None

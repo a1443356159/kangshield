@@ -27,6 +27,7 @@
 - [V1-M3 语音模型同集对比设计](docs/v1-m3-speech-model-comparison.md)
 - [V1-M3 语音模型同集对比报告](docs/reports/v1-m3-speech-model-comparison.md)
 - [V1-M2c 目标设备样本与时间基采集规程](docs/v1-m2c-device-sample-protocol.md)
+- [V1-M3 睡眠字段路线与 Fail-Closed Gate](docs/v1-m3-sleep-field-route.md)
 
 ## V1 初步开发
 
@@ -96,6 +97,17 @@ kangshield-info benchmark-speech-models \
 ```
 
 该命令只重放六条 FLEURS 普通话，对比 FunASR 基线与 Whisper small，并运行不落原文的静音探针；不会重复运行视频模型。固定解码、权重、CER 和隐私口径见[语音模型对比设计](docs/v1-m3-speech-model-comparison.md)。
+
+评估睡眠字段路线（不持久化数值）：
+
+```bash
+kangshield-info assess-sleep-route \
+  tests/fixtures/sleep/sdnl1-export.synthetic.json \
+  --evidence-level E1 \
+  --source-type fixture
+```
+
+该命令只判断字段路径、证据和语义是否足以开始 adapter 实现，不输出睡眠或生命体征值。真实 SDNL1 字段必须使用 E2/E3 导出/API 和本地 confirmed mapping 解锁；详细边界见[睡眠字段路线](docs/v1-m3-sleep-field-route.md)。
 
 输出默认写入被 Git 忽略的 runs 目录。Fixture 只能作为 E1 开发证据，不能写成真实设备已接通。
 

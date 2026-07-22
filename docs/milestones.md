@@ -151,6 +151,15 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 
 语言切片设计见 [V1-M3 语音模型同集对比](v1-m3-speech-model-comparison.md)，正式证据见 [同集对比报告](reports/v1-m3-speech-model-comparison.md)。语言切片已通过 Review；完整 V1-M3 仍需关闭睡眠字段路线。
 
+当前睡眠字段路线：
+
+- [x] 按《监测方案》冻结 19 个 direct-if-exposed、5 组 multi-night derived 和 11 个 not-assumed 字段。
+- [x] 实现无值 SleepProfile v0.2、mapping evidence/语义 gate、SleepRouteAssessment 严格契约与 CLI。
+- [x] fixture、伪 confirmed E1 拒绝、E2 单字段解锁和监测方案摘要漂移均有自动化测试；全套 40 passed。
+- [ ] 在干净提交上生成 E1 路线报告，审计身份/数值不落报告并完成 Review。
+
+本切片只决定“不训练睡眠模型、保留字段接口和派生前置条件”，不会替代 V1-M2c 的真实 SDNL1 API/SDK/导出证据。设计见 [V1-M3 睡眠字段路线](v1-m3-sleep-field-route.md)。
+
 每个候选模型必须记录：
 
 - 模型及权重版本、许可证、输入尺寸。

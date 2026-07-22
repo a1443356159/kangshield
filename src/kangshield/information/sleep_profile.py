@@ -25,8 +25,22 @@ from .contracts import (
 from .privacy import is_sensitive_key, safe_local_uri, sha256_file
 
 
-PROFILER_VERSION = "sleep-profile-v0.1.0"
+PROFILER_VERSION = "sleep-profile-v0.2.0"
 CANONICAL_ALIASES = {
+    "measurement_at": (
+        "timestamp",
+        "measurement_at",
+        "sample_time",
+        "record_time",
+        "观测时间",
+        "采样时间",
+    ),
+    "device_status": (
+        "device_status",
+        "online_status",
+        "设备状态",
+        "在线状态",
+    ),
     "heart_rate_bpm": (
         "heart_rate",
         "heartrate",
@@ -75,6 +89,62 @@ CANONICAL_ALIASES = {
         "wake_count",
         "夜间觉醒次数",
         "觉醒次数",
+    ),
+    "report_generated_at": (
+        "report_generated_at",
+        "report_time",
+        "generated_at",
+        "报告生成时间",
+    ),
+    "waso_duration": (
+        "waso",
+        "waso_duration",
+        "wake_after_sleep_onset",
+        "入睡后觉醒时间",
+    ),
+    "long_wake_episode_count": (
+        "long_wake_episode_count",
+        "lwep",
+        "长清醒次数",
+    ),
+    "sleep_efficiency_ratio": (
+        "sleep_efficiency",
+        "sleep_efficiency_ratio",
+        "睡眠效率",
+    ),
+    "sleep_stage": (
+        "sleep_stage",
+        "stage",
+        "sleep_depth",
+        "睡眠阶段",
+        "睡眠深度",
+    ),
+    "movement_duration_ratio": (
+        "movement_duration_ratio",
+        "movement_ratio",
+        "睡眠期运动时间占比",
+    ),
+    "body_movement_index": (
+        "body_movement",
+        "movement_index",
+        "movement_score",
+        "体动",
+        "体动指数",
+    ),
+    "turnover_count": (
+        "turnover_count",
+        "turn_count",
+        "翻身次数",
+    ),
+    "rem_duration": (
+        "rem_duration",
+        "rem_time",
+        "rem期时长",
+    ),
+    "nap_duration": (
+        "nap_duration",
+        "daytime_nap_duration",
+        "日间小睡时长",
     ),
 }
 

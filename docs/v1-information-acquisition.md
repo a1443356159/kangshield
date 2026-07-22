@@ -203,7 +203,7 @@ AppKey、AccessToken、设备验证码和设备序列号不得提交到仓库。
 | 多语种 ASR 对照 | OpenAI Whisper small | 多语种转写、语言和时间段信息 | V1-M3 同集对照完成；普通话 CER 23.36% 对 FunASR 6.57%，不晋级普通话主链路；仅在新多语种/方言 held-out 证据下重开 |
 | 声学特征 | openSMILE eGeMAPS | F0、HNR、Jitter、Shimmer、能量、谱特征等 | 只输出客观声学量，不直接输出疾病判断 |
 | 环境声音 | YAMNet | 521 类通用音频事件及 embedding | 低优先级；先确认跌倒撞击/呼救是否在实际音频中可分 |
-| 睡眠信息 | 字段映射与质量规则 | 心率/呼吸/在离床/睡眠摘要等实际开放字段 | 不先上模型；先完成 API 字段与缺失分析 |
+| 睡眠信息 | 字段映射与 fail-closed 路线 gate | 心率/呼吸/在离床/睡眠摘要等实际开放字段 | 不选睡眠模型；19 direct、5 derived、11 not-assumed 已冻结，E2/E3 真实 schema 前不输出标准值 |
 
 模型依据：
 
@@ -306,5 +306,7 @@ V1 不在没有参考设备的情况下声称心率、呼吸或睡眠分期准�
 V1-M3 姿态同集对比已经冻结模型、摘要、阈值和报告契约，见 [姿态模型对比设计](v1-m3-pose-model-comparison.md)。它只复用公开 URFD 视频；最终是否进入 V2 仍取决于 L40 结果、C6c V1-M2c 复测和许可证 Review。
 
 V1-M3 语音同集对比已经完成，见 [语音模型对比设计](v1-m3-speech-model-comparison.md)和[正式报告](reports/v1-m3-speech-model-comparison.md)。FunASR 保留为普通话默认候选，Whisper small 不晋级；该结论只来自六条 clean FLEURS 普通话，不代表 C6c 远场、方言、老人或背景噪声效果。
+
+V1-M3 睡眠路线不训练模型，而采用绑定《监测方案》的字段 policy 和 fail-closed mapping gate，见 [睡眠字段路线](v1-m3-sleep-field-route.md)。通用萤石睡觉检测服务的宣传能力不会自动映射到 CS-EP-SDNL1；真实 E2/E3 schema、单位、时间和缺失语义确认前，所有标准化值与多夜派生保持关闭。
 
 萤石通用 SDK 能力可参考[官方 SDK 说明](https://open.ys7.com/doc/zh/book/4.x/android-sdk.html)；CS-EP-SDNL1 硬件参数可参考[萤石官方商品页](https://www.ys7.com/item/994492.html)。最终判断必须以测试账号的真实能力集和接口响应为准。

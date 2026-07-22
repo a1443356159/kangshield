@@ -11,6 +11,7 @@ test:
 info-fixtures:
 	PYTHONPATH=src $(PYTHON) -m kangshield.information.cli inspect-ezviz tests/fixtures/ezviz/device-list.synthetic.json --evidence-level E1
 	PYTHONPATH=src $(PYTHON) -m kangshield.information.cli profile-sleep tests/fixtures/sleep/sdnl1-export.synthetic.json --evidence-level E1
+	PYTHONPATH=src $(PYTHON) -m kangshield.information.cli assess-sleep-route tests/fixtures/sleep/sdnl1-export.synthetic.json --evidence-level E1
 
 prepare-mm-models:
 	$(PYTHON) scripts/prepare_multimodal_models.py

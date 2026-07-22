@@ -55,3 +55,14 @@ def test_speech_benchmark_parser_freezes_candidate_decoding_defaults():
     assert args.language == "zh"
     assert args.whisper_beam_size == 5
     assert args.whisper_fp16 is None
+
+
+def test_sleep_route_parser_defaults_to_fail_closed_fixture_inputs():
+    args = build_parser().parse_args(
+        ["assess-sleep-route", "sleep-export.json"]
+    )
+    assert args.command == "assess-sleep-route"
+    assert args.evidence_level.value == "E1"
+    assert args.source_type.value == "fixture"
+    assert args.policy.name == "v1-sleep-route-policy.json"
+    assert args.mapping_config.name == "sdnl1-field-map.example.json"

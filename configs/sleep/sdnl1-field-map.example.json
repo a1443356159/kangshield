@@ -1,22 +1,35 @@
 {
-  "schema_version": "0.1",
+  "schema_version": "1.0",
   "fixture_only": true,
+  "evidence_level": "E1",
   "device_model": "CS-EP-SDNL1",
-  "note": "Source paths are synthetic examples and must be replaced after inspecting a real E2/E3 export.",
+  "note": "Source paths are synthetic candidates and cannot enable standardized features. Replace this file only after inspecting a real E2/E3 export.",
   "mappings": {
     "heart_rate_bpm": {
       "source_path": "$.records[].heart_rate",
-      "unit": "bpm",
+      "confirmed_unit": null,
+      "time_source_path": null,
+      "time_semantics": null,
+      "value_semantics": null,
+      "missing_semantics": null,
       "status": "candidate"
     },
     "respiratory_rate_bpm": {
       "source_path": "$.records[].respiratory_rate",
-      "unit": "breaths/min",
+      "confirmed_unit": null,
+      "time_source_path": null,
+      "time_semantics": null,
+      "value_semantics": null,
+      "missing_semantics": null,
       "status": "candidate"
     },
     "bed_presence": {
       "source_path": "$.records[].in_bed",
-      "unit": "boolean",
+      "confirmed_unit": null,
+      "time_source_path": null,
+      "time_semantics": null,
+      "value_semantics": null,
+      "missing_semantics": null,
       "status": "candidate"
     }
   }

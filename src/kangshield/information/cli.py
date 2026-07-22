@@ -71,6 +71,31 @@ def build_parser() -> argparse.ArgumentParser:
     sleep.add_argument("--device-ref")
     sleep.add_argument("--elder-ref")
 
+    sleep_route = subparsers.add_parser(
+        "assess-sleep-route",
+        help="Assess fail-closed sleep field readiness without persisting values",
+    )
+    sleep_route.add_argument("path", type=Path)
+    sleep_route.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    sleep_route.add_argument(
+        "--evidence-level", type=_evidence, default=EvidenceLevel.E1
+    )
+    sleep_route.add_argument(
+        "--source-type", type=_source_type, default=SourceType.FIXTURE
+    )
+    sleep_route.add_argument("--device-ref")
+    sleep_route.add_argument("--elder-ref")
+    sleep_route.add_argument(
+        "--policy",
+        type=Path,
+        default=Path("configs/sleep/v1-sleep-route-policy.json"),
+    )
+    sleep_route.add_argument(
+        "--mapping-config",
+        type=Path,
+        default=Path("configs/sleep/sdnl1-field-map.example.json"),
+    )
+
     ezviz = subparsers.add_parser(
         "inspect-ezviz",
         help="Inspect and redact an EZVIZ SDK/API JSON snapshot",
@@ -302,6 +327,60 @@ def _profile_sleep_command(args: argparse.Namespace) -> int:
             "record_count": report.record_count,
             "field_count": len(report.fields),
             "mapping_candidate_count": len(report.mapping_candidates),
+        },
+    )
+    return 0
+
+
+def _assess_sleep_route_command(args: argparse.Namespace) -> int:
+    from .sleep_route import assess_sleep_route
+
+    with RunArtifacts(
+        args.runs_dir,
+        stage="v1-m3-sleep-field-route",
+        evidence_level=args.evidence_level,
+        configuration={
+            "command": "assess-sleep-route",
+            "source_type": args.source_type.value,
+            "policy": str(args.policy),
+            "mapping_config": str(args.mapping_config),
+            "values_persisted": False,
+        },
+    ) as run:
+        with run.step("profile-sleep-fields") as step:
+            profile = profile_sleep_export(
+                args.path,
+                evidence_level=args.evidence_level,
+                source_type=args.source_type,
+                device_ref=args.device_ref,
+                elder_ref=args.elder_ref,
+            )
+            run.record_asset(profile.asset)
+            run.record_observation(profile.observation)
+            profile_path = run.write_report("sleep-field-profile.json", profile)
+            step.outputs.append(run.relative(profile_path))
+        with run.step("assess-sleep-field-route") as step:
+            report = assess_sleep_route(
+                profile=profile,
+                policy_path=args.policy,
+                mapping_config_path=args.mapping_config,
+            )
+            report_path = run.write_report(
+                "sleep-route-assessment.json", report
+            )
+            step.outputs.append(run.relative(report_path))
+    _print_result(
+        run,
+        {
+            "decision": report.decision,
+            "direct_field_count": report.counts["direct_total"],
+            "direct_ready_count": report.counts["direct_ready"],
+            "candidate_unconfirmed_count": report.counts.get(
+                "direct_candidate_unconfirmed", 0
+            ),
+            "not_assumed_count": report.counts["not_assumed_total"],
+            "derived_enabled_count": report.counts["derived_enabled"],
+            "values_persisted": report.values_persisted,
         },
     )
     return 0
@@ -547,6 +626,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _probe_media_command(args)
     if args.command == "profile-sleep":
         return _profile_sleep_command(args)
+    if args.command == "assess-sleep-route":
+        return _assess_sleep_route_command(args)
     if args.command == "inspect-ezviz":
         return _inspect_ezviz_command(args)
     if args.command == "run-multimodal":
