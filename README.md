@@ -44,6 +44,7 @@
 - [V1-R1 G4 Open Images 静态居家人物检测压力报告](docs/reports/v1-g4-openimages-static-home-stress.md)
 - [V1-R1 G4 事件标注、候选评测与就绪门](docs/v1-g4-event-evaluation-readiness.md)
 - [V1-R1 G4 事件评估 E1 初测报告](docs/reports/v1-g4-event-evaluation-smoke.md)
+- [V1-R1 G4 跌倒候选 episode 设计](docs/v1-g4-fall-event-candidates.md)
 
 ## V1 初步开发
 
@@ -153,6 +154,18 @@ kangshield-info benchmark-fall-adl \
 ```
 
 该命令对 12 段 clip-level no-fall ADL 顺序运行三个姿态变体，并按动作/光照汇总代理激活。它不训练或评测跌倒分类器；正式 E1 结果见 [压力集设计](docs/v1-g4-caucafall-adl-stress.md)和[压力报告](docs/reports/v1-g4-caucafall-adl-stress.md)。
+
+从已有 clean G4 特征生成并压力测试去重 candidate episode：
+
+```bash
+kangshield-info benchmark-fall-candidates \
+  --urfd-run runs/<clean-yolo-fall-feature-run> \
+  --urfd-run runs/<clean-rtmpose-fall-feature-run> \
+  --urfd-run runs/<clean-keypointrcnn-fall-feature-run> \
+  --caucafall-run runs/<clean-three-variant-adl-parent>
+```
+
+该命令只在 label-blind 生成完成后读取公开标签做 E1 汇总；精确候选窗口留在被忽略的 derived-sensitive FeatureEvent。公开开发集结果不能作为 C6c 准确率或独立泛化证据，也不会产生风险或告警。冻结语义见[候选 episode 设计](docs/v1-g4-fall-event-candidates.md)。
 
 准备并运行静态居家人物检测压力集：
 

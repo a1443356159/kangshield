@@ -91,6 +91,8 @@ G4 再增加一条与视频事件严格隔离的 Open Images 静态人物检测�
 
 G4 事件评估支路位于 M2c/M3 与 M7 之间：“严格 capture/readiness 血缘 + 双人独立动作区间 + 裁决真值 + 外部 candidate episode → agreement/TP/FP/FN/误触发/延迟”。evaluator 不执行候选生成策略，只要求三个 variant 绑定同一 candidate-policy 摘要；原始 annotation/candidate 时间、annotator ref 和路径不进入父报告。fixture/sub-E2 只能发布 `tooling_only`，真实全部 clip 可用、camera gate、标注、裁决、最低数据和 clean provenance 同时通过后才发布 `event_metrics_ready_for_review`，且仍不产生 RiskAssessment 或 Alert。
 
+G4 candidate-generator 位于 frame feature 与事件 evaluator 之间：“同 track 下降历史 + 横卧持续/低运动 → 状态机确认 → release/refractory 去重 episode”。生成 API 不接收标签；精确 episode 只进入 derived-sensitive run feature，公开压力父报告只保存激活、路径计数和 delay 摘要。策略在查看 C6c held-out 输出前冻结，公开 URFD/CAUCAFall 复用结果只属于 E1 开发压力，不能作为目标设备或独立泛化证据。
+
 ## 5. V1 运行形态
 
 V1 采用一次运行一个目录的离线流水线：
@@ -143,6 +145,10 @@ PoseBenchmarkCaseEvaluation 复用相同视频和 sidecar，分别保存人物�
 ### FallMotionFrameValue 与 FallFeatureBenchmarkReport
 
 FallMotionFrameValue 保存归一化框形状/位置、同 track 的下降/低运动/横卧持续代理、COCO-17 关键点质量门、feature path 和 fallback reason；不复制原始 bbox、关键点或阶段标签。FallFeatureBenchmarkReport 只在评测层按 case/class/phase 聚合 available 与代理激活数，并以 Literal `false` 固定 `risk_assessment_emitted` 和 `alert_emitted`。来源 parent/child run、代码版本、模型 digest、配置和 sidecar 摘要不一致时 fail closed。
+
+### FallEventCandidatePolicy 与 FallCandidatePublicStressReport
+
+FallEventCandidatePolicy 冻结 transition/settled 两条触发路径、帧间隔、release、refractory、episode 起点和 label-blind 约束。FallEventCandidateEpisode 只表达候选窗口与 trigger path，固定不是风险或告警。公开压力 case/variant/parent report 只保存 URFD fall 激活覆盖、URFD/CAUCAFall negative activation、episode/hour 和 coarse phase-onset delay 摘要；精确窗口和 track 身份不进入父报告。完整设计见[跌倒候选 episode 设计](v1-g4-fall-event-candidates.md)。
 
 ### StaticHomeImageCase 与 StaticHomeBenchmarkReport
 

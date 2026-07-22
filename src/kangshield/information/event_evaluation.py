@@ -15,6 +15,7 @@ from .contracts import (
     EVIDENCE_RANK,
     EvidenceLevel,
     FallEventAnnotationAgreement,
+    FallEventCandidatePolicy,
     FallEventCaseEvaluation,
     FallEventEvaluationReadinessReport,
     FallEventVariantEvaluation,
@@ -170,17 +171,6 @@ class _Adjudication(_StrictModel):
         if len(ids) != len(set(ids)):
             raise ValueError("adjudication scenario ids must be unique")
         return self
-
-
-class _CandidateGeneratorPolicy(_StrictModel):
-    schema_version: Literal["1.0"]
-    policy_id: str = Field(min_length=3)
-    fixture: bool
-    target_event_label: Literal["simulated_fall"]
-    input_fall_feature_policy_sha256: str = Field(pattern=SHA256_PATTERN)
-    candidate_representation: Literal["deduplicated_event_episode"]
-    decision_logic_summary: str = Field(min_length=1)
-    limitations: list[str] = Field(default_factory=list)
 
 
 class _CandidateEvent(_StrictModel):
@@ -796,7 +786,7 @@ def assess_fall_event_evaluation(
     )
     candidate_policy = _load_json(
         candidate_policy_path,
-        _CandidateGeneratorPolicy,
+        FallEventCandidatePolicy,
         kind="candidate generator policy",
     )
     candidate_policy_sha256 = sha256_file(candidate_policy_path)

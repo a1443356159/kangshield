@@ -197,6 +197,18 @@ make submit-g4-adl-benchmark
 
 准备器冻结 DOI/版本/许可、Mendeley file ID、大小、SHA-256、subject/activity 矩阵和三档光照；评测器再次校验 prepared suite、模型摘要和 COCO-17 布局。每个 case 使用 child run 保存敏感 pose events，父报告只按动作/光照发布摘要。详见 [CAUCAFall 压力设计](v1-g4-caucafall-adl-stress.md)与[正式报告](reports/v1-g4-caucafall-adl-stress.md)。
 
+已有三路 clean URFD fall-feature run 和一个三路 CAUCAFall parent 后，可在 CPU 上生成并压力测试去重候选 episode：
+
+```bash
+kangshield-info benchmark-fall-candidates \
+  --urfd-run runs/<clean-yolo-fall-feature-run> \
+  --urfd-run runs/<clean-rtmpose-fall-feature-run> \
+  --urfd-run runs/<clean-keypointrcnn-fall-feature-run> \
+  --caucafall-run runs/<clean-three-variant-adl-parent>
+```
+
+生成阶段只接收 `FallMotionFrameValue`；URFD phase 与 CAUCAFall action label 在全部 episode 生成后才进入汇总。精确候选窗口只留在被忽略的 derived-sensitive FeatureEvent，父报告不发布 candidate/track/路径。策略、来源门和口径见[跌倒候选 episode 设计](v1-g4-fall-event-candidates.md)。
+
 家具/宠物人物负标签与多人框采用独立的 Open Images 静态 suite，不把图片重复成视频：
 
 ```bash

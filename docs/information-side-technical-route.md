@@ -75,6 +75,7 @@ src/kangshield/information/
 ├── streaming.py          # OpenCV 时间戳回放、PCM WAV 读取/重采样
 ├── pose_backend.py       # YOLO26n-pose + ByteTrack 适配器
 ├── fall_features.py      # 跌倒运动代理、关键点质量门与离线评测
+├── fall_candidates.py    # 无标签候选状态机、来源门与公开压力汇总
 ├── speech_backend.py     # FunASR VAD/ASR/标点和词面标签
 ├── multimodal_pipeline.py # 特征落盘、时间窗对齐和性能报告
 ├── dataset_preparation.py # 公开固定源校验、媒体转换、case/lock
@@ -329,7 +330,7 @@ bundle 同时绑定 M2c capture/readiness 与 clean assessor run、两份以上�
 
 - V2 姿态准确率有条件候选：YOLOX-m HumanArt + RTMPose-m HumanArt。
 - V2 姿态独立 fallback：TorchVision Keypoint R-CNN；覆盖较高但 lying keypoint gate 仅 4/21，且权重分发仍 Open，不替换 RTMPose 条件参考。
-- 跌倒特征输入：box-only 横卧/下降/静止与 keypoint quality gate 已完成 E1 离线实现；Open Images 静态 furniture/pet/multi-person 只补人物检测压力；双标注/裁决/事件 scorer 契约也已完成 E1 工具验证。C6c 正负视频、床上躺卧、多人 tracking、真实候选策略/指标和真实 G4 仍 Open。
+- 跌倒特征输入：box-only 横卧/下降/静止与 keypoint quality gate 已完成 E1 离线实现；首版 label-blind candidate episode 状态机已冻结并能复用既有 URFD/CAUCAFall 特征做公开开发压力；Open Images 只补静态人物检测，双标注/裁决/事件 scorer 只补工具链。C6c 正负视频、床上躺卧、多人 tracking、真实事件指标和真实 G4 仍 Open。
 - MediaPipe、openSMILE、Face/OpenFace、YAMNet 当前 Defer，不继续无标签扩展。
 
 ### 阶段 D：V2 晋级
@@ -382,6 +383,7 @@ V1-R1 已完成 E1 决策收敛：YOLO26n 为 V1 对照，HumanArt + RTMPose 为
 - 语音只在主动开启、同意和受控测试下处理。
 - FeatureEvent 不保留完整语音文本时，应保留脱敏文本或关键词类别。
 - G4 派生 FeatureEvent 不复制原始 bbox、关键点、阶段标签、源路径或参考转写，只保存归一化代理、质量门与摘要引用。
+- G4 candidate 生成器不接收标签；精确 episode 时间只留在被忽略的 derived-sensitive FeatureEvent，公开压力父报告只保存计数和 delay 摘要。
 - G4 事件父报告不复制 annotator/adjudicator ref、动作/候选时间窗口、candidate ID 或输入路径，只发布计数、比例和 delay 摘要。
 - Fixture 必须包含 synthetic 标记。
 - 差分隐私在 V1 只做设计评估；没有明确机制、敏感度和效用测试时不得声称已实现。

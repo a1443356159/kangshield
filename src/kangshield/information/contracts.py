@@ -479,6 +479,108 @@ class FallMotionFrameValue(ContractModel):
     alert_emitted: Literal[False] = False
 
 
+class FallCandidateTransitionRule(ContractModel):
+    minimum_horizontal_duration_ms: int = Field(gt=0)
+    rapid_descent_lookback_ms: int = Field(gt=0)
+    low_motion_required: bool = False
+
+
+class FallCandidateSettledRule(ContractModel):
+    minimum_horizontal_duration_ms: int = Field(gt=0)
+    low_motion_required: Literal[True] = True
+
+
+class FallCandidateStateMachine(ContractModel):
+    max_frame_gap_ms: int = Field(gt=0)
+    release_grace_ms: int = Field(gt=0)
+    refractory_ms: int = Field(ge=0)
+    require_track_id: Literal[True] = True
+    reset_on_track_change: Literal[True] = True
+    transition_start_strategy: Literal[
+        "earliest_recent_rapid_descent"
+    ] = "earliest_recent_rapid_descent"
+    settled_start_strategy: Literal[
+        "horizontal_duration_backfill"
+    ] = "horizontal_duration_backfill"
+
+
+class FallEventCandidatePolicy(ContractModel):
+    """Frozen policy that turns G4 frame proxies into deduplicated episodes."""
+
+    schema_version: Literal["1.0"] = "1.0"
+    policy_id: str = Field(min_length=3)
+    fixture: bool
+    review_status: Literal[
+        "fixture_only", "e1_exploratory_frozen"
+    ] = "fixture_only"
+    target_event_label: Literal["simulated_fall"] = "simulated_fall"
+    input_fall_feature_policy_sha256: str = Field(
+        pattern=r"^[0-9a-f]{64}$"
+    )
+    input_fall_feature_version: str = "fall-motion-features-v0.1.0"
+    candidate_representation: Literal[
+        "deduplicated_event_episode"
+    ] = "deduplicated_event_episode"
+    candidate_event_version: str = "fall-event-candidate-v0.1.0"
+    source_label_access: Literal[
+        "forbidden_during_generation"
+    ] = "forbidden_during_generation"
+    transition_rule: FallCandidateTransitionRule | None = None
+    settled_rule: FallCandidateSettledRule | None = None
+    state_machine: FallCandidateStateMachine | None = None
+    decision_logic_summary: str = Field(min_length=1)
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_review_scope(self) -> "FallEventCandidatePolicy":
+        rules = (self.transition_rule, self.settled_rule, self.state_machine)
+        if self.fixture:
+            if self.review_status != "fixture_only":
+                raise ValueError("fixture candidate policy must remain fixture_only")
+            return self
+        if self.review_status != "e1_exploratory_frozen":
+            raise ValueError("non-fixture candidate policy must be E1 frozen")
+        if any(rule is None for rule in rules):
+            raise ValueError("non-fixture candidate policy requires all rules")
+        assert self.transition_rule is not None
+        assert self.settled_rule is not None
+        if (
+            self.transition_rule.minimum_horizontal_duration_ms
+            > self.settled_rule.minimum_horizontal_duration_ms
+        ):
+            raise ValueError(
+                "transition horizontal duration cannot exceed settled fallback"
+            )
+        return self
+
+
+class FallEventCandidateEpisode(ContractModel):
+    """Derived-sensitive candidate episode; it is not a risk or alert."""
+
+    schema_version: Literal["1.0"] = "1.0"
+    candidate_version: str
+    candidate_id: str = Field(min_length=1)
+    start_ms: int = Field(ge=0)
+    detected_at_ms: int = Field(ge=0)
+    end_ms: int = Field(gt=0)
+    trigger_path: Literal[
+        "rapid_descent_then_horizontal",
+        "settled_horizontal_low_motion",
+    ]
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
+
+    @model_validator(mode="after")
+    def validate_window(self) -> "FallEventCandidateEpisode":
+        if self.end_ms <= self.start_ms:
+            raise ValueError("candidate episode end must be after start")
+        if not self.start_ms <= self.detected_at_ms <= self.end_ms:
+            raise ValueError("candidate detection must be inside the episode")
+        return self
+
+
 class FallFeatureMetrics(ContractModel):
     sampled_frames: int = Field(ge=0)
     unavailable_frames: int = Field(ge=0)
@@ -712,6 +814,249 @@ class FallAdlBenchmarkReport(ContractModel):
             for digest in self.pose_model_policy_sha256s.values()
         ):
             raise ValueError("fall ADL pose model policy digest is invalid")
+        return self
+
+
+class FallCandidateCaseStressEvaluation(ContractModel):
+    """Timestamp-free public-data stress summary for one variant/case."""
+
+    schema_version: Literal["1.0"] = "1.0"
+    case_ref: str
+    variant_id: str
+    dataset_id: Literal["urfd", "caucafall-v4"]
+    ground_truth_scope: Literal[
+        "urfd_fall_video_class_with_phase_onset_proxy",
+        "urfd_adl_video_class_no_fall",
+        "caucafall_action_level_no_fall",
+    ]
+    scenario_group: str
+    positive_case: bool
+    duration_ms: int = Field(gt=0)
+    input_frame_count: int = Field(gt=0)
+    episode_count: int = Field(ge=0)
+    activated: bool
+    transition_trigger_count: int = Field(ge=0)
+    settled_trigger_count: int = Field(ge=0)
+    transition_onset_detection_delay_ms: int | None = None
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_candidate_counts(self) -> "FallCandidateCaseStressEvaluation":
+        if self.episode_count != (
+            self.transition_trigger_count + self.settled_trigger_count
+        ):
+            raise ValueError("candidate trigger counts disagree with episode count")
+        if self.activated != (self.episode_count > 0):
+            raise ValueError("candidate activation flag disagrees with episodes")
+        expected_positive = self.ground_truth_scope == (
+            "urfd_fall_video_class_with_phase_onset_proxy"
+        )
+        if self.positive_case != expected_positive:
+            raise ValueError("candidate positive flag disagrees with label scope")
+        if not self.positive_case and self.transition_onset_detection_delay_ms is not None:
+            raise ValueError("negative case cannot carry a transition-onset delay")
+        if self.positive_case and self.activated:
+            if self.transition_onset_detection_delay_ms is None:
+                raise ValueError("activated positive case requires an onset delay")
+        elif self.transition_onset_detection_delay_ms is not None:
+            raise ValueError("non-activated case cannot carry an onset delay")
+        return self
+
+
+class FallCandidateVariantStressReport(ContractModel):
+    """Aggregate-only candidate stress evidence for one pose variant."""
+
+    schema_version: Literal["1.0"] = "1.0"
+    variant_id: str
+    source_urfd_run_id: str
+    source_urfd_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_urfd_report_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_urfd_features_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_caucafall_run_id: str
+    model_policy_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    fall_feature_policy_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    candidate_generator_policy_sha256: str = Field(
+        pattern=r"^[0-9a-f]{64}$"
+    )
+    case_count: int = Field(ge=0)
+    urfd_fall_case_count: int = Field(ge=0)
+    urfd_fall_activated_count: int = Field(ge=0)
+    urfd_adl_negative_case_count: int = Field(ge=0)
+    urfd_adl_false_activation_count: int = Field(ge=0)
+    caucafall_negative_case_count: int = Field(ge=0)
+    caucafall_false_activation_count: int = Field(ge=0)
+    negative_exposure_ms: int = Field(ge=0)
+    negative_episode_count: int = Field(ge=0)
+    false_activations_per_hour: float = Field(ge=0.0)
+    episode_count: int = Field(ge=0)
+    transition_trigger_count: int = Field(ge=0)
+    settled_trigger_count: int = Field(ge=0)
+    detection_delay_count: int = Field(ge=0)
+    mean_transition_onset_detection_delay_ms: float | None = None
+    median_transition_onset_detection_delay_ms: float | None = None
+    minimum_transition_onset_detection_delay_ms: int | None = None
+    maximum_transition_onset_detection_delay_ms: int | None = None
+    cases: list[FallCandidateCaseStressEvaluation]
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_aggregates(self) -> "FallCandidateVariantStressReport":
+        if self.case_count != len(self.cases):
+            raise ValueError("candidate variant case count disagrees with cases")
+        if any(case.variant_id != self.variant_id for case in self.cases):
+            raise ValueError("candidate case variant disagrees with parent")
+        urfd_fall = [case for case in self.cases if case.positive_case]
+        urfd_adl = [
+            case
+            for case in self.cases
+            if case.ground_truth_scope == "urfd_adl_video_class_no_fall"
+        ]
+        caucafall = [
+            case
+            for case in self.cases
+            if case.ground_truth_scope == "caucafall_action_level_no_fall"
+        ]
+        negatives = [case for case in self.cases if not case.positive_case]
+        expected = {
+            "urfd_fall_case_count": len(urfd_fall),
+            "urfd_fall_activated_count": sum(case.activated for case in urfd_fall),
+            "urfd_adl_negative_case_count": len(urfd_adl),
+            "urfd_adl_false_activation_count": sum(
+                case.activated for case in urfd_adl
+            ),
+            "caucafall_negative_case_count": len(caucafall),
+            "caucafall_false_activation_count": sum(
+                case.activated for case in caucafall
+            ),
+            "negative_exposure_ms": sum(case.duration_ms for case in negatives),
+            "negative_episode_count": sum(case.episode_count for case in negatives),
+            "episode_count": sum(case.episode_count for case in self.cases),
+            "transition_trigger_count": sum(
+                case.transition_trigger_count for case in self.cases
+            ),
+            "settled_trigger_count": sum(
+                case.settled_trigger_count for case in self.cases
+            ),
+            "detection_delay_count": sum(
+                case.transition_onset_detection_delay_ms is not None
+                for case in self.cases
+            ),
+        }
+        for field, value in expected.items():
+            if getattr(self, field) != value:
+                raise ValueError(f"candidate variant {field} disagrees with cases")
+        expected_rate = (
+            round(self.negative_episode_count * 3_600_000 / self.negative_exposure_ms, 6)
+            if self.negative_exposure_ms
+            else 0.0
+        )
+        if abs(self.false_activations_per_hour - expected_rate) > 1e-6:
+            raise ValueError("candidate false activations/hour disagrees with exposure")
+        delays = [
+            case.transition_onset_detection_delay_ms
+            for case in self.cases
+            if case.transition_onset_detection_delay_ms is not None
+        ]
+        summary_values = (
+            self.mean_transition_onset_detection_delay_ms,
+            self.median_transition_onset_detection_delay_ms,
+            self.minimum_transition_onset_detection_delay_ms,
+            self.maximum_transition_onset_detection_delay_ms,
+        )
+        if not delays and any(value is not None for value in summary_values):
+            raise ValueError("empty delay set cannot carry delay summaries")
+        if delays and any(value is None for value in summary_values):
+            raise ValueError("non-empty delay set requires all delay summaries")
+        if delays:
+            ordered = sorted(delays)
+            midpoint = len(ordered) // 2
+            expected_median = (
+                float(ordered[midpoint])
+                if len(ordered) % 2
+                else (ordered[midpoint - 1] + ordered[midpoint]) / 2
+            )
+            expected_delay_summary = {
+                "mean_transition_onset_detection_delay_ms": round(
+                    sum(ordered) / len(ordered), 3
+                ),
+                "median_transition_onset_detection_delay_ms": round(
+                    expected_median, 3
+                ),
+                "minimum_transition_onset_detection_delay_ms": ordered[0],
+                "maximum_transition_onset_detection_delay_ms": ordered[-1],
+            }
+            for field, expected_value in expected_delay_summary.items():
+                if getattr(self, field) != expected_value:
+                    raise ValueError(
+                        f"candidate variant {field} disagrees with cases"
+                    )
+        return self
+
+
+class FallCandidatePublicStressReport(ContractModel):
+    """E1 public-data stress report; it is not held-out event validation."""
+
+    schema_version: Literal["1.0"] = "1.0"
+    benchmark_id: str
+    benchmark_version: str
+    evidence_level: EvidenceLevel = EvidenceLevel.E1
+    candidate_policy_id: str
+    candidate_generator_policy_sha256: str = Field(
+        pattern=r"^[0-9a-f]{64}$"
+    )
+    fall_feature_policy_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    urfd_benchmark_id: str
+    urfd_benchmark_cases_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    caucafall_suite_id: str
+    caucafall_suite_manifest_sha256: str = Field(
+        pattern=r"^[0-9a-f]{64}$"
+    )
+    source_caucafall_run_id: str
+    source_caucafall_manifest_sha256: str = Field(
+        pattern=r"^[0-9a-f]{64}$"
+    )
+    source_caucafall_report_sha256: str = Field(
+        pattern=r"^[0-9a-f]{64}$"
+    )
+    variant_count: int = Field(ge=0)
+    case_evaluation_count: int = Field(ge=0)
+    variants: list[FallCandidateVariantStressReport]
+    raw_paths_persisted: Literal[False] = False
+    candidate_windows_persisted_in_report: Literal[False] = False
+    candidate_episode_artifact_scope: Literal[
+        "derived_sensitive_run_feature_events"
+    ] = "derived_sensitive_run_feature_events"
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_variants(self) -> "FallCandidatePublicStressReport":
+        if self.evidence_level is not EvidenceLevel.E1:
+            raise ValueError("public candidate stress report must remain E1")
+        if self.variant_count != len(self.variants) or not self.variants:
+            raise ValueError("candidate report variant count disagrees")
+        ids = [variant.variant_id for variant in self.variants]
+        if len(ids) != len(set(ids)):
+            raise ValueError("candidate report variant ids must be unique")
+        if self.case_evaluation_count != sum(
+            variant.case_count for variant in self.variants
+        ):
+            raise ValueError("candidate report case evaluation count disagrees")
+        if any(
+            variant.fall_feature_policy_sha256
+            != self.fall_feature_policy_sha256
+            or variant.candidate_generator_policy_sha256
+            != self.candidate_generator_policy_sha256
+            or variant.source_caucafall_run_id
+            != self.source_caucafall_run_id
+            for variant in self.variants
+        ):
+            raise ValueError("candidate report source policy binding disagrees")
         return self
 
 

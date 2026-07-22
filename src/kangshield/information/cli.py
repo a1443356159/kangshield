@@ -397,6 +397,38 @@ def build_parser() -> argparse.ArgumentParser:
     fall_adl.add_argument("--pose-sample-fps", type=float, default=5.0)
     fall_adl.add_argument("--max-duration-s", type=float, default=30.0)
 
+    fall_candidates = subparsers.add_parser(
+        "benchmark-fall-candidates",
+        help=(
+            "Generate deduplicated fall candidate episodes and stress them on "
+            "existing URFD and CAUCAFall G4 feature runs"
+        ),
+    )
+    fall_candidates.add_argument(
+        "--urfd-run",
+        action="append",
+        type=Path,
+        required=True,
+        help="Repeat exactly three times for the frozen pose variants",
+    )
+    fall_candidates.add_argument("--caucafall-run", type=Path, required=True)
+    fall_candidates.add_argument(
+        "--benchmark-cases",
+        type=Path,
+        default=Path("data/processed/v1-m2b/benchmark-cases.json"),
+    )
+    fall_candidates.add_argument(
+        "--policy",
+        type=Path,
+        default=Path("configs/v1-g4-event-candidate-policy.json"),
+    )
+    fall_candidates.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    fall_candidates.add_argument(
+        "--allow-dirty-source",
+        action="store_true",
+        help="Allow dirty source runs for development only",
+    )
+
     static_home = subparsers.add_parser(
         "benchmark-static-home",
         help=(
@@ -1168,6 +1200,49 @@ def _benchmark_fall_adl_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def _benchmark_fall_candidates_command(args: argparse.Namespace) -> int:
+    from .fall_candidates import run_fall_candidate_public_stress
+
+    run, report = run_fall_candidate_public_stress(
+        urfd_run_dirs=args.urfd_run,
+        caucafall_run_dir=args.caucafall_run,
+        benchmark_cases_path=args.benchmark_cases,
+        policy_path=args.policy,
+        runs_dir=args.runs_dir,
+        allow_dirty_source=args.allow_dirty_source,
+    )
+    summaries = [
+        {
+            "variant_id": variant.variant_id,
+            "urfd_fall_activated_count": variant.urfd_fall_activated_count,
+            "urfd_fall_case_count": variant.urfd_fall_case_count,
+            "urfd_adl_false_activation_count": (
+                variant.urfd_adl_false_activation_count
+            ),
+            "caucafall_false_activation_count": (
+                variant.caucafall_false_activation_count
+            ),
+            "negative_episode_count": variant.negative_episode_count,
+            "false_activations_per_hour": variant.false_activations_per_hour,
+            "risk_assessment_emitted": variant.risk_assessment_emitted,
+            "alert_emitted": variant.alert_emitted,
+        }
+        for variant in report.variants
+    ]
+    _print_result(
+        run,
+        {
+            "benchmark_id": report.benchmark_id,
+            "candidate_policy_id": report.candidate_policy_id,
+            "case_evaluation_count": report.case_evaluation_count,
+            "variants": summaries,
+            "risk_assessment_emitted": report.risk_assessment_emitted,
+            "alert_emitted": report.alert_emitted,
+        },
+    )
+    return 0
+
+
 def _benchmark_static_home_command(args: argparse.Namespace) -> int:
     from .static_home_benchmark import run_static_home_benchmark
 
@@ -1257,6 +1332,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _benchmark_fall_features_command(args)
     if args.command == "benchmark-fall-adl":
         return _benchmark_fall_adl_command(args)
+    if args.command == "benchmark-fall-candidates":
+        return _benchmark_fall_candidates_command(args)
     if args.command == "benchmark-static-home":
         return _benchmark_static_home_command(args)
     if args.command == "benchmark-speech-models":

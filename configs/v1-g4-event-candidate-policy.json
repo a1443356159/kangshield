@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0",
+  "policy_id": "v1-g4-event-candidate-policy-v0.1.0",
+  "fixture": false,
+  "review_status": "e1_exploratory_frozen",
+  "target_event_label": "simulated_fall",
+  "input_fall_feature_policy_sha256": "3bedf218e9e413c1ab168134b8333db5cdebf764d5f8c9ece65ba212ea9d5eda",
+  "input_fall_feature_version": "fall-motion-features-v0.1.0",
+  "candidate_representation": "deduplicated_event_episode",
+  "candidate_event_version": "fall-event-candidate-v0.1.0",
+  "source_label_access": "forbidden_during_generation",
+  "transition_rule": {
+    "minimum_horizontal_duration_ms": 600,
+    "rapid_descent_lookback_ms": 1500,
+    "low_motion_required": false
+  },
+  "settled_rule": {
+    "minimum_horizontal_duration_ms": 1200,
+    "low_motion_required": true
+  },
+  "state_machine": {
+    "max_frame_gap_ms": 450,
+    "release_grace_ms": 600,
+    "refractory_ms": 3000,
+    "require_track_id": true,
+    "reset_on_track_change": true,
+    "transition_start_strategy": "earliest_recent_rapid_descent",
+    "settled_start_strategy": "horizontal_duration_backfill"
+  },
+  "decision_logic_summary": "Emit one episode when a tracked person remains bbox-horizontal for 600 ms after a rapid-descent proxy observed within 1500 ms; otherwise use a 1200 ms bbox-horizontal plus low-motion fallback. Close after 600 ms without horizontal evidence, reset temporal evidence on gaps or track changes, and suppress a new episode for 3000 ms after closure.",
+  "risk_assessment_emitted": false,
+  "alert_emitted": false,
+  "limitations": [
+    "frozen_before_target_c6c_held_out_candidate_review",
+    "e1_engineering_policy_not_target_device_validated",
+    "largest_bbox_single_primary_person_only",
+    "bbox_horizontal_proxy_is_viewpoint_sensitive",
+    "low_motion_fallback_can_activate_on_non_fall_floor_level_actions",
+    "candidate_episode_is_not_risk_assessment_or_alert"
+  ]
+}

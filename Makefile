@@ -1,4 +1,4 @@
-.PHONY: test info-fixtures prepare-mm-models prepare-mm-smoke prepare-m2c-timing-fixture prepare-m2c-capture-fixture assess-m2c-capture-fixture prepare-g4-event-evaluation-fixture assess-g4-event-evaluation-fixture submit-mm-smoke prepare-m2b-data submit-m2b-benchmark prepare-m3-pose-models submit-m3-pose-comparison prepare-m3-speech-models submit-m3-speech-comparison prepare-g4-caucafall submit-g4-adl-benchmark prepare-g4-static-home submit-g4-static-home-benchmark
+.PHONY: test info-fixtures prepare-mm-models prepare-mm-smoke prepare-m2c-timing-fixture prepare-m2c-capture-fixture assess-m2c-capture-fixture prepare-g4-event-evaluation-fixture assess-g4-event-evaluation-fixture submit-mm-smoke prepare-m2b-data submit-m2b-benchmark prepare-m3-pose-models submit-m3-pose-comparison prepare-m3-speech-models submit-m3-speech-comparison prepare-g4-caucafall submit-g4-adl-benchmark benchmark-g4-fall-candidates prepare-g4-static-home submit-g4-static-home-benchmark
 
 PYTHON ?= python3
 KANG_VIDEO_INPUT ?= $(CURDIR)/data/raw/public-smoke/ultralytics-bus-replay.avi
@@ -8,6 +8,10 @@ KANG_G4_ADL_CASES ?= $(CURDIR)/data/processed/v1-g4-caucafall/fall-adl-cases.jso
 KANG_G4_STATIC_HOME_CASES ?= $(CURDIR)/data/processed/v1-g4-openimages-static-home/static-home-cases.json
 KANG_M2C_CAPTURE_MANIFEST ?= $(CURDIR)/data/raw/public-smoke/v1-m2c-capture/capture-manifest.json
 KANG_G4_EVENT_BUNDLE ?= $(CURDIR)/data/raw/public-smoke/v1-g4-event-evaluation/event-evaluation-bundle.json
+KANG_G4_URFD_YOLO_RUN ?=
+KANG_G4_URFD_RTMPOSE_RUN ?=
+KANG_G4_URFD_KEYPOINTRCNN_RUN ?=
+KANG_G4_CAUCAFALL_RUN ?=
 
 test:
 	PYTHONPATH=src $(PYTHON) -m pytest -q
@@ -78,6 +82,13 @@ submit-g4-adl-benchmark:
 	$(PYTHON) scripts/prepare_v1_m3_pose_models.py --offline
 	PYTHONPATH=src $(PYTHON) scripts/prepare_v1_m3_torchvision_pose_model.py --offline
 	sbatch --export=ALL,KANG_FALL_ADL_CASES="$(KANG_G4_ADL_CASES)" scripts/slurm/v1_g4_fall_adl_benchmark.sbatch
+
+benchmark-g4-fall-candidates:
+	test -d "$(KANG_G4_URFD_YOLO_RUN)"
+	test -d "$(KANG_G4_URFD_RTMPOSE_RUN)"
+	test -d "$(KANG_G4_URFD_KEYPOINTRCNN_RUN)"
+	test -d "$(KANG_G4_CAUCAFALL_RUN)"
+	PYTHONPATH=src $(PYTHON) -m kangshield.information.cli benchmark-fall-candidates --urfd-run "$(KANG_G4_URFD_YOLO_RUN)" --urfd-run "$(KANG_G4_URFD_RTMPOSE_RUN)" --urfd-run "$(KANG_G4_URFD_KEYPOINTRCNN_RUN)" --caucafall-run "$(KANG_G4_CAUCAFALL_RUN)" --benchmark-cases "$(KANG_M2B_CASES)"
 
 prepare-g4-static-home:
 	PYTHONPATH=src $(PYTHON) scripts/prepare_v1_g4_openimages_data.py

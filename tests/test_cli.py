@@ -134,6 +134,27 @@ def test_fall_adl_parser_defaults_to_fixed_three_variant_stress_run():
     assert args.torchvision_max_size == 1333
 
 
+def test_fall_candidate_parser_requires_sources_and_freezes_policy_default():
+    args = build_parser().parse_args(
+        [
+            "benchmark-fall-candidates",
+            "--urfd-run",
+            "runs/yolo",
+            "--urfd-run",
+            "runs/rtmpose",
+            "--urfd-run",
+            "runs/keypointrcnn",
+            "--caucafall-run",
+            "runs/caucafall",
+        ]
+    )
+    assert args.command == "benchmark-fall-candidates"
+    assert len(args.urfd_run) == 3
+    assert args.policy.name == "v1-g4-event-candidate-policy.json"
+    assert args.benchmark_cases.name == "benchmark-cases.json"
+    assert args.allow_dirty_source is False
+
+
 def test_static_home_parser_defaults_to_fixed_three_variant_stress_run():
     args = build_parser().parse_args(
         ["benchmark-static-home", "static-home-cases.json"]
