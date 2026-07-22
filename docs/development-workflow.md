@@ -130,7 +130,16 @@ kangshield-info run-multimodal sample.mp4 sample.wav \
   --fusion-window-ms 1000
 ```
 
-当前音频输入必须是无压缩 PCM WAV。独立视频和音频被假设共享零时刻；真实 C6c 需要优先保留同容器时间基，或在适配器中显式记录时钟偏差。
+独立音频输入必须是无压缩 PCM WAV，并明确假设与视频共享 synthetic zero。若媒体本身含音轨，使用：
+
+```bash
+kangshield-info run-multimodal capture.mkv \
+  --audio-from-video \
+  --pose-model models/yolo26n-pose.pt \
+  --offline-models
+```
+
+同容器模式要求单视频/单音频轨及完整 PTS，按 timing probe 的起点 offset 映射语言事件；不会把多轨、缺 PTS 或扫描截断静默降级为共同零点。它仍是离线回放，且单个 offset 不能估计 drift。真实 C6c 需要保留原容器，并按采集规程人工定位两次同步事件。
 
 ### Slurm GPU
 
@@ -144,6 +153,8 @@ sbatch scripts/slurm/v1_multimodal_smoke.sbatch
 squeue -j <job_id>
 sacct -j <job_id> --format=JobID,State,ExitCode,Elapsed,NodeList
 ```
+
+确定性同容器 GPU smoke 使用 `make submit-mm-container-smoke`。Slurm 脚本通过 `KANG_AUDIO_FROM_VIDEO=1` 选择容器音轨，并拒绝同时传入非空 `KANG_AUDIO_INPUT`。
 
 脚本会清除指向 `127.0.0.1` 的代理变量，避免计算节点尝试连接登录节点本地代理。权重和运行目录不进入 Git；报告必须保存权重摘要和 Slurm job_id。
 

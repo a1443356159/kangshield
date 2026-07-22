@@ -1,8 +1,9 @@
-.PHONY: test info-fixtures prepare-mm-models prepare-mm-smoke prepare-m2c-timing-fixture prepare-m2c-capture-fixture assess-m2c-capture-fixture prepare-g4-event-evaluation-fixture assess-g4-event-evaluation-fixture prepare-g4-candidate-export-fixture assess-g4-candidate-export-fixture submit-g4-feature-capture-smoke submit-mm-smoke prepare-m2b-data submit-m2b-benchmark prepare-m3-pose-models submit-m3-pose-comparison prepare-m3-speech-models submit-m3-speech-comparison prepare-g4-caucafall submit-g4-adl-benchmark benchmark-g4-fall-candidates prepare-g4-static-home submit-g4-static-home-benchmark
+.PHONY: test info-fixtures prepare-mm-models prepare-mm-smoke prepare-m2c-timing-fixture prepare-m2c-capture-fixture assess-m2c-capture-fixture prepare-g4-event-evaluation-fixture assess-g4-event-evaluation-fixture prepare-g4-candidate-export-fixture assess-g4-candidate-export-fixture submit-g4-feature-capture-smoke submit-mm-smoke submit-mm-container-smoke prepare-m2b-data submit-m2b-benchmark prepare-m3-pose-models submit-m3-pose-comparison prepare-m3-speech-models submit-m3-speech-comparison prepare-g4-caucafall submit-g4-adl-benchmark benchmark-g4-fall-candidates prepare-g4-static-home submit-g4-static-home-benchmark
 
 PYTHON ?= python3
 KANG_VIDEO_INPUT ?= $(CURDIR)/data/raw/public-smoke/ultralytics-bus-replay.avi
 KANG_AUDIO_INPUT ?= $(CURDIR)/data/raw/public-smoke/funasr-asr-example-zh.wav
+KANG_AV_INPUT ?= $(CURDIR)/data/raw/public-smoke/v1-m2c-timing.synthetic.avi
 KANG_M2B_CASES ?= $(CURDIR)/data/processed/v1-m2b/benchmark-cases.json
 KANG_G4_ADL_CASES ?= $(CURDIR)/data/processed/v1-g4-caucafall/fall-adl-cases.json
 KANG_G4_STATIC_HOME_CASES ?= $(CURDIR)/data/processed/v1-g4-openimages-static-home/static-home-cases.json
@@ -67,6 +68,10 @@ submit-mm-smoke:
 	test -f "$(KANG_VIDEO_INPUT)"
 	test -f "$(KANG_AUDIO_INPUT)"
 	sbatch --export=ALL,KANG_VIDEO_INPUT="$(KANG_VIDEO_INPUT)",KANG_AUDIO_INPUT="$(KANG_AUDIO_INPUT)" scripts/slurm/v1_multimodal_smoke.sbatch
+
+submit-mm-container-smoke:
+	test -f "$(KANG_AV_INPUT)"
+	sbatch --export=ALL,KANG_VIDEO_INPUT="$(KANG_AV_INPUT)",KANG_AUDIO_INPUT=,KANG_AUDIO_FROM_VIDEO=1 scripts/slurm/v1_multimodal_smoke.sbatch
 
 prepare-m2b-data:
 	$(PYTHON) scripts/prepare_v1_m2b_data.py --accept-urfd-noncommercial-license

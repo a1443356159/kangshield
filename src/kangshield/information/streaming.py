@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import wave
 from dataclasses import dataclass
+from math import isfinite
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -18,6 +19,7 @@ class AudioBuffer:
     samples: Any
     sample_rate_hz: int
     duration_ms: int
+    start_ms: int = 0
 
 
 class OpenCVVideoReplay:
@@ -132,4 +134,145 @@ def read_pcm_wav(path: Path, target_sample_rate_hz: int = 16000) -> AudioBuffer:
         samples=samples,
         sample_rate_hz=target_sample_rate_hz,
         duration_ms=max(0, duration_ms),
+    )
+
+
+def read_container_audio(
+    path: Path,
+    *,
+    audio_minus_video_start_ms: float,
+    target_sample_rate_hz: int = 16000,
+    max_duration_s: float | None = None,
+) -> AudioBuffer:
+    """Decode one container audio track onto the probed video PTS timeline.
+
+    The caller must supply the offset from the container timing probe. This keeps
+    media decoding separate from the fail-closed decision about which tracks and
+    timestamps are authoritative.
+    """
+
+    if target_sample_rate_hz <= 0:
+        raise ValueError("target_sample_rate_hz must be positive")
+    if max_duration_s is not None and max_duration_s <= 0:
+        raise ValueError("max_duration_s must be positive")
+    if not isfinite(audio_minus_video_start_ms):
+        raise ValueError("audio_minus_video_start_ms must be finite")
+    try:
+        import av
+        import numpy as np
+    except ImportError as error:
+        raise RuntimeError(
+            "PyAV and NumPy are required for container audio loading"
+        ) from error
+
+    path = Path(path)
+    if not path.is_file():
+        raise FileNotFoundError(path)
+
+    offset_samples = round(
+        audio_minus_video_start_ms * target_sample_rate_hz / 1000.0
+    )
+    maximum_timeline_samples = (
+        round(max_duration_s * target_sample_rate_hz)
+        if max_duration_s is not None
+        else None
+    )
+    source_trim_samples = max(0, -offset_samples)
+    source_samples_needed = None
+    if maximum_timeline_samples is not None:
+        available_timeline_samples = max(
+            0,
+            maximum_timeline_samples - max(0, offset_samples),
+        )
+        source_samples_needed = source_trim_samples + available_timeline_samples
+
+    chunks: list[Any] = []
+    first_output_position: int | None = None
+    cursor = 0
+    decoded_frame_count = 0
+
+    def append_resampled(frame: Any) -> None:
+        nonlocal cursor, first_output_position
+        if frame.pts is None or frame.time_base is None:
+            raise ValueError("decoded container audio is missing PTS")
+        absolute_position = round(
+            float(frame.pts * frame.time_base) * target_sample_rate_hz
+        )
+        if first_output_position is None:
+            first_output_position = absolute_position
+        relative_position = absolute_position - first_output_position
+        if relative_position < 0:
+            raise ValueError("decoded container audio PTS moved before its start")
+
+        values = np.asarray(frame.to_ndarray(), dtype=np.float32)
+        if values.ndim != 2 or values.shape[0] != 1:
+            raise ValueError("resampled container audio is not mono")
+        values = values.reshape(-1)
+
+        if relative_position > cursor:
+            gap_end = relative_position
+            if source_samples_needed is not None:
+                gap_end = min(gap_end, source_samples_needed)
+            if gap_end > cursor:
+                chunks.append(np.zeros(gap_end - cursor, dtype=np.float32))
+                cursor = gap_end
+        elif relative_position < cursor:
+            overlap = cursor - relative_position
+            if overlap >= values.size:
+                return
+            values = values[overlap:]
+
+        if source_samples_needed is not None:
+            remaining = source_samples_needed - cursor
+            if remaining <= 0:
+                return
+            values = values[:remaining]
+        if values.size:
+            chunks.append(np.ascontiguousarray(values, dtype=np.float32))
+            cursor += int(values.size)
+
+    with av.open(str(path), mode="r") as container:
+        audio_streams = list(container.streams.audio)
+        if len(audio_streams) != 1:
+            raise ValueError(
+                "same-container replay requires exactly one audio stream; "
+                f"found {len(audio_streams)}"
+            )
+        if source_samples_needed is not None and source_samples_needed <= 0:
+            raise ValueError("container audio does not overlap the replay window")
+
+        resampler = av.AudioResampler(
+            format="fltp",
+            layout="mono",
+            rate=target_sample_rate_hz,
+        )
+        for decoded in container.decode(audio_streams[0]):
+            decoded_frame_count += 1
+            for output in resampler.resample(decoded):
+                append_resampled(output)
+            if (
+                source_samples_needed is not None
+                and cursor >= source_samples_needed
+            ):
+                break
+        for output in resampler.resample(None):
+            append_resampled(output)
+
+    if decoded_frame_count == 0 or not chunks:
+        raise ValueError("container audio stream produced no decoded samples")
+    samples = np.ascontiguousarray(np.concatenate(chunks), dtype=np.float32)
+    if source_trim_samples:
+        samples = samples[source_trim_samples:]
+    timeline_start_samples = max(0, offset_samples)
+    if maximum_timeline_samples is not None:
+        available = max(0, maximum_timeline_samples - timeline_start_samples)
+        samples = samples[:available]
+    if not samples.size:
+        raise ValueError("container audio does not overlap the replay window")
+
+    return AudioBuffer(
+        samples=np.ascontiguousarray(samples, dtype=np.float32),
+        sample_rate_hz=target_sample_rate_hz,
+        duration_ms=round(samples.size * 1000 / target_sample_rate_hz),
+        start_ms=round(timeline_start_samples * 1000 / target_sample_rate_hz),
     )

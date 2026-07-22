@@ -313,7 +313,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Replay video and speech into aligned multimodal feature windows",
     )
     multimodal.add_argument("video", type=Path)
-    multimodal.add_argument("audio", type=Path)
+    multimodal.add_argument("audio", type=Path, nargs="?")
+    multimodal.add_argument(
+        "--audio-from-video",
+        action="store_true",
+        help="Decode the single audio track from the video container and align by PTS",
+    )
     multimodal.add_argument("--runs-dir", type=Path, default=Path("runs"))
     multimodal.add_argument(
         "--evidence-level",
@@ -1164,9 +1169,27 @@ def _inspect_ezviz_command(args: argparse.Namespace) -> int:
 
 
 def _run_multimodal_command(args: argparse.Namespace) -> int:
+    if args.audio_from_video and args.audio is not None:
+        raise ValueError(
+            "do not provide a separate audio path with --audio-from-video"
+        )
+    if args.audio_from_video:
+        audio_path = args.video
+    elif args.audio is not None:
+        audio_path = args.audio
+    else:
+        raise ValueError(
+            "provide a PCM WAV audio path or select --audio-from-video"
+        )
+    same_container_av = args.video.resolve() == audio_path.resolve()
     configuration = {
         "command": "run-multimodal",
         "source_type": args.source_type.value,
+        "input_layout": (
+            "same_container_pts"
+            if same_container_av
+            else "separate_files_synthetic_common_zero"
+        ),
         "pose_model": args.pose_model,
         "pose_device": args.pose_device,
         "pose_image_size": args.pose_image_size,
@@ -1208,7 +1231,7 @@ def _run_multimodal_command(args: argparse.Namespace) -> int:
         model_load_wall_ms = (perf_counter() - model_load_started) * 1000.0
         report = run_multimodal_pipeline(
             video_path=args.video,
-            audio_path=args.audio,
+            audio_path=audio_path,
             pose_backend=pose_backend,
             speech_backend=speech_backend,
             run=run,
@@ -1226,6 +1249,8 @@ def _run_multimodal_command(args: argparse.Namespace) -> int:
     _print_result(
         run,
         {
+            "input_layout": report.input_layout,
+            "audio_start_offset_ms": report.audio_start_offset_ms,
             "duration_ms": report.duration_ms,
             "sampled_video_frames": report.sampled_video_frames,
             "pose_detection_count": report.pose_detection_count,

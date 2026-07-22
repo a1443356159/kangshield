@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from kangshield.information.cli import main
 from kangshield.information.cli import build_parser
 
@@ -78,6 +80,34 @@ def test_media_probe_parser_freezes_packet_scan_and_audio_gate_defaults():
     assert args.command == "probe-media"
     assert args.require_audio_track is False
     assert args.max_packets_per_stream == 200_000
+
+
+def test_multimodal_parser_supports_legacy_wav_and_same_container_audio():
+    legacy = build_parser().parse_args(
+        ["run-multimodal", "capture.avi", "speech.wav"]
+    )
+    assert legacy.audio == Path("speech.wav")
+    assert legacy.audio_from_video is False
+
+    same_container = build_parser().parse_args(
+        ["run-multimodal", "capture.mkv", "--audio-from-video"]
+    )
+    assert same_container.audio is None
+    assert same_container.audio_from_video is True
+
+
+def test_multimodal_cli_rejects_missing_or_conflicting_audio_selection():
+    with pytest.raises(ValueError, match="provide a PCM WAV"):
+        main(["run-multimodal", "capture.mkv"])
+    with pytest.raises(ValueError, match="do not provide a separate audio"):
+        main(
+            [
+                "run-multimodal",
+                "capture.mkv",
+                "speech.wav",
+                "--audio-from-video",
+            ]
+        )
 
 
 def test_m2c_capture_parser_defaults_to_fixture_and_fail_closed_policy():

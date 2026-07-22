@@ -1,19 +1,21 @@
 # V1 视频与语言多模态采集 Pipeline
 
-状态：Implemented Baseline v0.3；V1-R1 决策已同步
+状态：Implemented Baseline v0.4；同容器 PTS 路径已实现；V1-R1 决策已同步
 
-更新时间：2026-07-22
+更新时间：2026-07-23
 
 适用范围：V1 设备无关链路探索；不代表萤石实时流或最终比赛模型已经验收
 
 ## 1. 本阶段结论
 
-V1 先采用可回放的两路输入打通主链路：
+V1 支持两种可回放输入布局，二者进入同一条特征链：
 
 ```text
-视频文件 ──> 时间戳抽帧 ──> 人体姿态 + 跟踪 ─┐
-                                                ├─> 固定时间窗 ─> 多模态窗口与报告
-PCM WAV ──> 单声道 16 kHz ─> VAD + ASR + 标点 ─┘
+视频轨 ──> OpenCV 相对时间抽帧 ──> 人体姿态 + 跟踪 ─────────┐
+                                                            ├─> 固定时间窗 ─> 多模态窗口与报告
+同容器单音轨 ─> PyAV 解码/PTS offset ─┐                   │
+                                      ├─> 单声道 16 kHz ─> VAD + ASR + 标点 ─┘
+独立 PCM WAV ─> synthetic common zero ┘
 ```
 
 这一阶段解决的是工程接口和数据形态，不依赖 CS-C6c-V101-1J4WF 的具体取流方式。后续接入萤石时，只替换输入适配器，保留 FeatureEvent、ModelBinding、MultimodalWindow 和运行报告。
@@ -21,9 +23,12 @@ PCM WAV ──> 单声道 16 kHz ─> VAD + ASR + 标点 ─┘
 当前输入约束：
 
 - 视频由 OpenCV 解码，按媒体相对时间抽帧。
-- 语言流首版接收独立的无压缩 PCM WAV，自动下混并重采样为单声道 16 kHz。
-- 视频和音频被假设拥有共同的零时刻；当前没有估计两路时钟偏差。
+- `--audio-from-video` 要求同一容器恰有一条视频轨和一条音轨；复用 `ContainerTimingReport` 的逐包 PTS 门，按 `audio_minus_video_start_ms` 把语言事件平移到视频时间轴。
+- 同容器音频由 PyAV 解码、下混并重采样为单声道 16 kHz；音频晚开始时保留前置空窗，早开始时裁掉视频零点之前的样本，包内 PTS 间隙以静音保留。
+- 缺音轨、多音轨、多视频轨、起点不可测、包缺 PTS、音频 PTS 逆序或扫描截断均在模型处理前失败，不回退为猜测零点。
+- 兼容旧的独立无压缩 PCM WAV 输入；这种布局仍明确标记为 `separate_files_synthetic_common_zero`，只能验证工程窗口，不能证明自然同步。
 - 当前是离线回放，不把结果写成直播时延。
+- 单个起点偏移不能估计时钟漂移；真实 G2 仍需两次跨模态同步事件。
 
 ## 2. V1 基线模型
 
@@ -57,7 +62,7 @@ V1-R1 进一步明确：YOLO26n 只保留为 V1 对照；FunASR 和 HumanArt + R
 
 ```text
 src/kangshield/information/
-├── streaming.py             # 视频回放迭代器、PCM WAV 读取/重采样
+├── streaming.py             # 视频回放、PCM WAV、容器音轨 PTS 解码/重采样
 ├── pose_backend.py          # 姿态后端协议、YOLO26n-pose + ByteTrack 适配器
 ├── speech_backend.py        # 语音后端协议、FunASR、结果归一化、词面标签
 ├── multimodal_pipeline.py   # 探测、特征提取、时间窗融合和性能报告
@@ -96,7 +101,7 @@ src/kangshield/information/
 - `language.transcript_segment`：文本、语言和来源语音段引用。
 - `language.lexical_tags`：从文本派生的词面类别，不是风险结论。
 
-完整转写标记为 `derived_sensitive`，只进入受控的 `features.jsonl`，汇总报告不复制文本。
+完整转写标记为 `derived_sensitive`，只进入受控的 `features.jsonl`，汇总报告不复制文本。同容器模式下 SpeechBackend 仍只看到从音轨零点开始的 PCM；Pipeline 使用 `AudioBuffer.start_ms` 对 VAD/ASR 段统一平移，模型后端不自行解释容器时间。
 
 ### 5.3 MultimodalWindow
 
@@ -120,10 +125,13 @@ runs/<run_id>/
 ├── features.jsonl
 ├── multimodal_windows.jsonl
 └── reports/
-    ├── multimodal-video-probe.json
-    ├── multimodal-audio-probe.json
+    ├── multimodal-video-probe.json       # 独立文件模式
+    ├── multimodal-audio-probe.json       # 独立文件模式
+    ├── multimodal-container-probe.json   # 同容器模式
     └── multimodal-pipeline-report.json
 ```
+
+同容器输入只登记一个 SourceAsset、一个 Observation 和一个 probe report；`video_asset_id == audio_asset_id`。Pipeline report 显式记录 `input_layout`、`same_container_av` 和有符号的 `audio_start_offset_ms`，契约校验布局、asset 引用和 offset 语义必须一致。
 
 性能报告区分：
 
@@ -162,6 +170,17 @@ runs/<run_id>/
   --max-duration-s 5
 ```
 
+同容器音轨：
+
+```bash
+.venv/bin/kangshield-info run-multimodal \
+  data/raw/public-smoke/v1-m2c-timing.synthetic.avi \
+  --audio-from-video \
+  --pose-model models/yolo26n-pose.pt \
+  --offline-models \
+  --max-duration-s 3
+```
+
 提交 Slurm：
 
 ```bash
@@ -170,6 +189,8 @@ export KANG_AUDIO_INPUT="$PWD/data/raw/public-smoke/funasr-asr-example-zh.wav"
 export KANG_MAX_DURATION_S=5
 sbatch scripts/slurm/v1_multimodal_smoke.sbatch
 ```
+
+同容器 Slurm smoke 可直接执行 `make submit-mm-container-smoke`，或设置 `KANG_VIDEO_INPUT` 与 `KANG_AUDIO_FROM_VIDEO=1`；此时必须清空 `KANG_AUDIO_INPUT`，脚本会拒绝含糊的双重选择。
 
 两个准备脚本应在可联网登录节点执行。模型脚本把 YOLO 权重写入被 Git 忽略的 `models/`，把三个 FunASR snapshot 写入 ModelScope 缓存，并校验 V1 冻结的权重 SHA-256。上游 `master` 发生变化时脚本会失败，必须经过模型 Review 后才能更新基线摘要。
 
@@ -183,11 +204,12 @@ Slurm 脚本请求 1 张 L40、8 CPU、20 分钟，并强制从本地缓存加�
 - [x] 报告不复制完整转写；完整文本只进入敏感 FeatureEvent。
 - [x] 自动化测试覆盖回放采样、WAV 重采样、FunASR 归一化、模型缓存和跨模态窗口。
 - [x] Slurm L40 公开样本 smoke 完成。
+- [x] 确定性同容器样例完成单音轨解码、16 kHz 重采样、正负 offset、事件平移、单来源登记和 fail-closed PTS 测试。
 - [ ] 真实 C6c 同容器音视频或可靠同步样本完成。
 - [ ] 固定居家场景集上的姿态漏检、跟踪稳定性、ASR 字错率和噪声测试完成。
 - [ ] V2 姿态许可证/替代模型决策完成。
 
-前六项关闭的是“设备无关链路”，后三项属于 V1 真实数据和模型对比，不得由公开 smoke 替代。
+前七项关闭的是“设备无关链路与同容器实现”，后三项属于 V1 真实数据和模型对比，不得由 synthetic/public smoke 替代。
 
 固定提交上的 Slurm 结果见 [V1-M2a 初测报告](reports/v1-m2a-multimodal-smoke.md)。
 

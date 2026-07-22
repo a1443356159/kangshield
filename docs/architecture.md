@@ -1,8 +1,8 @@
 # 康盾工程架构与模块设计
 
-状态：Draft v0.8
+状态：Draft v0.9
 
-更新时间：2026-07-22
+更新时间：2026-07-23
 
 适用范围：V1 探索版与 V2 比赛版的共同架构边界
 
@@ -80,6 +80,8 @@ V1-M3 在 M3/M7 之间增加“同一 PoseBackend 契约 → 视频-only variant
 睡眠切片不选择模型，而在 M1/M3 之间设置 fail-closed schema gate：“无值字段 profile → 监测需求 policy + 人工 mapping → route assessment”。E1/fixture 只能生成 candidate；只有 E2/E3、单位/时间/值域/缺失语义完整的单字段可以授权后续 adapter。多夜节律派生在连续覆盖审计前保持禁用，避免把商品能力或字段名误写成标准医学指标。
 
 V1-M2c 在 M1/M2 之间增加独立容器时间戳探针：“本地原始容器 → PyAV stream/packet 扫描 → ContainerTimingReport”。它确认同容器轨道、time base、PTS/DTS 完整性和首尾容器偏移，但固定 `drift_estimate_available=false`；只有真实录制中的两个跨模态同步事件才能形成 offset/drift 验收。E1 工具通过不会提升 C6c 的设备证据等级。
+
+M2a/M2c 之间再复用该报告形成同容器语言入口：“单音视频容器 → strict timing gate → PyAV 单声道 16 kHz → SpeechBackend → 按 audio-minus-video offset 平移 FeatureEvent”。解码器不自行选择轨道或推断零点；多轨、缺 PTS、扫描截断和音频 PTS 逆序均失败。相同容器只形成一个 SourceAsset/Observation，Pipeline report 显式区分 `same_container_pts` 与历史 `separate_files_synthetic_common_zero`。这关闭的是 adapter seam，不是 C6c 取流或 drift 证据。
 
 V1-M2c 另在 M1/M7 之间增加“受控采集包 → strict manifest/场景 policy → 文件摘要与媒体探针 → held-out/覆盖聚合”的就绪门。子 clip 只发布 `structurally_usable`；只有非 fixture E2、同意/能力快照、8 个核心 clip、双同步事件和三模型策略摘要同时通过，父级才发布 `camera_ready_for_model_retest`。完整 C01～C10 与真实 SDNL1 导出再打开 `capture_bundle_ready_for_review`；它只验收采集输入，不替代下游模型/语言/字段报告或整个 M2c 里程碑。这样 E1 fixture 即使结构 10/10 也不能冒充真机数据。
 
@@ -182,7 +184,7 @@ V1 暂不冻结 RiskAssessment、AlertEvent 和 FeedbackEvent；这些对象在 
 
 | V1 简化 | 目的 | V2 偿还 |
 |---|---|---|
-| 本地 MP4/WAV 优先 | 不等待平台权限即可测试模型 | 替换为萤石实时/回放适配器 |
+| 本地音视频容器或独立 MP4/WAV 优先 | 不等待平台权限即可测试模型和 PTS adapter | 替换为萤石实时/回放适配器；保留同一 timing gate |
 | 单进程顺序执行 | 快速调试和观察中间结果 | 采集与推理 Worker 解耦 |
 | JSONL 文件存储 | 易检查、易比较 | PostgreSQL + 对象存储 |
 | 规则和统计特征优先 | 先判断数据是否可用 | 再选择时序模型和融合策略 |

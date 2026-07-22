@@ -1,8 +1,8 @@
 # 康盾里程碑与验收门
 
-状态：Active v0.9
+状态：Active v1.0
 
-基准日期：2026-07-22
+基准日期：2026-07-23
 
 比赛提交目标：2026-09-05
 
@@ -111,6 +111,7 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 - [x] 权重 SHA-256、许可证、环境、峰值显存与性能口径。
 - [x] Slurm 离线模型缓存与代理隔离。
 - [x] 18 项自动化测试和干净提交 L40 smoke。
+- [x] 同容器单音轨解码、16 kHz 重采样、PTS offset 事件平移、单来源 provenance 与 fail-closed timing gate。
 
 证据见 [V1-M2a 多模态 Pipeline 初测报告](reports/v1-m2a-multimodal-smoke.md)。V1-M2b 先把公开真实人物录制扩展成固定评测集；C6c 音视频时间基和受控居家样本仍由 V1-M2c 验收，不允许用公开数据代替。
 
@@ -132,6 +133,7 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 - [x] 冻结 C6c 白天/夜视、距离、遮挡、日常动作、横卧与空场采集规程和 manifest 模板。
 - [x] 实现 PyAV 容器轨道、逐包 PTS/DTS、required audio 和扫描截断的 fail-closed 探针。
 - [x] 在干净提交 `4a65630` 上完成确定性同容器音视频 E1 正式运行与隐私审计。
+- [x] 将容器 timing report 接入多模态语言 adapter；synthetic 正负 offset 和 PTS 故障门已自动化验证。
 - [x] 冻结 manifest 1.1、C01～C12 场景/动作标签、三姿态 held-out 策略和两级 readiness policy。
 - [x] 实现包内路径/摘要、媒体探针、双同步事件、fixture marker、重复媒体和隐私安全报告 gate。
 - [x] 在干净提交 `6f1c02a` 上完成 10 场景 E1 正式运行：结构 10/10，最终决定 `tooling_only`，四个真机门均为 false。

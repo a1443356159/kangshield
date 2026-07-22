@@ -5,6 +5,7 @@ import platform
 import socket
 from collections import Counter
 from dataclasses import dataclass
+from math import isfinite
 from pathlib import Path
 from statistics import mean
 from time import perf_counter
@@ -14,6 +15,7 @@ from .artifacts import RunArtifacts
 from .contracts import (
     EvidenceLevel,
     FeatureEvent,
+    MediaProbeReport,
     MultimodalPipelineReport,
     MultimodalWindow,
     PrivacyLevel,
@@ -24,10 +26,15 @@ from .contracts import (
 from .media_probe import probe_media
 from .pose_backend import PoseBackend, PoseDetection
 from .speech_backend import SpeechBackend, tag_transcript
-from .streaming import AudioBuffer, OpenCVVideoReplay, read_pcm_wav
+from .streaming import (
+    AudioBuffer,
+    OpenCVVideoReplay,
+    read_container_audio,
+    read_pcm_wav,
+)
 
 
-PIPELINE_VERSION = "multimodal-replay-v0.2.0"
+PIPELINE_VERSION = "multimodal-replay-v0.3.0"
 
 
 @dataclass(frozen=True)
@@ -60,6 +67,8 @@ def run_multimodal_pipeline(
     model_load_wall_ms: float | None = None,
 ) -> MultimodalPipelineReport:
     processing_started = perf_counter()
+    same_container_av = _same_resolved_path(video_path, audio_path)
+    audio_start_offset_ms = 0.0
     with run.step("probe-multimodal-inputs") as step:
         video_probe = probe_media(
             video_path,
@@ -67,23 +76,39 @@ def run_multimodal_pipeline(
             device_ref=device_ref,
             elder_ref=elder_ref,
             source_type=source_type,
-        )
-        audio_probe = probe_media(
-            audio_path,
-            evidence_level=evidence_level,
-            device_ref=device_ref,
-            elder_ref=elder_ref,
-            source_type=source_type,
+            require_audio_track=same_container_av,
         )
         run.record_asset(video_probe.asset)
-        run.record_asset(audio_probe.asset)
         run.record_observation(video_probe.observation)
-        run.record_observation(audio_probe.observation)
-        video_probe_path = run.write_report("multimodal-video-probe.json", video_probe)
-        audio_probe_path = run.write_report("multimodal-audio-probe.json", audio_probe)
-        step.outputs.extend(
-            [run.relative(video_probe_path), run.relative(audio_probe_path)]
-        )
+        if same_container_av:
+            audio_start_offset_ms = _same_container_audio_offset(video_probe)
+            audio_probe = video_probe
+            probe_path = run.write_report(
+                "multimodal-container-probe.json",
+                video_probe,
+            )
+            step.outputs.append(run.relative(probe_path))
+        else:
+            audio_probe = probe_media(
+                audio_path,
+                evidence_level=evidence_level,
+                device_ref=device_ref,
+                elder_ref=elder_ref,
+                source_type=source_type,
+            )
+            run.record_asset(audio_probe.asset)
+            run.record_observation(audio_probe.observation)
+            video_probe_path = run.write_report(
+                "multimodal-video-probe.json",
+                video_probe,
+            )
+            audio_probe_path = run.write_report(
+                "multimodal-audio-probe.json",
+                audio_probe,
+            )
+            step.outputs.extend(
+                [run.relative(video_probe_path), run.relative(audio_probe_path)]
+            )
 
     pose_events: list[FeatureEvent] = []
     pose_latencies_ms: list[float] = []
@@ -120,8 +145,16 @@ def run_multimodal_pipeline(
     video_wall_ms = (perf_counter() - video_started) * 1000.0
 
     with run.step("load-audio-stream"):
-        audio = read_pcm_wav(audio_path, target_sample_rate_hz=16000)
-        audio = _limit_audio(audio, config.max_duration_s)
+        if same_container_av:
+            audio = read_container_audio(
+                audio_path,
+                audio_minus_video_start_ms=audio_start_offset_ms,
+                target_sample_rate_hz=16000,
+                max_duration_s=config.max_duration_s,
+            )
+        else:
+            audio = read_pcm_wav(audio_path, target_sample_rate_hz=16000)
+            audio = _limit_audio(audio, config.max_duration_s)
 
     speech_started = perf_counter()
     with run.step("extract-speech-language") as step:
@@ -131,6 +164,7 @@ def run_multimodal_pipeline(
             observation_id=audio_probe.observation.observation_id,
             segments=segments,
             bindings=speech_backend.bindings,
+            timeline_offset_ms=audio.start_ms,
         )
         for event in [*speech_events, *transcript_events, *semantic_events]:
             run.record_feature(event)
@@ -143,7 +177,7 @@ def run_multimodal_pipeline(
         config.video_sample_fps,
         config.max_duration_s,
     )
-    duration_ms = max(video_duration_ms, audio.duration_ms)
+    duration_ms = max(video_duration_ms, audio.start_ms + audio.duration_ms)
     all_events = [
         *pose_events,
         *speech_events,
@@ -209,9 +243,25 @@ def run_multimodal_pipeline(
         runtime_environment=_runtime_environment(),
         timing_ms=timing_ms,
         realtime_factors=realtime_factors,
+        input_layout=(
+            "same_container_pts"
+            if same_container_av
+            else "separate_files_synthetic_common_zero"
+        ),
+        same_container_av=same_container_av,
+        audio_start_offset_ms=audio_start_offset_ms,
         limitations=[
             "offline_replay_is_not_live_transport_latency",
-            "separate_video_and_audio_inputs_assume_a_common_zero_time",
+            *(
+                [
+                    "container_pts_does_not_prove_capture_clock_accuracy",
+                    "single_start_offset_does_not_measure_clock_drift",
+                ]
+                if same_container_av
+                else [
+                    "separate_video_and_audio_inputs_assume_a_common_zero_time"
+                ]
+            ),
             "pose_coordinates_are_uncalibrated_image_coordinates",
             "transcript_features_are_sensitive_and_runs_must_remain_controlled",
             "semantic_tags_are_lexical_observations_not_risk_diagnoses",
@@ -281,7 +331,10 @@ def _speech_features(
     observation_id: str,
     segments: list[Any],
     bindings: list[Any],
+    timeline_offset_ms: int = 0,
 ) -> tuple[list[FeatureEvent], list[FeatureEvent], list[FeatureEvent]]:
+    if timeline_offset_ms < 0:
+        raise ValueError("timeline_offset_ms must be non-negative")
     speech_events: list[FeatureEvent] = []
     transcript_events: list[FeatureEvent] = []
     semantic_events: list[FeatureEvent] = []
@@ -290,7 +343,10 @@ def _speech_features(
     vad_version = _backend_version(vad_binding)
     asr_version = _backend_version(asr_binding)
     for sequence, segment in enumerate(segments):
-        time_range = TimeRange(start_ms=segment.start_ms, end_ms=segment.end_ms)
+        time_range = TimeRange(
+            start_ms=timeline_offset_ms + segment.start_ms,
+            end_ms=timeline_offset_ms + segment.end_ms,
+        )
         speech_id = f"feature_{run_id}_speech_{sequence:04d}"
         transcript_id = f"feature_{run_id}_transcript_{sequence:04d}"
         speech_event = FeatureEvent(
@@ -418,15 +474,67 @@ def _overlaps(time_range: TimeRange, start_ms: int, end_ms: int) -> bool:
 
 
 def _limit_audio(audio: AudioBuffer, max_duration_s: float | None) -> AudioBuffer:
-    if max_duration_s is None or audio.duration_ms <= max_duration_s * 1000.0:
+    if max_duration_s is None:
         return audio
-    sample_count = round(max_duration_s * audio.sample_rate_hz)
+    maximum_timeline_ms = round(max_duration_s * 1000.0)
+    if audio.start_ms >= maximum_timeline_ms:
+        raise ValueError("audio does not overlap the replay window")
+    if audio.start_ms + audio.duration_ms <= maximum_timeline_ms:
+        return audio
+    available_ms = maximum_timeline_ms - audio.start_ms
+    sample_count = round(available_ms * audio.sample_rate_hz / 1000.0)
     samples = audio.samples[:sample_count]
     return AudioBuffer(
         samples=samples,
         sample_rate_hz=audio.sample_rate_hz,
         duration_ms=round(len(samples) * 1000 / audio.sample_rate_hz),
+        start_ms=audio.start_ms,
     )
+
+
+def _same_resolved_path(first: Path, second: Path) -> bool:
+    return Path(first).resolve() == Path(second).resolve()
+
+
+def _same_container_audio_offset(probe: MediaProbeReport) -> float:
+    timing = probe.container_timing
+    failures: list[str] = []
+    if probe.observation.quality_status is QualityStatus.FAIL:
+        failures.append("media_probe_failed")
+    if timing is None:
+        failures.append("container_timing_unavailable")
+    else:
+        if timing.video_stream_count != 1:
+            failures.append("video_stream_count_must_equal_one")
+        if timing.audio_stream_count != 1:
+            failures.append("audio_stream_count_must_equal_one")
+        if not timing.same_container_av:
+            failures.append("audio_video_tracks_not_verified")
+        if not timing.can_measure_start_offset:
+            failures.append("audio_video_start_offset_unavailable")
+        if (
+            timing.audio_minus_video_start_ms is None
+            or not isfinite(timing.audio_minus_video_start_ms)
+        ):
+            failures.append("audio_video_start_offset_invalid")
+        for stream in timing.streams:
+            if stream.stream_type not in {"video", "audio"}:
+                continue
+            if stream.packet_count <= 0:
+                failures.append(f"{stream.stream_type}_packets_missing")
+            if stream.missing_pts_count:
+                failures.append(f"{stream.stream_type}_packet_pts_missing")
+            if stream.scan_truncated:
+                failures.append(f"{stream.stream_type}_packet_scan_truncated")
+            if stream.stream_type == "audio" and stream.pts_backward_step_count:
+                failures.append("audio_packet_pts_not_monotonic")
+    if failures:
+        raise ValueError(
+            "same-container PTS gate failed: " + ", ".join(sorted(set(failures)))
+        )
+    assert timing is not None
+    assert timing.audio_minus_video_start_ms is not None
+    return float(timing.audio_minus_video_start_ms)
 
 
 def _video_duration_ms(

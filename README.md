@@ -119,9 +119,15 @@ python -m pip install -e ".[dev,multimodal]"
 kangshield-info run-multimodal <video> <pcm-wav> \
   --pose-model models/yolo26n-pose.pt \
   --offline-models
+
+# 或从单音视频容器读取麦克风轨，并按容器 PTS 对齐
+kangshield-info run-multimodal <av-container> \
+  --audio-from-video \
+  --pose-model models/yolo26n-pose.pt \
+  --offline-models
 ```
 
-该命令输出姿态/跟踪、VAD、中文转写、词面标签和固定时间窗。Slurm 环境与模型准备见 [Pipeline 文档](docs/v1-multimodal-pipeline.md)和[开发流程](docs/development-workflow.md)。
+该命令输出姿态/跟踪、VAD、中文转写、词面标签和固定时间窗。同容器模式要求唯一音视频轨和完整 PTS，不会回退为猜测同步；它仍不代表 C6c 已接入。Slurm 环境与模型准备见 [Pipeline 文档](docs/v1-multimodal-pipeline.md)和[开发流程](docs/development-workflow.md)。
 
 准备并运行 V1-M2b 六 case 固定集：
 

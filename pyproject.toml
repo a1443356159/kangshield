@@ -21,6 +21,7 @@ media = [
 multimodal = [
     "numpy>=1.26,<3",
     "opencv-python-headless>=4.10,<5",
+    "av==18.0.0",
     "torch>=2.3",
     "torchvision>=0.28,<0.29",
     "torchaudio>=2.11",

@@ -1,8 +1,8 @@
 # 信息侧模块详细技术路线
 
-状态：Implementation Baseline v0.7
+状态：Implementation Baseline v0.8
 
-更新时间：2026-07-22
+更新时间：2026-07-23
 
 适用里程碑：V1-M1～V1-R1
 
@@ -72,7 +72,7 @@ src/kangshield/information/
 ├── sleep_profile.py      # JSON/CSV 字段发现与映射候选
 ├── ezviz_snapshot.py     # SDK/API 脱敏快照分析与证据分级
 ├── extractor.py          # 通用模型插件 Protocol
-├── streaming.py          # OpenCV 时间戳回放、PCM WAV 读取/重采样
+├── streaming.py          # OpenCV 回放、PCM WAV、同容器音轨 PTS 解码/重采样
 ├── pose_backend.py       # YOLO26n-pose + ByteTrack 适配器
 ├── fall_features.py      # 跌倒运动代理、关键点质量门与离线评测
 ├── fall_feature_capture.py # capture clip 的 pose→G4 feature producer
@@ -279,9 +279,12 @@ kangshield-info inspect-ezviz <sanitized-json> --evidence-level E1|E2|E3
 
 ```text
 kangshield-info run-multimodal <video> <pcm-wav>
+kangshield-info run-multimodal <av-container> --audio-from-video
 ```
 
-首版把两路文件视为共享零时刻的流式回放：视频按可配置 FPS 抽取时间戳帧，音频转为单声道 16 kHz，经姿态跟踪和 VAD/中文 ASR 后汇入固定毫秒窗口。输出完整 ModelBinding、FeatureEvent、MultimodalWindow 以及 warm/cold 两套性能口径。
+独立视频/WAV 模式继续明确标记为 synthetic common zero，只验证窗口工程。`--audio-from-video` 则先复用容器 timing probe，要求恰好一条视频轨和一条音轨、起点 offset 可测、逐包 PTS 完整且扫描未截断，再由 PyAV 解码音轨、重采样为单声道 16 kHz，并把 VAD/ASR 段按有符号 offset 映射到视频时间轴。两个布局都经姿态跟踪和 VAD/中文 ASR 汇入固定毫秒窗口，输出完整 ModelBinding、FeatureEvent、MultimodalWindow 以及 warm/cold 两套性能口径。
+
+同容器只登记一个 SourceAsset/Observation，report 固定记录 `input_layout=same_container_pts` 与 `audio_start_offset_ms`；歧义轨道、缺 PTS、逆序音频 PTS或 scan truncation 都失败，不回退为共享零点。单个起点 offset 仍不能证明 capture clock 或 drift，真实 C6c 必须按 M2c 规程保留两次同步事件。
 
 实现、命令、模型决策和限制见 [V1 视频与语言多模态 Pipeline](v1-multimodal-pipeline.md)。
 

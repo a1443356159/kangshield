@@ -9,7 +9,25 @@
 set -euo pipefail
 
 : "${KANG_VIDEO_INPUT:?Set KANG_VIDEO_INPUT to a local video file}"
-: "${KANG_AUDIO_INPUT:?Set KANG_AUDIO_INPUT to a 16-bit PCM WAV file}"
+
+kang_audio_arguments=()
+case "${KANG_AUDIO_FROM_VIDEO:-0}" in
+  0)
+    : "${KANG_AUDIO_INPUT:?Set KANG_AUDIO_INPUT or KANG_AUDIO_FROM_VIDEO=1}"
+    kang_audio_arguments=("${KANG_AUDIO_INPUT}")
+    ;;
+  1)
+    if [[ -n "${KANG_AUDIO_INPUT:-}" ]]; then
+      echo "KANG_AUDIO_INPUT must be unset when KANG_AUDIO_FROM_VIDEO=1" >&2
+      exit 2
+    fi
+    kang_audio_arguments=(--audio-from-video)
+    ;;
+  *)
+    echo "KANG_AUDIO_FROM_VIDEO must be 0 or 1" >&2
+    exit 2
+    ;;
+esac
 
 kang_repo_dir=${SLURM_SUBMIT_DIR:-/home/yyy/kangshield}
 kang_python=${KANG_PYTHON:-${kang_repo_dir}/.venv/bin/python}
@@ -22,7 +40,7 @@ unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy
 
 "${kang_python}" -m kangshield.information.cli run-multimodal \
   "${KANG_VIDEO_INPUT}" \
-  "${KANG_AUDIO_INPUT}" \
+  "${kang_audio_arguments[@]}" \
   --runs-dir "${kang_runs_dir}" \
   --pose-model "${kang_pose_model}" \
   --pose-device 0 \

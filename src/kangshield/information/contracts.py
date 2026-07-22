@@ -208,7 +208,24 @@ class MultimodalPipelineReport(ContractModel):
     runtime_environment: dict[str, Any] = Field(default_factory=dict)
     timing_ms: dict[str, float] = Field(default_factory=dict)
     realtime_factors: dict[str, float] = Field(default_factory=dict)
+    input_layout: Literal[
+        "separate_files_synthetic_common_zero",
+        "same_container_pts",
+    ] = "separate_files_synthetic_common_zero"
+    same_container_av: bool = False
+    audio_start_offset_ms: float = Field(default=0.0, allow_inf_nan=False)
     limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_input_layout(self) -> "MultimodalPipelineReport":
+        same_container = self.input_layout == "same_container_pts"
+        if same_container != self.same_container_av:
+            raise ValueError("input_layout and same_container_av disagree")
+        if same_container and self.video_asset_id != self.audio_asset_id:
+            raise ValueError("same-container report must reference one source asset")
+        if not same_container and self.audio_start_offset_ms != 0.0:
+            raise ValueError("separate-file replay must use synthetic common zero")
+        return self
 
 
 class DatasetBenchmarkCase(ContractModel):
