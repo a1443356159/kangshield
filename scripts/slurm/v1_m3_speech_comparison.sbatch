@@ -8,16 +8,17 @@
 
 set -euo pipefail
 
+if [[ -z "${SLURM_SUBMIT_DIR:-}" ]]; then
+  echo "SLURM_SUBMIT_DIR is required; submit from the repository root" >&2
+  exit 2
+fi
+# shellcheck source=scripts/slurm/runtime.sh
+source "${SLURM_SUBMIT_DIR}/scripts/slurm/runtime.sh"
+kang_slurm_init
+
 : "${KANG_DATASET_CASES:?Set KANG_DATASET_CASES to benchmark-cases.json}"
 
-kang_repo_dir=${SLURM_SUBMIT_DIR:-/home/yyy/kangshield}
-kang_python=${KANG_PYTHON:-${kang_repo_dir}/.venv/bin/python}
-kang_runs_dir=${KANG_RUNS_DIR:-${kang_repo_dir}/runs}
 kang_whisper_model=${KANG_WHISPER_MODEL:-${kang_repo_dir}/models/whisper/small.pt}
-
-cd "${kang_repo_dir}"
-export PYTHONUNBUFFERED=1
-unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy
 
 "${kang_python}" scripts/prepare_v1_m3_speech_models.py --offline
 nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader

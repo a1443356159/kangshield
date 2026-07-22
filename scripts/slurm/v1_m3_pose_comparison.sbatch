@@ -8,21 +8,23 @@
 
 set -euo pipefail
 
+if [[ -z "${SLURM_SUBMIT_DIR:-}" ]]; then
+  echo "SLURM_SUBMIT_DIR is required; submit from the repository root" >&2
+  exit 2
+fi
+# shellcheck source=scripts/slurm/runtime.sh
+source "${SLURM_SUBMIT_DIR}/scripts/slurm/runtime.sh"
+kang_slurm_init
+kang_slurm_bind_cudnn9
+kang_slurm_verify_onnxruntime_cuda
+
 : "${KANG_DATASET_CASES:?Set KANG_DATASET_CASES to benchmark-cases.json}"
 
-kang_repo_dir=${SLURM_SUBMIT_DIR:-/home/yyy/kangshield}
-kang_python=${KANG_PYTHON:-${kang_repo_dir}/.venv/bin/python}
-kang_runs_dir=${KANG_RUNS_DIR:-${kang_repo_dir}/runs}
 kang_yolo_model=${KANG_YOLO_MODEL:-${kang_repo_dir}/models/yolo26n-pose.pt}
 kang_rtmpose_detector=${KANG_RTMPOSE_DETECTOR:-${kang_repo_dir}/models/rtmpose/yolox_m_humanart/yolox_m_humanart.onnx}
 kang_rtmpose_pose=${KANG_RTMPOSE_POSE:-${kang_repo_dir}/models/rtmpose/rtmpose_m_humanart/rtmpose_m_humanart.onnx}
 kang_torchvision_model=${KANG_TORCHVISION_MODEL:-${kang_repo_dir}/models/torchvision/keypointrcnn_resnet50_fpn_coco-fc266e95.pth}
 kang_torchvision_policy=${KANG_TORCHVISION_POLICY:-${kang_repo_dir}/configs/v1-m3-torchvision-pose-model.json}
-
-cd "${kang_repo_dir}"
-export PYTHONUNBUFFERED=1
-export PYTHONPATH="${kang_repo_dir}/src${PYTHONPATH:+:${PYTHONPATH}}"
-unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy
 
 "${kang_python}" scripts/prepare_v1_m3_pose_models.py --offline
 "${kang_python}" scripts/prepare_v1_m3_torchvision_pose_model.py --offline
