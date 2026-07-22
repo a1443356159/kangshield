@@ -749,7 +749,7 @@
 - 状态：Accepted for E1 static person-detection stress slice；V1-R1 milestone remains In progress
 - 参与人：项目组、Codex
 - 评审范围：公开来源/逐图许可、Person 负标签与多人框、人工对齐 Review、确定性准备、三模型 L40 结果、失败证据拒绝、隐私与能力边界
-- 输入材料：[静态压力集设计](v1-g4-openimages-static-home-stress.md)、[正式报告](reports/v1-g4-openimages-static-home-stress.md)、实现提交 `40359c1`、标注审计修正 `fad9491`、正式 run `20260722T151348Z-a34b37b3`
+- 输入材料：[静态压力集设计](v1-g4-openimages-static-home-stress.md)、[正式报告](reports/v1-g4-openimages-static-home-stress.md)、实现提交 `40359c1`、标注审计修正 `fad9491`、报告提交 `c77525e`、正式 run `20260722T151348Z-a34b37b3`
 
 ### 发现
 
