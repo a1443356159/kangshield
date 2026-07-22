@@ -1,6 +1,6 @@
 # 开发与证据晋级流程
 
-状态：Active v0.7
+状态：Active v0.9
 
 ## 1. 开发顺序
 
@@ -146,10 +146,16 @@ kangshield-info run-multimodal capture.mkv \
 模型先在可联网登录节点进入本地缓存；计算节点使用 `--offline-models`：
 
 ```bash
+make submit-runtime-preflight
+```
+
+首次使用新 checkout、Python/CUDA 环境或计算节点时，先运行该 5 分钟上限的轻量 preflight。它只验证 submit/execution commit 一致、shared clean checkout、owner-only stdout/runs、checkout-bound import、cuDNN 9、ONNX Runtime CUDA provider、Slurm/CUDA 可见设备和最小 CUDA tensor，不加载模型或数据。正式 L40 证据见 [V1 Slurm Runtime Preflight 报告](reports/v1-slurm-runtime-preflight.md)。
+
+```bash
 .venv/bin/python scripts/prepare_multimodal_models.py
 export KANG_VIDEO_INPUT="$PWD/sample.mp4"
 export KANG_AUDIO_INPUT="$PWD/sample.wav"
-sbatch scripts/slurm/v1_multimodal_smoke.sbatch
+scripts/slurm/submit.sh scripts/slurm/v1_multimodal_smoke.sbatch
 squeue -j <job_id>
 sacct -j <job_id> --format=JobID,State,ExitCode,Elapsed,NodeList
 ```
@@ -158,7 +164,9 @@ sacct -j <job_id> --format=JobID,State,ExitCode,Elapsed,NodeList
 
 首次运行前执行 `make PYTHON=.venv/bin/python prepare-mm-container-smoke`。该准备器消费已下载的公开 video/WAV，以 bitexact Matroska 固定 250 ms 音轨 PTS 偏移；提交 target 默认显式记录 `source_type=fixture` 和 6 秒上限，不会把工程构造的对齐升级成自然同步证据。
 
-脚本会清除指向 `127.0.0.1` 的代理变量，避免计算节点尝试连接登录节点本地代理；从 Python NVIDIA runtime 包显式发现并验证 cuDNN 9，避免 ONNX Runtime 注册了 CUDA provider 却在建 session 时静默回退。Slurm submit/workdir 必须位于计算节点可见的共享目录，不能从仅登录节点可见的 `/tmp` worktree 提交。权重和运行目录不进入 Git；runs 根/run/子目录、JSON/JSONL 与 Slurm stdout 分别固定为 `0700/0700/0600/0600`，报告必须保存权重摘要和 Slurm job_id。
+八个 sbatch 入口统一由 `scripts/slurm/submit.sh` 提交，再执行 `slurm-runtime-v0.2.0`。提交器要求仓库 clean，并把完整 40 位 submit commit 注入作业；计算节点启动时必须仍处于同一 commit，从而拒绝排队期间的 checkout 漂移。运行层清除登录节点代理，要求计算节点可见的 Git 根提交，将 import 强制绑定到 submit checkout 的 `src/`，并在任何业务输入校验前把 stdout 与 runs 根收紧为 `0600/0700`。RTMPose 相关入口再从 Python NVIDIA runtime 包发现并实际加载 cuDNN 9，同时验证 ONNX Runtime CUDA provider 动态库可加载，避免“provider 已注册但 session 建立失败”或静默回退。
+
+正式证据不得直接调用裸 `sbatch`，也不得设置 `KANG_REQUIRE_CLEAN_CHECKOUT=0`；后者只允许本地故障注入，输出会如实标记 `clean=false`。所有 `KANG_*` 业务参数通过提交器进程环境传入，禁止覆盖提交器生成的 `--export`。全部仓库脚本固定使用 `#SBATCH --output=slurm-%x-%j.out`；若调用方显式覆盖 Slurm stdout 路径，必须同步传入 `KANG_SLURM_OUTPUT_PATH`，否则 preflight fail closed。权重、运行目录和 stdout 不进入 Git；runs 根/run/子目录、JSON/JSONL 与 Slurm stdout 分别固定为 `0700/0700/0600/0600`，业务报告继续保存权重摘要和 Slurm job_id。
 
 ### V1-M2b 公开固定集
 
@@ -291,6 +299,7 @@ V1-R1 的当前采用/候选/放弃状态见 [探索收敛与 V2 输入清单](v
 23. Candidate prediction/source run 是否绑定同一 frozen candidate policy 和准确的 `candidate_events_sha256`，且 generated time 位于 run 内。
 24. Export summary 是否不含时间、窗口、candidate/track/observation ID 或本地路径，Risk/Alert 是否仍为 false。
 25. 正式 runs 根/run/子目录、JSON/JSONL 与 Slurm stdout 是否分别保持 `0700`、`0600` 与 `0600`；任一权限漂移时是否拒绝旧 run 并用新路径重跑，而非手工改权限后冒充原始证据。
+26. 正式 sbatch 是否经统一提交器冻结完整 commit，并通过 `slurm-runtime-v0.2.0` 的 submit/execution commit 一致性、Git 根、clean checkout、checkout import 与 CUDA runtime 门；stdout override 是否显式绑定，RTMPose 是否同时通过 cuDNN/ORT loadability，而非只检查 provider 名称。
 
 快速检查：
 

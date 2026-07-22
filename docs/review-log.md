@@ -1127,8 +1127,8 @@
 - 日期：2026-07-23
 - 状态：Accepted for V1 file-artifact seam；V2 service ACL design remains Open
 - 参与人：项目组、Codex
-- 评审范围：共享 checkout、CUDA runtime、manifest 本地路径、run/JSONL/Slurm stdout 权限、失败证据处置与 V2 继承边界
-- 输入材料：修复提交 `243cef3` / `195c966` / `d1d4b5a` / `8b4b52d`，失败/拒绝 jobs `1769` / `1771` / `1772` / `1773` / `1774`，正式 jobs `1776` / `1777`
+- 评审范围：共享 checkout、submit/execution commit、CUDA runtime、manifest 本地路径、run/JSONL/Slurm stdout 权限、失败证据处置与 V2 继承边界
+- 输入材料：修复提交 `243cef3` / `195c966` / `d1d4b5a` / `8b4b52d`，共享 Slurm 契约 `673560d` / `667ad8d` / `b54d8b8`，失败/拒绝 jobs `1769` / `1771` / `1772` / `1773` / `1774`，正式 jobs `1776` / `1777` / `1780`，[Slurm Runtime Preflight 报告](reports/v1-slurm-runtime-preflight.md)
 
 ### 发现
 
@@ -1138,6 +1138,9 @@
 4. 原子 JSON 由临时文件产生时已为 `0600`，但追加 JSONL 与目录曾继承默认 umask 为 `0644/0755`。其中 `features.jsonl` 可包含 bbox/keypoints/track 与完整转写，因此功能成功也不能通过正式隐私门。
 5. `d1d4b5a` 将每个 run 及 `reports/logs/artifacts` 强制为 `0700`，`append_jsonl` 使用 `os.open(..., 0600)` 并校正既有目标模式；两条正式 Slurm 脚本同时设置 `umask 077` 并把 stdout 收紧为 `0600`。
 6. jobs `1776` / `1777` 通过后，本地下游复跑又暴露 `RunArtifacts` 只加固 run 子树、未加固新建 `--runs-dir` 根目录。首次结果根目录为 `0755` 并被拒绝；`8b4b52d` 将根目录也强制为 `0700`，用全新路径复跑 candidate/scorer 后通过，旧结果未通过 chmod 升级。
+7. 各正式 sbatch 曾各自复制 checkout、代理、权限和 CUDA 准备逻辑，容易随入口增加而漂移。`673560d` 将七个业务入口和一个轻量 preflight 入口统一到 `runtime.sh`，并在业务输入前执行同一 fail-closed 门。
+8. 只在作业启动时检查 clean checkout 仍存在排队竞态：提交后、启动前 `HEAD` 可能变化。`667ad8d` 增加统一提交器，冻结完整 40 位 submit commit；`slurm-runtime-v0.2.0` 要求 execution commit 相同，裸 `sbatch` 因缺少绑定而失败。
+9. 节点级 `nvidia-smi` 会列出两张物理 L40，不能据此声称作业占用两卡。job `1780` 的 Slurm/CUDA 环境和 Torch 均只暴露分配的 GPU `1`，并实际完成最小 CUDA tensor。
 
 ### 决定
 
@@ -1145,13 +1148,15 @@
 2. 权限或路径隐私门失败的旧 run 保留为诊断证据，但不能手工 chmod 后升级成原始正式证据；必须在修复后的 clean commit 上重跑。
 3. Slurm 脚本必须绑定 shared submit checkout 的 `src/`、显式 source type、离线模型缓存和可加载的 cuDNN runtime。任何 CUDA provider fallback 都必须失败，而非记录为 GPU run。
 4. 本轮只冻结 V1 文件式 artifact seam。V2 对象存储、数据库与日志平台必须另行定义 service identity、ACL、审计、备份、留存和删除责任。
+5. V1 正式 Slurm 证据只接受 `scripts/slurm/submit.sh` + `slurm-runtime-v0.2.0`：提交与执行 commit 必须一致，全部入口复用同一 preflight；裸 `sbatch` 或调用方覆盖 `--export` 不构成正式证据。
 
 ### 验证
 
-- 自动化：118 passed；权限/CLI/multimodal/producer 定向 26 passed；`compileall`、全部 shell/sbatch `bash -n`、`pip check` 与 `git diff --check` 通过。
+- 自动化：129 passed；新增 Slurm runtime/submit 契约定向 11 passed；`compileall`、全部 shell/sbatch `bash -n`、`pip check` 与 `git diff --check` 通过。
 - CUDA runtime：`libcudnn.so.9` 可由 venv Python 发现并加载；ONNX Runtime provider `ldd` 无 unresolved dependency。
 - Owner-only formal reruns：job `1776` 三路 producer 与 job `1777` 同容器 run 均 clean `d1d4b5a`、completed/0 issue；run 树、全部 JSON/JSONL、stdout 与 aggregate path scan 通过。
 - 下游根目录复跑：clean `8b4b52d` 的三 candidate run、16-file bundle 和独立 scorer 均通过全树 `0700/0600`；scorer report 与 assembler preflight SHA-256 同为 `26b58c13b41ed1313082508ca91586c50b289c0e136e5b6361ecd41dfb9bc3e9`。
+- 统一 runtime 预检：job `1779` 在 clean `673560d` 验证 v0.1 基线；最终 job `1780` 在 clean `b54d8b8` 验证 `slurm-runtime-v0.2.0`、submit/execution commit 绑定、owner-only、cuDNN/ORT CUDA、单张分配 L40 和最小 tensor，completed `0:0`，stdout SHA-256 为 `e208492910043e9bf383dcb106e70d9b7fc4c3ae8e113140ffb458e818b68cc4`。
 
 ### 行动项
 
@@ -1159,7 +1164,7 @@
 |---|---|---|---|
 | 完成 producer、同容器与下游全链 owner-only clean rerun | Codex | 2026-07-23 | Closed；jobs `1776` / `1777` + clean `8b4b52d` downstream |
 | 在 V2-D1 定义对象存储/数据库/日志 ACL、审计和删除责任 | 项目组 | 2026-08-12 | Open |
-| 将其他正式 Slurm 入口逐项迁移到同一 stdout/shared-checkout preflight | Codex | 2026-08-12 | Open；本轮只加固两条当前入口 |
+| 将其他正式 Slurm 入口逐项迁移到同一 stdout/shared-checkout preflight | Codex | 2026-08-12 | Closed；八个入口统一到 v0.2，job `1780` |
 
 ### 未决问题
 

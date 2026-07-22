@@ -1,6 +1,6 @@
 # 康盾工程架构与模块设计
 
-状态：Draft v0.9
+状态：Draft v1.0
 
 更新时间：2026-07-23
 
@@ -118,6 +118,8 @@ runs/<run_id>/
 ```
 
 `RunArtifacts` 是该目录的唯一写入口：用户传入的 runs 根、run 与子目录均固定为 owner-only `0700`，原子 JSON 和追加 JSONL 固定为 `0600`。尤其是 bbox/keypoints/track 和完整转写所在的 derived-sensitive JSONL，不依赖宿主机默认 umask。
+
+所有正式 Slurm 入口在读取业务输入前统一 source `scripts/slurm/runtime.sh` 的 `slurm-runtime-v0.2.0` 契约，并且只能由 `scripts/slurm/submit.sh` 提交。提交器要求仓库 clean，冻结提交时的完整 40 位 commit；计算节点启动时必须仍位于同一 commit，排队期间 checkout 漂移会 fail closed。运行层还要求计算节点可见的 Git 根提交，把 `PYTHONPATH` 绑定到该 checkout 的 `src/` 并反查实际 import 路径，同时先将 stdout、runs 根分别固定为 `0600/0700`。RTMPose 入口还在模型准备前验证 cuDNN 9 和 ONNX Runtime CUDA provider 已注册且动态库可加载。该层只冻结批处理执行与证据来源，不替代 RunManifest、模型摘要或 E2/E3 设备证据。
 
 这样可以在没有数据库和消息队列的情况下验证：
 

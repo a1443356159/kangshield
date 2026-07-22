@@ -1,6 +1,6 @@
 # 康盾里程碑与验收门
 
-状态：Active v1.1
+状态：Active v1.2
 
 基准日期：2026-07-23
 
@@ -209,7 +209,7 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 - [x] 在干净提交 `a57b8ee` 上将 capture-bound `FallFeatureCaptureSet`、公共 event prediction、strict source provenance 和 `export-fall-candidates` 接到 REV-016 scorer；三路 rule-bearing E1 fixture 与 run `20260722T172634Z-59174d4c` 已验证真实状态机到 evaluator 的接口，未使用模型推理。
 - [x] 实现 capture/readiness → 三真实姿态 backend → pose/G4 feature producer；owner-only L40 job `1776` 与 clean `8b4b52d` exporter → assembler → scorer 已完成全链验证；输入无人物，因此只关闭 production-interface tooling 子门。
 - [x] 实现 event evaluation bundle assembler 的 `0700/0600` staging、strict preflight 与原子发布，并由独立 scorer 验证 report 逐字节一致。
-- [x] 将 `--runs-dir` 根、run/子目录、JSON/JSONL 与两条正式 Slurm stdout 收紧为 `0700/0700/0600/0600`；绝对模型目录不进入同容器 manifest，权限漂移旧 run 不作为正式证据。
+- [x] 将 `--runs-dir` 根、run/子目录固定为 `0700`，JSON/JSONL 固定为 `0600`；全部八个正式 Slurm 入口的 stdout 固定为 `0600`，统一提交器冻结完整 submit commit，`slurm-runtime-v0.2.0` 复核 execution commit、checkout import 和 CUDA runtime，L40 job `1780` 已通过。
 - [ ] 使用 C6c 正负视频继续补空场持续、床上躺卧、宠物移动和真实多人 tracking，按已冻结 policy 生成真实候选并复用事件评估口径。
 - [ ] 用 E2/E3 证据把 C6c 与 SDNL1 从 Unknown 归类为 available、limited 或 blocked。
 - [ ] 决定 V2 最终姿态权重和项目分发许可证，生成第三方 NOTICE；HumanArt 与 Keypoint R-CNN 均未关闭该门。

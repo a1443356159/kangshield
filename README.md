@@ -53,6 +53,7 @@
 - [V1-R1 G4 Capture Fall Feature Producer E1 报告](docs/reports/v1-g4-fall-feature-capture.md)
 - [V1-R1 G4 Event Evaluation Bundle Assembler](docs/v1-g4-event-bundle-assembly.md)
 - [V1-R1 G4 Event Bundle Assembly E1 报告](docs/reports/v1-g4-event-bundle-assembly.md)
+- [V1 正式 Slurm Runtime Preflight 报告](docs/reports/v1-slurm-runtime-preflight.md)
 
 ## V1 初步开发
 
@@ -67,6 +68,8 @@ python -m pip install -e ".[dev,media]"
 make test
 make info-fixtures
 ```
+
+正式 Slurm 作业在 clean commit 上统一通过提交器运行；首次使用新 checkout、计算节点或 CUDA 环境时先执行 `make submit-runtime-preflight`。契约与 L40 证据见 [Slurm Runtime Preflight 报告](docs/reports/v1-slurm-runtime-preflight.md)。
 
 不安装 media extra 时，WAV 与 JSON/CSV 探测仍可运行；视频命令会明确报告 OpenCV 不可用。
 

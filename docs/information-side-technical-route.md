@@ -1,6 +1,6 @@
 # 信息侧模块详细技术路线
 
-状态：Implementation Baseline v0.9
+状态：Implementation Baseline v1.1
 
 更新时间：2026-07-23
 
@@ -190,6 +190,7 @@ runs/<run_id>/
 5. reports 不保存 accessToken、AppKey、验证码、设备序列号或真实姓名。
 6. runs 默认被 Git 忽略。
 7. 用户传入的 runs 根、每个 run 及其 `reports/logs/artifacts` 子目录固定 `0700`，JSON/JSONL 固定 `0600`；权限漂移的运行不得作为正式证据。
+8. 正式 Slurm 入口统一经 `scripts/slurm/submit.sh` 冻结完整 submit commit，再执行 `slurm-runtime-v0.2.0`；运行时在业务输入前核对 execution commit、shared clean checkout、实际 Python import、owner-only stdout/runs，并按 backend 预检 cuDNN/ONNX Runtime。裸 `sbatch` 不构成正式证据，脚本间也不得复制一份会漂移的 runtime 逻辑。
 
 ## 7. 开发路径
 

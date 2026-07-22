@@ -4,7 +4,7 @@
 
 基准日期：2026-07-23
 
-证据快照：截至 `f5bb761` 的 V1-M1～V1-M3 报告、许可证 fail-closed 修正 `f4aa1c5`、G4 离线特征实现 `782026b`、CAUCAFall ADL 压力实现 `336bbe9`、Keypoint R-CNN 候选实现 `eae5f56` / G4 派生接入 `d956203`、Open Images 静态人物检测实现 `40359c1` / 标注审计修正 `fad9491`、双标注/裁决/事件评估工具 `b0b2e97`、首版 candidate episode 生成器 `dc6cace`、capture producer `7a8dc23` / tracker 修复与加固 `b233abe` / `b4b72f7`、event bundle assembler `7b64719`，同容器音轨 adapter `8c6df2d` / bitexact smoke `eca6231` / 路径脱敏 `195c966`，以及 owner-only artifact 修复 `d1d4b5a` / `8b4b52d`
+证据快照：截至 `f5bb761` 的 V1-M1～V1-M3 报告、许可证 fail-closed 修正 `f4aa1c5`、G4 离线特征实现 `782026b`、CAUCAFall ADL 压力实现 `336bbe9`、Keypoint R-CNN 候选实现 `eae5f56` / G4 派生接入 `d956203`、Open Images 静态人物检测实现 `40359c1` / 标注审计修正 `fad9491`、双标注/裁决/事件评估工具 `b0b2e97`、首版 candidate episode 生成器 `dc6cace`、capture producer `7a8dc23` / tracker 修复与加固 `b233abe` / `b4b72f7`、event bundle assembler `7b64719`，同容器音轨 adapter `8c6df2d` / bitexact smoke `eca6231` / 路径脱敏 `195c966`、owner-only artifact 修复 `d1d4b5a` / `8b4b52d`，以及正式 Slurm runtime/submit 契约 `673560d` / `667ad8d` / `b54d8b8`
 
 ## 1. Review 目标与状态语义
 
@@ -53,6 +53,7 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 | R1-D10 | Label-blind fall candidate episode 状态机 | Conditional implementation baseline | REV-017 在查看 C6c held-out 输出前冻结 transition/settled、回溯、release、refractory 与 track/gap reset；54 项公开开发压力可重复 | C6c 首轮必须原样使用 policy；公开数据上的 0/3、1/3、3/3 不用于最终选型或准确率宣传 |
 | R1-D11 | 同容器音轨 PTS → 16 kHz SpeechBackend adapter | Adopt as offline adapter seam | +250 ms bitexact E1 A/V 上完成真实 YOLO/FunASR、事件平移、单来源 ledger 与 fail-closed timing gate | 真实录制必须保留容器 PTS；单一 start offset 不表达 drift，也不证明平台开放音轨 |
 | R1-D12 | V1 run artifact owner-only 权限 | Adopt | `d1d4b5a` 将 run/子目录固定为 `0700`、JSON/JSONL 与两条正式 Slurm stdout 固定为 `0600`；`8b4b52d` 继续将 `--runs-dir` 根固定为 `0700`；权限漂移的早期 run 被拒绝并用新路径重跑 | V2 对象存储/数据库必须提供同等或更强的访问控制、审计与留存，不得依赖宿主默认 umask |
+| R1-D13 | 正式 Slurm 提交与运行时契约 | Adopt | 全部正式入口复用 `slurm-runtime-v0.2.0`；统一提交器要求 clean checkout、冻结完整 submit commit，计算节点复核 execution commit、实际 import、owner-only stdout/runs 与所需 CUDA 动态库 | V2 批处理或部署系统必须保留不可变版本绑定和 fail-closed runtime preflight；裸 `sbatch` 不构成正式证据 |
 
 ## 4. 模型与提取器决策账本
 
@@ -111,6 +112,7 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 |---|---|---|
 | 证据与运行契约 | E0～E4、SourceAsset、Observation、FeatureEvent、RunManifest | V1-M1/M2a |
 | 本地运行权限 | `--runs-dir` 根、run/子目录 `0700`，JSON/JSONL `0600`，Slurm stdout `0600`；同容器 run 的模型本地目录不入 manifest | R1-D12 |
+| 正式批处理 provenance | clean submit checkout、完整 submit/execution commit 一致、checkout-bound import、owner-only stdout/runs、按 backend 验证 CUDA runtime | R1-D13 / REV-022 |
 | 离线回放与评测边界 | PoseBackend、SpeechBackend、固定 case、隐私安全汇总 | V1-M2b/M3 |
 | 同容器音轨 adapter | 单 A/V asset、严格 track/PTS gate、16 kHz PCM、signed start offset 与 Pipeline 统一时间平移 | REV-010 / REV-021 |
 | 姿态候选配置 | 5 fps、RTMPose detector conf 0.05；Keypoint R-CNN conf 0.5 / resize 800～1333；COCO-17 与分数语义分开记录 | REV-006 / REV-013 |

@@ -189,14 +189,14 @@ runs/<run_id>/
 export KANG_VIDEO_INPUT="$PWD/data/raw/public-smoke/ultralytics-bus-replay.avi"
 export KANG_AUDIO_INPUT="$PWD/data/raw/public-smoke/funasr-asr-example-zh.wav"
 export KANG_MAX_DURATION_S=5
-sbatch scripts/slurm/v1_multimodal_smoke.sbatch
+scripts/slurm/submit.sh scripts/slurm/v1_multimodal_smoke.sbatch
 ```
 
 同容器 Slurm smoke 可直接执行 `make submit-mm-container-smoke`，或设置 `KANG_VIDEO_INPUT` 与 `KANG_AUDIO_FROM_VIDEO=1`；此时必须清空 `KANG_AUDIO_INPUT`，脚本会拒绝含糊的双重选择。
 
 前两个准备脚本应在可联网登录节点执行。第三个脚本不联网，把已固定的公开视频/WAV 重新编码成 FFV1 + PCM16 Matroska，在音轨 PTS 写入 250 ms 起点偏移，并启用 bitexact mux；相同输入的输出 SHA-256 必须一致。模型脚本把 YOLO 权重写入被 Git 忽略的 `models/`，把三个 FunASR snapshot 写入 ModelScope 缓存，并校验 V1 冻结的权重 SHA-256。上游 `master` 发生变化时脚本会失败，必须经过模型 Review 后才能更新基线摘要。
 
-Slurm 脚本请求 1 张 L40、8 CPU、20 分钟，并强制从本地缓存加载模型。计算节点不依赖公网，也不会继承指向登录节点 localhost 的代理。
+Slurm 脚本请求 1 张 L40、8 CPU、20 分钟，并强制从本地缓存加载模型。正式提交统一经过 `scripts/slurm/submit.sh` 与 `slurm-runtime-v0.2.0` 的 submit/execution commit、checkout import、owner-only 和 CUDA 门；计算节点不依赖公网，也不会继承指向登录节点 localhost 的代理。
 
 ## 8. V1-M2a 验收门
 
