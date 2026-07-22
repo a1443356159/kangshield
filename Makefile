@@ -4,6 +4,8 @@ PYTHON ?= python3
 KANG_VIDEO_INPUT ?= $(CURDIR)/data/raw/public-smoke/ultralytics-bus-replay.avi
 KANG_AUDIO_INPUT ?= $(CURDIR)/data/raw/public-smoke/funasr-asr-example-zh.wav
 KANG_AV_INPUT ?= $(CURDIR)/data/raw/public-smoke/v1-m2a-public-av-offset-250ms.mkv
+KANG_AV_SOURCE_TYPE ?= fixture
+KANG_AV_MAX_DURATION_S ?= 6
 KANG_M2B_CASES ?= $(CURDIR)/data/processed/v1-m2b/benchmark-cases.json
 KANG_G4_ADL_CASES ?= $(CURDIR)/data/processed/v1-g4-caucafall/fall-adl-cases.json
 KANG_G4_STATIC_HOME_CASES ?= $(CURDIR)/data/processed/v1-g4-openimages-static-home/static-home-cases.json
@@ -76,7 +78,7 @@ submit-mm-smoke:
 
 submit-mm-container-smoke:
 	test -f "$(KANG_AV_INPUT)"
-	sbatch --export=ALL,KANG_VIDEO_INPUT="$(KANG_AV_INPUT)",KANG_AUDIO_INPUT=,KANG_AUDIO_FROM_VIDEO=1 scripts/slurm/v1_multimodal_smoke.sbatch
+	sbatch --export=ALL,KANG_VIDEO_INPUT="$(KANG_AV_INPUT)",KANG_AUDIO_INPUT=,KANG_AUDIO_FROM_VIDEO=1,KANG_SOURCE_TYPE="$(KANG_AV_SOURCE_TYPE)",KANG_MAX_DURATION_S="$(KANG_AV_MAX_DURATION_S)" scripts/slurm/v1_multimodal_smoke.sbatch
 
 prepare-m2b-data:
 	$(PYTHON) scripts/prepare_v1_m2b_data.py --accept-urfd-noncommercial-license

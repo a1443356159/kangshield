@@ -284,7 +284,7 @@ kangshield-info run-multimodal <av-container> --audio-from-video
 
 独立视频/WAV 模式继续明确标记为 synthetic common zero，只验证窗口工程。`--audio-from-video` 则先复用容器 timing probe，要求恰好一条视频轨和一条音轨、起点 offset 可测、逐包 PTS 完整且扫描未截断，再由 PyAV 解码音轨、重采样为单声道 16 kHz，并把 VAD/ASR 段按有符号 offset 映射到视频时间轴。两个布局都经姿态跟踪和 VAD/中文 ASR 汇入固定毫秒窗口，输出完整 ModelBinding、FeatureEvent、MultimodalWindow 以及 warm/cold 两套性能口径。
 
-同容器只登记一个 SourceAsset/Observation，report 固定记录 `input_layout=same_container_pts` 与 `audio_start_offset_ms`；歧义轨道、缺 PTS、逆序音频 PTS或 scan truncation 都失败，不回退为共享零点。单个起点 offset 仍不能证明 capture clock 或 drift，真实 C6c 必须按 M2c 规程保留两次同步事件。
+同容器只登记一个 SourceAsset/Observation，report 固定记录 `input_layout=same_container_pts` 与 `audio_start_offset_ms`；歧义轨道、缺 PTS、逆序音频 PTS 或 scan truncation 都失败，不回退为共享零点。单个起点 offset 仍不能证明 capture clock 或 drift，真实 C6c 必须按 M2c 规程保留两次同步事件。
 
 实现、命令、模型决策和限制见 [V1 视频与语言多模态 Pipeline](v1-multimodal-pipeline.md)，正偏移真实后端证据见[同容器音轨初测报告](reports/v1-m2a-same-container-audio-smoke.md)。
 
