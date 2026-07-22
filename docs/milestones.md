@@ -21,7 +21,7 @@
 | D0 文档基线 | 07-22～07-24 | Done | 架构、模块、里程碑、Review、采集探索文档 | 三份原始资料与硬件边界没有冲突口径 |
 | V1-M1 设备能力探测 | 07-25～07-28 | In progress | 摄像头/睡眠仪能力矩阵、API 样例、原始样本 | 每项能力有真实调用或明确“不开放/待确认”证据 |
 | V1-M2a 设备无关多模态链路 | 07-22～07-23 | Done | 视频/语言回放、姿态、VAD/ASR、窗口、Slurm 报告 | 干净提交在 L40 上完成 E1 smoke，warm/cold 口径分离 |
-| V1-M2b 公开真实场景固定集与对齐评测 | 07-22～07-23 | In progress | URFD/FLEURS 固定集、批量 Pipeline、标签/CER/覆盖率与 Slurm 报告 | 六 case 在干净提交和 L40 上可重复完成，公开数据边界固定为 E1 |
+| V1-M2b 公开真实场景固定集与对齐评测 | 07-22～07-23 | Done | URFD/FLEURS 固定集、批量 Pipeline、标签/CER/覆盖率与 Slurm 报告 | 六 case 在干净提交和 L40 上可重复完成，公开数据边界固定为 E1 |
 | V1-M2c 目标设备样本与时间基 | 07-29～08-01 | Planned | C6c 音视频样本、时间基、睡眠样例与统一产物 | 目标设备视频、音频、睡眠样例可追溯且时间语义明确 |
 | V1-M3 模型快速对比 | 08-02～08-07 | Planned | 姿态、VAD/ASR、睡眠字段的对比报告 | 至少一条视频和一条音频基线可重复运行 |
 | V1-R1 探索 Review | 08-08～08-09 | Planned | V1 结论、淘汰项、V2 输入清单 | 决定每类特征的采用/候选/放弃状态 |
@@ -41,8 +41,9 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 | D0 文档基线 | `214c2f6` | `origin/main` | 2026-07-22 已验证 | 原始资料、架构、技术路线、能力矩阵、里程碑与 Review 基线 |
 | V1-M1 初步开发 | `98233f1` | `origin/main` | 2026-07-22 已验证 | 公共契约、运行产物、三类探针、Fixture、测试与初步开发报告；不代表真实设备验收完成 |
 | V1-M2a 多模态链路 | `fb39903` / `6f1287f` | `origin/main` | 2026-07-22 已验证 | 视频/语言回放、模型绑定、融合窗口、Slurm 脚本、测试与脱敏报告；不代表真实设备或 V2 模型验收 |
+| V1-M2b 公开固定集评测 | `93f7d09` | `origin/main` | 待本轮推送验证 | 固定 URFD/FLEURS 子集、可重复准备、六 case 标签/CER/覆盖率和 L40 证据；明确只属于 E1 |
 
-这里的“推送验证”只证明代码已到达远端。V1-M1 仍为 In progress，必须取得 C6c 与 CS-EP-SDNL1 的 E2/E3 证据后才能进入 Review/Done。V1-M2a 的 Done 只关闭设备无关 E1 链路，不会提升真实设备证据等级。
+这里的“推送验证”只证明代码已到达远端。V1-M1 仍为 In progress，必须取得 C6c 与 CS-EP-SDNL1 的 E2/E3 证据后才能进入 Review/Done。V1-M2a 和 V1-M2b 的 Done 只关闭设备无关 E1 链路及公开固定集评测，不会提升真实设备证据等级。
 
 ## 4. 当前阶段任务
 
@@ -109,9 +110,9 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 - [x] FLEURS float WAV 到 16 kHz 单声道 PCM16。
 - [x] 六 case 批量调度、独立 child run、CER、阶段与覆盖率汇总。
 - [x] 跨数据集 `synthetic_common_zero` 与 E1 证据约束。
-- [ ] 干净提交的 L40 六 case benchmark 与 Review 报告。
+- [x] 干净提交的 L40 六 case benchmark 与 Review 报告。
 
-设计和口径见 [V1-M2b 公开真实场景固定集与对齐评测](v1-m2b-public-dataset-benchmark.md)。本门不会把公开数据晋级为 C6c/CS-EP-SDNL1 证据。
+设计和口径见 [V1-M2b 公开真实场景固定集与对齐评测](v1-m2b-public-dataset-benchmark.md)，实测证据见 [初测报告](reports/v1-m2b-public-dataset-benchmark.md)。job `1759` 在 NVIDIA L40 上完成，姿态帧覆盖率 89.41%、跟踪覆盖率 97.37%、corpus CER 6.57%；本门不会把公开数据晋级为 C6c/CS-EP-SDNL1 证据。
 
 ### V1-M2c：目标设备样本与时间基
 

@@ -21,6 +21,7 @@
 - [V1 视频与语言多模态 Pipeline](docs/v1-multimodal-pipeline.md)
 - [V1-M2a 多模态 Pipeline 初测报告](docs/reports/v1-m2a-multimodal-smoke.md)
 - [V1-M2b 公开真实场景固定集与对齐评测](docs/v1-m2b-public-dataset-benchmark.md)
+- [V1-M2b 公开固定集初测报告](docs/reports/v1-m2b-public-dataset-benchmark.md)
 
 ## V1 初步开发
 

@@ -1,8 +1,10 @@
 # V1-M2b 公开真实场景固定集与对齐评测
 
-状态：Implementation Baseline v0.1
+状态：Validated v0.2
 
 更新时间：2026-07-22
+
+实现与 L40 结果见 [V1-M2b 公开真实场景固定集初测报告](reports/v1-m2b-public-dataset-benchmark.md)。
 
 ## 1. 目标与边界
 

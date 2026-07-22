@@ -218,3 +218,59 @@
 2. 目标居家镜头中人体最小像素高度和典型遮挡比例是多少？
 3. 方言、电视串音和远场条件下 Paraformer 的 CER 与误触发率是否合格？
 4. 最终比赛仓库的开源/分发方式是否满足 Ultralytics AGPL，还是必须切换 RTMPose？
+
+---
+
+## REV-005 V1-M2b 公开固定集与评测 Review
+
+- 日期：2026-07-22
+- 状态：Accepted for V1-M2b
+- 参与人：项目组、Codex
+- 评审范围：公开真实人物录制固定集、标签/转写评测、批量 Pipeline、证据与许可证边界
+- 输入材料：[V1-M2b 设计](v1-m2b-public-dataset-benchmark.md)、[初测报告](reports/v1-m2b-public-dataset-benchmark.md)、提交 `93f7d09`、Slurm job `1759`
+
+### 发现
+
+1. URFD 官方数据能以较小固定子集提供模拟跌倒/ADL RGB 序列、同步时间和帧级姿态阶段；FLEURS 普通话 dev 能提供版本固定的 16 kHz 真实语音和参考转写。
+2. FLEURS 源 WAV 使用 IEEE float，现有 PCM 回放器不能直接读取；在数据准备层统一转成 PCM16 可以保持在线 Pipeline 的输入契约不变。
+3. URFD 视频与 FLEURS 语言并非自然同步录制。把它们配成共同零时刻只能验证窗口与 schema，不能计算跨模态语义准确率。
+4. 六 case 姿态帧覆盖率为 89.41%，但 lying 阶段只有 42.86%；YOLO26n-pose 在 fall-01/02 倒地后的横卧人体上明显漏检。
+5. corpus CER 为 6.57%，9 次编辑中 7 次来自一条中英混合样本省略 `Moldova`；普通话主体表现较好，但固定集官方口径不能删除该样本。
+6. 六 case processing 合计 RTF 为 0.150，整套冷启动 wall/media 为 1.056；FunASR 共享加载 36.228 秒，常驻模型进程仍是 demo 必需条件。
+7. URFD 的 CC-BY-NC-SA-4.0、FLEURS 的 CC-BY-4.0 和 Ultralytics 的 AGPL/Enterprise 路线都需要进入比赛材料与 V2 分发审查。
+
+### 决定
+
+1. V1-M2b 定义为“公开真实场景固定集与对齐评测”，验收 E1 工程、标签/CER、性能和可重复性；状态标记 Done。
+2. 原计划中的 C6c 音视频时间基、受控居家样本和睡眠仪真实字段改列 V1-M2c，仍要求 E2/E3，公开数据不得替代。
+3. 所有跨数据集 case 强制声明 `cross_dataset_synthetic_common_zero`；视频和语言精度分别计算，融合窗口只作工程验证。
+4. YOLO26n-pose + ByteTrack 和 FunASR 继续保留为 V1 baseline，不因本次结果自动晋级 V2。
+5. M3 姿态比较优先评价 lying 阶段，不能只看整体覆盖率；需评估 RTMPose/MMPose、人体检测 fallback 和短时轨迹容错。
+6. 汇总报告不复制完整参考/识别文本；原始数据、派生媒体和 runs 不进入 Git。
+
+### 验证
+
+- 数据准备：16 个固定源文件，995 个 URFD RGB 帧，六段 PCM16，重复生成 lock 摘要一致。
+- 自动化：22 passed。
+- Slurm：job `1759`，`COMPLETED`，exit `0:0`，NVIDIA L40，elapsed 00:00:51。
+- 代码：`93f7d09`，parent/child 全部 `code_dirty=false`。
+- 视频：170 个抽样帧，152 个人物阳性帧，148 个含 track_id 的人物阳性帧。
+- 语言：137 个参考字符，9 次编辑，3/6 完全匹配。
+- 隐私：汇总 JSON 未出现六条完整参考转写。
+
+### 行动项
+
+| 行动 | 负责人 | 截止日期 | 状态 |
+|---|---|---|---|
+| 获取 C6c 同意录制样本并验证音视频 PTS/时钟偏差 | 待指定 | 2026-07-29 | Open |
+| 获取 CS-EP-SDNL1 真实 API/SDK/导出字段样例 | 待指定 | 2026-07-29 | Open |
+| 在当前六段视频对比 RTMPose/MMPose 的 lying 阶段覆盖率 | 待指定 | 2026-08-05 | Open |
+| 设计人体检测 fallback 与短时轨迹容错基线 | 待指定 | 2026-08-05 | Open |
+| 完成 URFD/FLEURS/Ultralytics 的比赛使用与分发审查 | 待指定 | 2026-08-09 | Open |
+
+### 未决问题
+
+1. C6c 夜视和目标机位下 lying 阶段的人体像素高度、遮挡和姿态覆盖率是多少？
+2. RTMPose/MMPose 能否在相同算力与许可证约束下显著改善横卧检出？
+3. 目标老人远场普通话、方言和电视背景下的 CER/VAD 覆盖率是多少？
+4. 比赛材料是否会分发 URFD 派生媒体，若会，如何满足 BY-NC-SA 条款？
