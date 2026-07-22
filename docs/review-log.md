@@ -958,3 +958,53 @@
 1. 通用 capture producer 是直接重放原始 clip，还是先消费一个独立 pose-capture run；必须保证 pose policy、feature policy 和 clip 时序只计算一次且可审计。
 2. 真实 bundle assembler 是否复制 derived-sensitive prediction 到受控 bundle，还是只允许同一受控根目录内引用；需要结合数据保留策略冻结。
 3. C6c 多人物场景是否继续 largest-bbox 场景级候选；本桥接保持现有语义，没有提前替项目组做身份策略决定。
+
+---
+
+## REV-020 G4 Event Evaluation Bundle Assembler Review
+
+- 日期：2026-07-23
+- 状态：Accepted for E1 controlled assembly tooling；V1-R1 remains In progress
+- 参与人：项目组、Codex
+- 评审范围：真实 event evaluator 输入组装、相对路径/摘要、owner-only staging、原子发布、原 evaluator preflight、隐私与 readiness 边界
+- 输入材料：[组装器设计](v1-g4-event-bundle-assembly.md)、[正式 E1 报告](reports/v1-g4-event-bundle-assembly.md)、实现提交 `7b64719`、证据提交 `07d7edd`
+
+### 发现
+
+1. REV-018 关闭了 feature-to-candidate 接口，但真实 scorer 仍需人工把 capture/readiness、两份标注、裁决、candidate policy 与三路 prediction/source manifest 拼成 bundle。人工复制容易产生路径越界、摘要漂移、variant 重复或 prediction/run 错配。
+2. Assembler 先在随机 staging 中复制 13 个显式输入，统一生成规范化 bundle-relative 路径、SHA-256 和大小；不复制 capture 原媒体，也不从输入内容推断额外文件。全部目录固定 0700、文件固定 0600。
+3. staging 必须调用 REV-016 原 evaluator 完成 strict preflight 后才能原子发布；失败时删除 staging，不保留半成品，不覆盖已存在输出。Assembler 没有复制或弱化 evaluator 的 annotation、agreement、adjudication、minimum-data、provenance、camera/E2 gate。
+4. clean `7b64719` 正式组装生成 16 个文件，bundle SHA-256 `3a8c7be99b4946f99780793ff761b99e1a7bb1794e1c6a137eb2a9ea7b842331`，assembly report SHA-256 `8d1216dda24d30ecaf4dbb9bfda8c4239f2b5c33bde2b7916861de0dc77cb5f2`；权限审计为 16/16 文件 0600、全部目录 0700。
+5. 内置 preflight 为 `tooling_only`、provenance true、event ready false。随后从独立 clean main `b233abe` 对发布 bundle 复跑 scorer，run `20260722T182727Z-5e95a5f8` completed、0 issue、15 个 SourceAsset，report SHA-256 `e96d676cf17aa92b639c65cc41602a536e95d774368bb0fa906a0321d5965327` 与内置 preflight 逐字节一致。
+6. annotation 顺序按内容摘要稳定化；重复 variant、prediction/source run ID 错配、capture/policy/source type 漂移、已存在输出和 late preflight failure 均 fail closed。聚合 report 不含 annotation/candidate window、annotator ref、本地路径、bbox 或 keypoints。
+7. 本轮输入仍是 deterministic fixture。组装成功只表示 bundle 结构和来源可被原 evaluator 接受，不表示 camera gate、真实事件指标、模型晋级、RiskAssessment 或 Alert 已授权。
+
+### 决定
+
+1. 接受 `assemble-event-evaluation-bundle` CLI、`FallEventBundleAssemblyReport`、owner-only staging、原子发布和 evaluator preflight 复用，作为 REV-016/018 的受控输入组装基线。
+2. 冻结“只复制显式证据、不复制原媒体、不覆盖输出、preflight 后发布”的边界。不得增加跳过摘要、跳过权限或 `--force` 快捷路径。
+3. Readiness 的唯一语义来源继续是 REV-016 evaluator。Assembler report 只能镜像 preflight decision，不能自行把 fixture、partial 或 camera-failed 输入升级为 ready。
+4. 真实 C6c 路线按“clean feature producer → frozen candidate export → 本 assembler → 原 evaluator”执行；candidate policy digest 与三路 variant/source provenance 必须保持一致。
+5. RiskAssessment 与 Alert 继续 Literal false；V1-R1、M2c 和最终模型/许可证状态不因本 Review 改变。
+
+### 验证
+
+- 自动化：105 passed；`compileall`、全部 shell/sbatch `bash -n`、`pip check` 与 `git diff --check` 通过。
+- 正式 assembly：13 个 copied input、16 个 total file、owner-only 权限、0 raw media。
+- 独立复跑：run `20260722T182727Z-5e95a5f8`；manifest `a9dc01e0faeb6f4528208a96344d51b9567378f5df1d0570a9fe018d40e8ecb8`；report/preflight `e96d676cf17aa92b639c65cc41602a536e95d774368bb0fa906a0321d5965327`。
+- 边界：decision `tooling_only`、provenance gate true、camera gate/event ready false、Risk/Alert false。
+
+### 行动项
+
+| 行动 | 负责人 | 截止日期 | 状态 |
+|---|---|---|---|
+| 使用通用 capture producer 完成三姿态 clean feature/candidate run | Codex | 2026-07-24 | In progress；job `1769` |
+| 取得 C6c E2 held-out capture，并冻结独立标注/裁决责任人 | 待指定采集人 / 项目组 | 2026-08-02 | Open |
+| 对真实三路 candidate 调用 assembler 与原 scorer，不手工改写 bundle | Codex | 2026-08-03 | Blocked on capture and annotation |
+| 冻结真实 derived-sensitive prediction/bundle 的保留、访问和删除责任 | 项目组 | 2026-08-03 | Open |
+
+### 未决问题
+
+1. 比赛环境中 owner-only bundle 的物理根目录、备份与删除责任由谁承担？
+2. derived-sensitive prediction 是否保留完整比赛周期，还是 scorer 后只保留摘要与审计 receipt？
+3. 多人 per-person/场景级 candidate 语义改变时，prediction schema 与 assembler 是否需要新版本；不能在现有版本中静默扩展。
