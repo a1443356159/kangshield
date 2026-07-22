@@ -36,6 +36,7 @@ kang_runs_dir=${KANG_RUNS_DIR:-${kang_repo_dir}/runs}
 
 cd "${kang_repo_dir}"
 export PYTHONUNBUFFERED=1
+export PYTHONPATH="${kang_repo_dir}/src${PYTHONPATH:+:${PYTHONPATH}}"
 unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy
 
 "${kang_python}" -m kangshield.information.cli run-multimodal \
@@ -49,4 +50,5 @@ unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy
   --pose-sample-fps "${KANG_POSE_SAMPLE_FPS:-5}" \
   --fusion-window-ms "${KANG_FUSION_WINDOW_MS:-1000}" \
   --max-duration-s "${KANG_MAX_DURATION_S:-30}" \
-  --evidence-level "${KANG_EVIDENCE_LEVEL:-E1}"
+  --evidence-level "${KANG_EVIDENCE_LEVEL:-E1}" \
+  --source-type "${KANG_SOURCE_TYPE:-local_file}"
