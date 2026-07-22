@@ -573,7 +573,7 @@
 
 | 行动 | 负责人 | 截止日期 | 状态 |
 |---|---|---|---|
-| 增加许可证可审计的空房、家具、弯腰、坐下、床上躺卧和多人负样本来源 | Codex | 2026-07-25 | Partial：REV-012 已补弯腰/坐下/跪地/行走；其余 Open |
+| 增加许可证可审计的空房、家具、弯腰、坐下、床上躺卧和多人负样本来源 | Codex | 2026-07-25 | Partial：REV-012 已补 ADL；REV-015 已补静态 furniture/pet/multi-person 人物检测；空场视频与床上躺卧仍 Open |
 | 用同一冻结配置复跑 C6c 白天/夜视、距离、遮挡和安全模拟跌倒场景 | 待指定 | 2026-08-01 | Open |
 | 为 C6c 集增加 person-presence、动作区间和事件时刻人工标注并冻结事件指标 | 待指定 | 2026-08-03 | Open |
 | 评测一个不依赖 Human-Art 训练条款的姿态候选 | Codex | 2026-07-25 | Done（REV-013；保留 fallback，分发仍 Open） |
@@ -623,7 +623,7 @@
 
 | 行动 | 负责人 | 截止日期 | 状态 |
 |---|---|---|---|
-| 补空房、纯家具、床上躺卧、宠物和多人负样本；许可证不清时转为受控自采 | Codex / 待指定采集人 | 2026-07-27 | Open |
+| 补空房、纯家具、床上躺卧、宠物和多人负样本；许可证不清时转为受控自采 | Codex / 待指定采集人 | 2026-07-27 | Partial：REV-015 已补静态 furniture/pet/multi-person；空场视频、躺卧、宠物移动和多人 tracking 仍 Open |
 | 用 C6c 采集同配置白天/夜视、距离、遮挡和安全模拟跌倒正负样本 | 待指定 | 2026-08-01 | Open |
 | 冻结 held-out 事件标注、组合决策和误触发/延迟口径 | 待指定 | 2026-08-03 | Open |
 | 评测不依赖 HumanArt 训练条款的姿态候选 | Codex | 2026-07-25 | Done（REV-013；保留 fallback，分发仍 Open） |
@@ -678,7 +678,7 @@
 | 冻结 C6c held-out 场景/事件标注后复跑三候选，不在目标集调阈值 | 待指定采集人 / Codex | 2026-08-03 | Open |
 | 确认比赛提交物是否包含权重及 COCO/ImageNet/HumanArt 再分发要求 | 待指定许可证负责人 | 2026-07-29 | Open |
 | 若公开 checkpoint 均不能关闭分发门，冻结自有训练数据/模型路线 | 项目组 | 2026-08-05 | Open |
-| 补空房、床上躺卧、家具、宠物和真实多人负样本 | 待指定采集人 | 2026-08-03 | Open |
+| 补空房、床上躺卧、家具、宠物和真实多人负样本 | 待指定采集人 / Codex | 2026-08-03 | Partial：REV-015 已补公开静态检测压力；C6c 视频与时序仍 Open |
 
 ### 未决问题
 
@@ -740,3 +740,56 @@
 1. C6c 首批采集由谁执行，受控目录、同意记录和删除责任人分别是谁？
 2. 真实容器双事件采用逐帧/波形人工标注，还是补自动峰值候选后人工确认？
 3. 多人和宠物作为 C13+ 扩展场景加入同一 manifest revision，还是独立负样本包？
+
+---
+
+## REV-015 V1-R1 G4 Open Images 静态居家人物检测压力 Review
+
+- 日期：2026-07-22
+- 状态：Accepted for E1 static person-detection stress slice；V1-R1 milestone remains In progress
+- 参与人：项目组、Codex
+- 评审范围：公开来源/逐图许可、Person 负标签与多人框、人工对齐 Review、确定性准备、三模型 L40 结果、失败证据拒绝、隐私与能力边界
+- 输入材料：[静态压力集设计](v1-g4-openimages-static-home-stress.md)、[正式报告](reports/v1-g4-openimages-static-home-stress.md)、实现提交 `40359c1`、标注审计修正 `fad9491`、正式 run `20260722T151348Z-a34b37b3`
+
+### 发现
+
+1. Open Images 标注固定为 Google LLC / CC BY 4.0；12 张 validation 图片逐一固定作者、标题、原始 Flickr landing page、CC BY 2.0 URL、页面检查日期、像素字节数和 SHA-256。官方免责声明意味着比赛展示/再分发前仍须逐图重审。
+2. job `1765` 虽然执行成功，但 post-run 视觉复核发现 wheelchair case 有一个明显人物未被 Person boxes 覆盖，会把正确检出误计为 FP。本次 Review 拒绝该 run，并以 r2 suite ID/source digest 隔离替换数据；“程序 completed”不等于“证据可接受”。
+3. r2 新增 `visible_person_count == expected_person_box_count` 和多人逐框视觉对齐硬门。12-case、16 个 source file、14 个 processed artifact 连续准备两次摘要不漂移。
+4. 正式 job `1766` 中，RTMPose / YOLO / Keypoint R-CNN 的 person-absent 激活分别为 2/8、3/8、3/8；家具组分别为 2/4、2/4、1/4，宠物组为 0/4、1/4、2/4。三模型都不是静态负样本零激活。
+5. 多人子集共有 11 个框。RTMPose 与 Keypoint R-CNN 均 matched 11/11，但分别有 2、3 个多人 FP；YOLO 为 9/11、0 FP，远距离会议室 case 输出 0 框。覆盖、干净度和远距离检测存在明确权衡。
+6. sofa-toy 使三模型都激活；报告不保存预测坐标，因此其他 case 的具体误检对象不能从汇总反推。该设计保护隐私但限制错误可视化，后续 C6c 受控 Review 需另设短期、受限访问的可视化流程。
+7. 三模型冻结阈值没有针对 12 图调整。RTMPose 当前结果最好地平衡了静态负激活与多人召回，但 HumanArt 分发、C6c、床上躺卧、宠物移动、多人 tracking 和事件指标仍未关闭，不能据此晋级最终比赛模型。
+
+### 决定
+
+1. 接受 r2 source manifest、attribution、dataset lock、`StaticHome*` 契约、静态 runner 和 job `1766` 为 G4 E1 静态人物检测回归资产。
+2. job `1765` 固定为 rejected evidence：保留审计记录但不进入正式指标、模型比较或里程碑数值。
+3. RTMPose 继续作为 conditional accuracy candidate，Keypoint R-CNN 继续作为 fallback，YOLO 继续作为 V1 对照；本轮不改变 REV-013 的最终选型状态。
+4. 不在本 12 图上调整 0.35 / 0.05 / 0.5 阈值或增加 checkpoint；下一次参数决定只能在预先冻结的 C6c held-out 视频上形成新 policy revision。
+5. 静态 false activation 与 IoU box matching 不得写成跌倒误报率、事件 recall、多人 tracking 或 C6c 精度；所有 risk/alert 字段继续硬编码为 false。
+6. 将 furniture/pet/multi-person 静态人物检测子门标记完成；空场持续、床上躺卧、宠物移动、真实多人 tracking、跌倒正样本和事件指标仍 Open，V1-R1 保持 In progress。
+
+### 验证
+
+- 自动化：78 passed；`pip check` 无 broken requirements；`compileall`、`bash -n` 与 `git diff --check` 通过。
+- 正式执行：Slurm job `1766`，L40，completed `0:0`，16 s；parent + 36 child 均为 `fad9491`、clean、E1、completed，36/36 tracking false。
+- 数据：source manifest `434126ff0919dabed9ee40d702d71993fd8b5866d6c46162fa1441c8c2acfcd0`；suite `e62b34dbf093253e240bf780a85105caaf0ade09e722415a85136ba330340470`；attribution `fbcbec44f0276e09f6567d2c00d5c4cae0a9529de59ebf8e6e10c4f072e55efd`；lock `7568e4b8c49f4e8629a151c9dd05d2ff67ff08a030b1e84ec16bfa8c647b3f94`。
+- 产物：parent manifest `6e3e3ef711cc9f70edd9e8b57b698f3dc734d5c669a29fb5b36e6dadfd590aed`；report `fafafe109afcfafe5c946653371db4a06418399aa14664c1506c34dc2f777945`；41/41 parent steps completed，0 error / 0 warning。
+- 性能：YOLO / RTMPose / Keypoint R-CNN mean inference 115.749 / 88.695 / 63.434 ms；peak CUDA allocation 65.532 / 43.137 / 742.249 MiB；静态值不替代视频 RTF。
+- 隐私：parent + 36 child report/SourceAsset 中 bbox、keypoints、track ID、绝对路径、原始 landing/作者页、risk/alert true 均为 0 命中。
+
+### 行动项
+
+| 行动 | 负责人 | 截止日期 | 状态 |
+|---|---|---|---|
+| 按 REV-014 获取 C6c 核心包并在首次推理前冻结 held-out 与三模型 policy | 待指定采集人 / Codex | 2026-08-01 | Open |
+| 在 C6c 扩展包增加空场持续、床上躺卧、宠物移动和真实多人 tracking 场景 | 待指定采集人 | 2026-08-03 | Open |
+| 为受控错误可视化定义最小留存期、访问人和删除审计，不把 bbox 发布到父报告 | 项目组 | 2026-08-03 | Open |
+| 比赛展示/再分发前重新访问 12 个 landing page 并生成最终 attribution / NOTICE | 待指定许可证负责人 | 2026-08-29 | Open |
+
+### 未决问题
+
+1. C6c 视频 person-absent 口径按每帧、每分钟激活还是持续事件计数，如何避免把单帧静态比例误搬到时序？
+2. 多人策略采用全体风险候选、区域主目标还是 track-aware 人工确认，怎样处理进出画与遮挡？
+3. 若低阈值 RTMPose 在 C6c 继续保持召回但产生更多 FP，应先做场景/时序过滤，还是重新训练许可清晰的 detector？

@@ -1,6 +1,6 @@
 # V1-R1 G4 Open Images 静态居家人物检测压力集
 
-状态：Implemented revision r2；等待修正提交上的 L40 三模型正式运行
+状态：Accepted for E1 static person-detection stress slice；真实设备 G4 仍 Open
 
 基准日期：2026-07-22
 
@@ -121,7 +121,7 @@ make submit-g4-static-home-benchmark
 5. parent、variant 和 36 个 child 的 `risk_assessment_emitted`、`alert_emitted` 均为 false；
 6. 报告只写“静态人物检测压力”，不写跌倒、时序事件或 C6c 能力已验收。
 
-正式结果完成后记录到 `docs/reports/v1-g4-openimages-static-home-stress.md` 和 REV-015。
+正式结果见 [Open Images 静态居家人物检测压力报告](reports/v1-g4-openimages-static-home-stress.md)与 REV-015。
 
 ## 8. 仍未关闭
 

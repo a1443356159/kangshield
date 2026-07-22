@@ -206,7 +206,7 @@ kangshield-info benchmark-static-home \
 make submit-g4-static-home-benchmark
 ```
 
-准备器同时冻结 4 个官方 provenance CSV、12 张图片的字节摘要、Open Images Person 标签/框、逐图作者/标题/CC BY 2.0 landing-page 审计，以及 Google LLC / CC BY 4.0 标注归因。runner 对每张图独立推理且 `tracking=false`，person-absent 预测全部计 FP，多人物按 IoU 0.5 一对一匹配。该结果只能称为静态人物检测压力，不能写成跌倒误报率或 C6c 结果。详见[静态压力集设计](v1-g4-openimages-static-home-stress.md)。
+准备器同时冻结 4 个官方 provenance CSV、12 张图片的字节摘要、Open Images Person 标签/框、逐图作者/标题/CC BY 2.0 landing-page 审计，以及 Google LLC / CC BY 4.0 标注归因。runner 对每张图独立推理且 `tracking=false`，person-absent 预测全部计 FP，多人物按 IoU 0.5 一对一匹配。该结果只能称为静态人物检测压力，不能写成跌倒误报率或 C6c 结果。详见[静态压力集设计](v1-g4-openimages-static-home-stress.md)与[正式报告](reports/v1-g4-openimages-static-home-stress.md)。
 
 ### V1-M3 语音同集对比
 

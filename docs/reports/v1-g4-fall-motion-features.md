@@ -133,7 +133,7 @@ yolox_m_humanart.onnx: Apache-2.0 -> model-artifact-license-review-required
 
 ## 8. 下一步
 
-1. REV-012 已用 CAUCAFall 补拾物/坐下/跪地/行走和三档光照；继续增加空房、纯家具、床上躺卧、宠物和多人负样本并完成许可证审查。
+1. REV-012 已用 CAUCAFall 补拾物/坐下/跪地/行走和三档光照；REV-015 又以 Open Images r2 补静态 furniture/pet/multi-person 人物检测压力。继续增加 C6c 空场视频、床上躺卧、宠物移动和多人 tracking，并完成交付时许可证复审。
 2. 取得 C6c 场景矩阵后以同一配置复跑，并报告按光照/距离/遮挡的 available、fallback 和代理激活。
 3. 为真实设备集增加 person-presence、动作区间和事件时刻人工标注，届时再设计误触发与检出延迟口径。
 4. REV-013 已评估不依赖 Human-Art 的 Keypoint R-CNN；因 lying gate 仅 4/21 和 COCO/ImageNet 分发仍 Open，只保留 fallback。最终模型与项目 LICENSE/NOTICE 仍需独立决定。

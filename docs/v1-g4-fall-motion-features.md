@@ -126,7 +126,7 @@ REV-013 后 runner 也接受 `torchvision-keypointrcnn`。该路线不做历史 
 
 Keypoint R-CNN 后续在 URFD lying 为 21/21 有框，但只有 4/21 通过关键点门；CAUCAFall 又出现 5 个 gate-passed + torso-horizontal 的 no-fall kneel/walk 帧。因此质量门是字段可用门，不是事件决策门。完整证据见[独立候选报告](reports/v1-m3-torchvision-keypointrcnn-candidate.md)。
 
-[Open Images 静态居家压力集](v1-g4-openimages-static-home-stress.md)进一步冻结 4 张家具无人、4 张宠物无人和 4 张室内多人图片，只评测 person-absent false activation 与 IoU 0.5 人物框匹配。它不运行本节时序特征，不能补床上躺卧、宠物移动、多人 tracking 或事件级指标。
+[Open Images 静态居家压力集](v1-g4-openimages-static-home-stress.md)进一步冻结 4 张家具无人、4 张宠物无人和 4 张室内多人图片，只评测 person-absent false activation 与 IoU 0.5 人物框匹配。job `1766` 中 RTMPose 的无人激活最低（2/8）且多人匹配 11/11，但仍有 5 个 overall FP；该结果不运行本节时序特征，不能补床上躺卧、宠物移动、多人 tracking 或事件级指标。完整结果见[静态压力报告](reports/v1-g4-openimages-static-home-stress.md)。
 
 ## 8. V2 前的剩余门
 

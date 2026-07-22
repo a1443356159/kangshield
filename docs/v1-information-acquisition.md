@@ -311,7 +311,7 @@ V1-M3 姿态同集对比已经冻结模型、摘要、阈值和报告契约，�
 
 V1-R1 G4 已把既有姿态事件转换为 box 横卧/下降/低运动、横卧持续、COCO-17 关键点质量门和显式 fallback reason，见 [G4 设计](v1-g4-fall-motion-features.md)和[正式 E1 报告](reports/v1-g4-fall-motion-features.md)。RTMPose 在 21 个 lying 采样帧中有 20 帧可用框、11 帧通过关键点门；Keypoint R-CNN 为 21 帧有框但只有 4 帧过门。CAUCAFall 又证明 gate-passed torso-horizontal 会出现在 no-fall kneel/walk。这些是特征覆盖与混淆证据，不是跌倒准确率；真实 C6c G4、居家负样本和事件决策仍未关闭，且本切片不生成 RiskAssessment 或告警。
 
-另行设计的 [Open Images 静态居家人物检测压力集](v1-g4-openimages-static-home-stress.md)固定 4 张家具无人、4 张宠物无人和 4 张室内多人图片，以人工验证 Person 负标签和 validation Person boxes 测 false activation / IoU 匹配。该结果只缩小静态人物检测缺口：没有视频时间、动作、床上躺卧、宠物移动或多人身份，因此不改变真实 G4 与事件决策的 Open 状态。
+另行完成的 [Open Images 静态居家人物检测压力集](v1-g4-openimages-static-home-stress.md)固定 4 张家具无人、4 张宠物无人和 4 张室内多人图片，以人工验证 Person 负标签和 validation Person boxes 测 false activation / IoU 匹配。正式 job `1766` 中 RTMPose / YOLO / Keypoint R-CNN 的无人激活为 2/8、3/8、3/8，多人匹配为 11/11、9/11、11/11，详见[正式报告](reports/v1-g4-openimages-static-home-stress.md)。该结果只缩小静态人物检测缺口：没有视频时间、动作、床上躺卧、宠物移动或多人身份，因此不改变真实 G4 与事件决策的 Open 状态。
 
 V1-M3 语音同集对比已经完成，见 [语音模型对比设计](v1-m3-speech-model-comparison.md)和[正式报告](reports/v1-m3-speech-model-comparison.md)。FunASR 保留为普通话默认候选，Whisper small 不晋级；该结论只来自六条 clean FLEURS 普通话，不代表 C6c 远场、方言、老人或背景噪声效果。
 
