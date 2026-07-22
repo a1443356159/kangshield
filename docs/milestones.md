@@ -60,6 +60,7 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 | V1-M2a 同容器 PTS Adapter 与 owner-only 证据 | `8c6df2d` / `15406db` / `eca6231` / `243cef3` / `195c966` / `d1d4b5a` / `8b4b52d` / `8fdebd0` | `origin/main` | 2026-07-23 已验证 | job `1777` 完成单容器音轨解码、PTS 平移、真实 YOLO/FunASR、路径脱敏与 `0700/0600/0600` 审计；仍不证明 C6c 开放音轨或真实 clock/drift |
 | V1 正式 Slurm Runtime/Submit 契约 | `673560d` / `667ad8d` / `b54d8b8` / `fd5025f` | `origin/main` | 2026-07-23 已验证 | 八个 sbatch 统一 runtime，完整 submit/execution commit 绑定、checkout import、owner-only 与 CUDA 门；job `1780` 通过，只验收运行基础设施，不代表模型或设备能力 |
 | V1-R1 比赛提交分发就绪门 | `6c32364` / `c23c5be` | `origin/main` | 2026-07-23 已验证 | 7 个来源摘要、13 项资产 disposition、5 项 owner decision、3 个发布文件、5 个 fail-closed gate 与 REV-023；工程门禁通过，当前提交包保持 0/5 ready，不代表获得法律许可或可以分发 |
+| V1-R1 候选 Runtime 依赖闭包门 | `876ce07` / `f93a41a` | `origin/main` | 2026-07-23 已验证 | RTMPose + FunASR 候选 profile、脱敏 inventory、extras/marker 闭包、八个 fail-closed gate 与 REV-024；工程工具通过，共享环境保持 3/8 ready，不代表 final lock、NOTICE 或比赛环境已冻结 |
 
 这里的“推送验证”只证明代码已到达远端。V1-M1 仍为 In progress，必须取得 C6c 与 CS-EP-SDNL1 的 E2/E3 证据后才能进入 Review/Done。V1-M2a 和 V1-M2b 的 Done 只关闭设备无关 E1 链路及公开固定集评测，不会提升真实设备证据等级。V1-M3 的姿态、语言和睡眠字段三个 E1 切片均已验收，因此仅在 E1 探索范围标记 Done；M2c 已有采集规程、容器时间戳工具和采集包 readiness gate，但仍没有真实 C6c 媒体或 SDNL1 字段证据。V1-R1 G4 的离线特征、首版候选状态机、公开压力与双标注/裁决/事件 scorer 也都只属于 E1，不能替代 C6c 正负视频、冻结策略的真实候选/事件指标、床上躺卧、多人 tracking 或跌倒风险/告警验收。
 
