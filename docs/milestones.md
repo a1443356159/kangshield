@@ -46,6 +46,7 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 | V1-M3 语音同集对比 | `270fdc1` / `271bf94` | `origin/main` | 2026-07-22 已验证 | FunASR 与 Whisper small 的固定六 case、静音、性能和隐私对比；FunASR 保留默认候选，结论只属于 E1 |
 | V1-M3 睡眠字段路线 / E1 总 Review | `5635e95` / `ccb8e47` | `origin/main` | 2026-07-22 已验证 | 无值 profiler、fail-closed route gate、正式 E1 报告和 REV-008；V1-M3 仅在 E1 探索范围 Done，不代表 SDNL1 真机字段已取得 |
 | V1-R1 E1 决策基线 | `f4aa1c5` / `ea9b837` | `origin/main` | 2026-07-22 已验证 | HumanArt 许可证 fail-closed 修正、采用/候选/放弃账本、V2 七个硬门和 REV-009；V1-R1 仍等待真机与最终分发决定 |
+| V1-M2c 容器时间戳 E1 工具 | `4b17b21` / `4a65630` / `c5f2715` | `origin/main` | 2026-07-22 已验证 | PyAV 轨道与逐包 PTS/DTS、required-audio gate、确定性 AVI、正式 E1 报告和 REV-010；不代表 C6c 音频或 G2 已验收 |
 
 这里的“推送验证”只证明代码已到达远端。V1-M1 仍为 In progress，必须取得 C6c 与 CS-EP-SDNL1 的 E2/E3 证据后才能进入 Review/Done。V1-M2a 和 V1-M2b 的 Done 只关闭设备无关 E1 链路及公开固定集评测，不会提升真实设备证据等级。V1-M3 的姿态、语言和睡眠字段三个 E1 切片均已验收，因此仅在 E1 探索范围标记 Done；M2c 已有采集规程和 E1 容器时间戳工具，但仍没有真实 C6c 媒体或 SDNL1 字段证据。
 
