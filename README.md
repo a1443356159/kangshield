@@ -24,6 +24,7 @@
 - [V1-M2b 公开固定集初测报告](docs/reports/v1-m2b-public-dataset-benchmark.md)
 - [V1-M3 姿态模型对比设计](docs/v1-m3-pose-model-comparison.md)
 - [V1-M3 姿态模型同集对比报告](docs/reports/v1-m3-pose-model-comparison.md)
+- [V1-M3 语音模型同集对比设计](docs/v1-m3-speech-model-comparison.md)
 - [V1-M2c 目标设备样本与时间基采集规程](docs/v1-m2c-device-sample-protocol.md)
 
 ## V1 初步开发
@@ -82,6 +83,18 @@ kangshield-info benchmark-pose-models \
 ```
 
 该命令只重放六段视频，对比 YOLO26n-pose 与 YOLOX-m HumanArt + RTMPose-m HumanArt；不会重复运行语言模型。模型固定信息、阈值偏差和评测边界见[V1-M3 设计](docs/v1-m3-pose-model-comparison.md)。
+
+运行 V1-M3 同集语音对比：
+
+```bash
+python -m pip install -e ".[dev,multimodal,speech-compare]"
+python scripts/prepare_v1_m3_speech_models.py
+kangshield-info benchmark-speech-models \
+  data/processed/v1-m2b/benchmark-cases.json \
+  --offline-models
+```
+
+该命令只重放六条 FLEURS 普通话，对比 FunASR 基线与 Whisper small，并运行不落原文的静音探针；不会重复运行视频模型。固定解码、权重、CER 和隐私口径见[语音模型对比设计](docs/v1-m3-speech-model-comparison.md)。
 
 输出默认写入被 Git 忽略的 runs 目录。Fixture 只能作为 E1 开发证据，不能写成真实设备已接通。
 

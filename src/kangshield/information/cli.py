@@ -177,6 +177,48 @@ def build_parser() -> argparse.ArgumentParser:
     pose_benchmark.add_argument("--pose-sample-fps", type=float, default=5.0)
     pose_benchmark.add_argument("--max-duration-s", type=float, default=30.0)
 
+    speech_benchmark = subparsers.add_parser(
+        "benchmark-speech-models",
+        help="Compare the FunASR baseline and Whisper small on V1-M2b speech",
+    )
+    speech_benchmark.add_argument("benchmark_cases", type=Path)
+    speech_benchmark.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    speech_benchmark.add_argument(
+        "--variant",
+        action="append",
+        choices=("funasr-paraformer", "whisper-small"),
+        help="Repeat to select variants; defaults to both in this order",
+    )
+    speech_benchmark.add_argument("--asr-model", default="paraformer-zh")
+    speech_benchmark.add_argument("--vad-model", default="fsmn-vad")
+    speech_benchmark.add_argument("--punc-model", default="ct-punc")
+    speech_benchmark.add_argument("--funasr-device", default="auto")
+    speech_benchmark.add_argument("--language", default="zh")
+    speech_benchmark.add_argument("--offline-models", action="store_true")
+    speech_benchmark.add_argument(
+        "--whisper-model",
+        type=Path,
+        default=Path("models/whisper/small.pt"),
+    )
+    speech_benchmark.add_argument("--whisper-device", default="auto")
+    speech_benchmark.add_argument("--whisper-beam-size", type=int, default=5)
+    whisper_precision = speech_benchmark.add_mutually_exclusive_group()
+    whisper_precision.add_argument(
+        "--whisper-fp16",
+        dest="whisper_fp16",
+        action="store_const",
+        const=True,
+        help="Force FP16 decoding",
+    )
+    whisper_precision.add_argument(
+        "--whisper-fp32",
+        dest="whisper_fp16",
+        action="store_const",
+        const=False,
+        help="Force FP32 decoding",
+    )
+    speech_benchmark.set_defaults(whisper_fp16=None)
+
     return parser
 
 
@@ -451,6 +493,54 @@ def _benchmark_pose_models_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def _benchmark_speech_models_command(args: argparse.Namespace) -> int:
+    from .speech_benchmark import run_speech_model_comparison
+
+    variants = args.variant or ["funasr-paraformer", "whisper-small"]
+    run, report = run_speech_model_comparison(
+        benchmark_cases_path=args.benchmark_cases,
+        runs_dir=args.runs_dir,
+        variants=variants,
+        asr_model=args.asr_model,
+        vad_model=args.vad_model,
+        punc_model=args.punc_model,
+        funasr_device=args.funasr_device,
+        language=args.language,
+        offline_models=args.offline_models,
+        whisper_model=args.whisper_model,
+        whisper_device=args.whisper_device,
+        whisper_beam_size=args.whisper_beam_size,
+        whisper_fp16=args.whisper_fp16,
+    )
+    summaries = [
+        {
+            "variant_id": variant.variant_id,
+            "corpus_character_error_rate": (
+                variant.corpus_character_error_rate
+            ),
+            "transcript_exact_match_count": (
+                variant.transcript_exact_match_count
+            ),
+            "blank_output_count": variant.blank_output_count,
+            "speech_inference_realtime_factor": variant.realtime_factors[
+                "speech_inference"
+            ],
+            "silence_probe_passed": variant.silence_probe["passed"],
+        }
+        for variant in report.variants
+    ]
+    _print_result(
+        run,
+        {
+            "benchmark_id": report.benchmark_id,
+            "case_count": report.case_count,
+            "variants": summaries,
+            "comparisons": report.comparisons,
+        },
+    )
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "probe-media":
@@ -465,6 +555,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _benchmark_dataset_command(args)
     if args.command == "benchmark-pose-models":
         return _benchmark_pose_models_command(args)
+    if args.command == "benchmark-speech-models":
+        return _benchmark_speech_models_command(args)
     raise RuntimeError(f"unhandled command: {args.command}")
 
 

@@ -366,6 +366,71 @@ class PoseModelComparisonReport(ContractModel):
     limitations: list[str] = Field(default_factory=list)
 
 
+class SpeechBenchmarkCaseEvaluation(ContractModel):
+    """Privacy-safe per-case ASR metrics; transcript text is deliberately absent."""
+
+    schema_version: str = "1.0"
+    case_id: str
+    variant_id: str
+    run_id: str
+    audio_sample: str
+    audio_gender: str
+    audio_duration_ms: int = Field(ge=0)
+    segment_count: int = Field(ge=0)
+    speech_duration_ms: int = Field(ge=0)
+    speech_coverage: float = Field(ge=0.0, le=1.0)
+    reference_char_count: int = Field(ge=0)
+    hypothesis_char_count: int = Field(ge=0)
+    edit_distance: int = Field(ge=0)
+    character_error_rate: float = Field(ge=0.0)
+    transcript_exact_match: bool
+    blank_output: bool
+    timing_ms: dict[str, float] = Field(default_factory=dict)
+    realtime_factor: float = Field(ge=0.0)
+    limitations: list[str] = Field(default_factory=list)
+
+
+class SpeechBenchmarkVariantReport(ContractModel):
+    schema_version: str = "1.0"
+    variant_id: str
+    model_bindings: list[ModelBinding]
+    case_count: int = Field(ge=0)
+    cases: list[SpeechBenchmarkCaseEvaluation]
+    total_audio_duration_ms: int = Field(ge=0)
+    total_speech_duration_ms: int = Field(ge=0)
+    speech_coverage: float = Field(ge=0.0, le=1.0)
+    total_reference_chars: int = Field(ge=0)
+    total_hypothesis_chars: int = Field(ge=0)
+    total_edit_distance: int = Field(ge=0)
+    corpus_character_error_rate: float = Field(ge=0.0)
+    transcript_exact_match_count: int = Field(ge=0)
+    blank_output_count: int = Field(ge=0)
+    by_gender: dict[str, dict[str, float | int]] = Field(default_factory=dict)
+    silence_probe: dict[str, float | int | bool | str | None] = Field(
+        default_factory=dict
+    )
+    runtime_environment: dict[str, Any] = Field(default_factory=dict)
+    timing_ms: dict[str, float] = Field(default_factory=dict)
+    realtime_factors: dict[str, float] = Field(default_factory=dict)
+    limitations: list[str] = Field(default_factory=list)
+
+
+class SpeechModelComparisonReport(ContractModel):
+    schema_version: str = "1.0"
+    benchmark_id: str
+    benchmark_version: str
+    evidence_level: EvidenceLevel = EvidenceLevel.E1
+    source_manifest_sha256: str = Field(min_length=64, max_length=64)
+    benchmark_cases_sha256: str = Field(min_length=64, max_length=64)
+    case_count: int = Field(ge=0)
+    primary_metric: str
+    variants: list[SpeechBenchmarkVariantReport]
+    comparisons: dict[str, dict[str, float | int | str | bool | None]] = Field(
+        default_factory=dict
+    )
+    limitations: list[str] = Field(default_factory=list)
+
+
 class RunStep(ContractModel):
     name: str
     status: StepStatus = StepStatus.RUNNING

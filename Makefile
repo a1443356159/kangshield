@@ -1,4 +1,4 @@
-.PHONY: test info-fixtures prepare-mm-models prepare-mm-smoke submit-mm-smoke prepare-m2b-data submit-m2b-benchmark prepare-m3-pose-models submit-m3-pose-comparison
+.PHONY: test info-fixtures prepare-mm-models prepare-mm-smoke submit-mm-smoke prepare-m2b-data submit-m2b-benchmark prepare-m3-pose-models submit-m3-pose-comparison prepare-m3-speech-models submit-m3-speech-comparison
 
 PYTHON ?= python3
 KANG_VIDEO_INPUT ?= $(CURDIR)/data/raw/public-smoke/ultralytics-bus-replay.avi
@@ -37,3 +37,11 @@ submit-m3-pose-comparison:
 	test -f "$(KANG_M2B_CASES)"
 	$(PYTHON) scripts/prepare_v1_m3_pose_models.py --offline
 	sbatch --export=ALL,KANG_DATASET_CASES="$(KANG_M2B_CASES)" scripts/slurm/v1_m3_pose_comparison.sbatch
+
+prepare-m3-speech-models:
+	$(PYTHON) scripts/prepare_v1_m3_speech_models.py
+
+submit-m3-speech-comparison:
+	test -f "$(KANG_M2B_CASES)"
+	$(PYTHON) scripts/prepare_v1_m3_speech_models.py --offline
+	sbatch --export=ALL,KANG_DATASET_CASES="$(KANG_M2B_CASES)" scripts/slurm/v1_m3_speech_comparison.sbatch

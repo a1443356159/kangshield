@@ -75,6 +75,8 @@ M7 在 V1-M2b 增加“固定数据源清单 → 数据准备 → 单 case run �
 
 V1-M3 在 M3/M7 之间增加“同一 PoseBackend 契约 → 视频-only variant runner → 阶段/质量/性能对比”。在线姿态事件不读取 URFD 标签；标签只在评测器中按媒体相对时间匹配。RTMPose 采用独立人物检测、top-down 关键点和短时 IoU ID，但仍输出既有 PoseDetection，避免候选框架反向改变公共数据契约。
 
+语言切片沿用相同边界：“同一 SpeechBackend 契约 → audio-only variant runner → CER/静音/性能对比”。FunASR 与 Whisper 都只返回 SpeechSegment；参考文本仅由 M7 评测器读取，提取器不能读取或调参。逐句转写停留在被忽略的 child FeatureEvent，case/variant/父报告只包含字符计数和聚合指标。
+
 ## 5. V1 运行形态
 
 V1 采用一次运行一个目录的离线流水线：

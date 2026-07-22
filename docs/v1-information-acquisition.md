@@ -200,7 +200,7 @@ AppKey、AccessToken、设备验证码和设备序列号不得提交到仓库。
 | 人脸几何 | MediaPipe Face Landmarker | 478 个 3D 人脸点、52 个 blendshape、变换矩阵 | 只做可见性和表达变化探索，不直接当 FACS AU |
 | FACS AU | OpenFace | AU presence/intensity、头姿、眼动等 | 仅做对照实验；研究代码、老化工程栈和商业许可需审查 |
 | 中文 VAD/ASR | FunASR FSMN-VAD + Paraformer-zh + CT-Punc | 语音段、中文转写、时间戳、标点 | V1 已采用中文基线；固定权重按 SHA-256 追溯 |
-| 多语种 ASR 对照 | OpenAI Whisper small/turbo | 多语种转写、语言和时间段信息 | 对照；单独使用 Python 3.11 环境测试 |
+| 多语种 ASR 对照 | OpenAI Whisper small | 多语种转写、语言和时间段信息 | V1-M3 同集对照已实现；固定 20250625 原始运行时可在当前 Python 3.13 环境运行，等待 L40 正式结果 |
 | 声学特征 | openSMILE eGeMAPS | F0、HNR、Jitter、Shimmer、能量、谱特征等 | 只输出客观声学量，不直接输出疾病判断 |
 | 环境声音 | YAMNet | 521 类通用音频事件及 embedding | 低优先级；先确认跌倒撞击/呼救是否在实际音频中可分 |
 | 睡眠信息 | 字段映射与质量规则 | 心率/呼吸/在离床/睡眠摘要等实际开放字段 | 不先上模型；先完成 API 字段与缺失分析 |
@@ -304,5 +304,7 @@ V1 不在没有参考设备的情况下声称心率、呼吸或睡眠分期准�
 设备无关基线已在 Slurm L40 上通过 E1 smoke，见 [V1-M2a 初测报告](reports/v1-m2a-multimodal-smoke.md)。该结果不改变前四项真实设备任务的证据状态。
 
 V1-M3 姿态同集对比已经冻结模型、摘要、阈值和报告契约，见 [姿态模型对比设计](v1-m3-pose-model-comparison.md)。它只复用公开 URFD 视频；最终是否进入 V2 仍取决于 L40 结果、C6c V1-M2c 复测和许可证 Review。
+
+V1-M3 语音同集对比也已冻结 FunASR/Whisper small、解码、摘要、corpus CER 与静音探针口径，见 [语音模型对比设计](v1-m3-speech-model-comparison.md)。它只复用六条 clean FLEURS 普通话，不代表 C6c 远场、方言、老人或背景噪声效果。
 
 萤石通用 SDK 能力可参考[官方 SDK 说明](https://open.ys7.com/doc/zh/book/4.x/android-sdk.html)；CS-EP-SDNL1 硬件参数可参考[萤石官方商品页](https://www.ys7.com/item/994492.html)。最终判断必须以测试账号的真实能力集和接口响应为准。

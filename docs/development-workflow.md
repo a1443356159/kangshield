@@ -138,6 +138,19 @@ make submit-m3-pose-comparison
 
 计算节点不得下载权重。父报告记录两个 variant 的模型摘要、阶段覆盖、关键点质量、耗时和显存口径；详细设计见 [V1-M3 姿态模型对比](v1-m3-pose-model-comparison.md)。
 
+### V1-M3 语音同集对比
+
+在登录节点固定并校验 OpenAI Whisper small 和已有 FunASR 权重，再由同一 L40 job 顺序运行两个 variant：
+
+```bash
+python -m pip install -r requirements/slurm-speech-comparison.txt
+python scripts/prepare_v1_m3_speech_models.py
+python scripts/prepare_v1_m3_speech_models.py --offline
+make submit-m3-speech-comparison
+```
+
+计算节点不得下载权重或改变解码参数。父报告以 corpus CER 为主指标，另记录静音探针、按 gender 的诊断切片、纯推理 RTF 和显存口径；逐句转写不得进入 case/variant/comparison JSON。详细设计见 [V1-M3 语音模型同集对比](v1-m3-speech-model-comparison.md)。
+
 ## 5. 运行检查
 
 每次运行后检查：

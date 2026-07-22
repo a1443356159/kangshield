@@ -139,6 +139,17 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 
 设计见 [V1-M3 姿态模型对比](v1-m3-pose-model-comparison.md)，实测证据见 [同集对比报告](reports/v1-m3-pose-model-comparison.md)。姿态切片完成不等于整个 V1-M3 Done；ASR 对照和睡眠字段路线仍需在 V1-R1 前形成采用/候选/放弃结论。
 
+当前语言切片：
+
+- [x] 冻结 FunASR baseline 与 OpenAI Whisper small candidate、权重摘要和许可证。
+- [x] 固定 `zh/transcribe`、beam 5、temperature 0 和现有字符归一化/CER 口径。
+- [x] 实现 audio-only 双 variant、privacy-safe case/aggregate 契约和 2 秒全零静音探针。
+- [x] 完成 35 项自动化测试、全部权重离线校验及两个 variant 各自六 case + 静音 CPU 开发预检；baseline 复现 `9/137`。
+- [ ] 在干净提交的 L40 上复现 FunASR `9/137` 并完成 Whisper 六 case 正式对比。
+- [ ] Review CER、静音失败、性能和真实设备缺口，形成 V2 语言候选决定。
+
+语言切片设计见 [V1-M3 语音模型同集对比](v1-m3-speech-model-comparison.md)。开发预检不作为正式里程碑证据；完整 V1-M3 仍需关闭语言 Review 与睡眠字段路线。
+
 每个候选模型必须记录：
 
 - 模型及权重版本、许可证、输入尺寸。

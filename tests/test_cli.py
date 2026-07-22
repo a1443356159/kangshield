@@ -44,3 +44,14 @@ def test_pose_benchmark_parser_defaults_to_both_variants():
     assert args.command == "benchmark-pose-models"
     assert args.variant is None
     assert args.rtmpose_detection_confidence == 0.05
+
+
+def test_speech_benchmark_parser_freezes_candidate_decoding_defaults():
+    args = build_parser().parse_args(
+        ["benchmark-speech-models", "benchmark-cases.json"]
+    )
+    assert args.command == "benchmark-speech-models"
+    assert args.variant is None
+    assert args.language == "zh"
+    assert args.whisper_beam_size == 5
+    assert args.whisper_fp16 is None
