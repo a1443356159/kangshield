@@ -162,6 +162,10 @@ make submit-m3-speech-comparison
 
 计算节点不得下载权重或改变解码参数。父报告以 corpus CER 为主指标，另记录静音探针、按 gender 的诊断切片、纯推理 RTF 和显存口径；逐句转写不得进入 case/variant/comparison JSON。详细设计见 [V1-M3 语音模型同集对比](v1-m3-speech-model-comparison.md)。
 
+### V1-R1 决策与许可证门
+
+V1-R1 的当前采用/候选/放弃状态见 [探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。框架许可证、预训练权重、训练数据和比赛提交物必须分别记录；特别是 HumanArt + RTMPose 的 ModelBinding 已改为 `model-artifact-license-review-required`，不能因 MMPose 实现为 Apache-2.0 而自动解锁权重分发。
+
 ## 5. 运行检查
 
 每次运行后检查：

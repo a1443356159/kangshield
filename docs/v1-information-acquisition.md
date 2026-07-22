@@ -192,17 +192,17 @@ AppKey、AccessToken、设备验证码和设备序列号不得提交到仓库。
 
 | 模态/任务 | 候选 | 可得到的输出 | V1 决策 |
 |---|---|---|---|
-| 单人姿态快速候选 | MediaPipe Pose Landmarker | 每人 33 个图像/世界姿态点、可见性、可选分割 | 待对比；需要 CPU/移动端基线时加入 |
-| 多人/远距离姿态 | YOLO26n-pose + ByteTrack | 人体框、17 个 COCO 关键点、置信度、轨迹 | V1 已采用基线；V2 前必须解决 AGPL/Enterprise 许可证门或替换 |
-| 姿态精度候选 | YOLOX-m HumanArt + RTMPose-m HumanArt | 人体框、COCO-17 关键点、置信度、短时轨迹 | V1-M3 对比进行中；采用 ONNXRuntime，重点检查 lying 覆盖与 fall-01 关键点质量 |
-| 跌倒时序 | 规则特征 | 髋部下降、躯干角度、宽高比、横卧与静止窗口 | V1 首选，可解释且不需要训练集 |
-| 时序动作模型 | MMAction2 PoseC3D / ST-GCN 系列 | 骨架序列动作分类 | V2 候选；只有获得足够标注片段后才启动 |
-| 人脸几何 | MediaPipe Face Landmarker | 478 个 3D 人脸点、52 个 blendshape、变换矩阵 | 只做可见性和表达变化探索，不直接当 FACS AU |
-| FACS AU | OpenFace | AU presence/intensity、头姿、眼动等 | 仅做对照实验；研究代码、老化工程栈和商业许可需审查 |
-| 中文 VAD/ASR | FunASR FSMN-VAD + Paraformer-zh + CT-Punc | 语音段、中文转写、时间戳、标点 | V1 已采用中文基线；固定权重按 SHA-256 追溯 |
+| 单人姿态快速候选 | MediaPipe Pose Landmarker | 每人 33 个图像/世界姿态点、可见性、可选分割 | V1-R1 Defer；只有 CPU/移动端成为明确部署门时重开 |
+| 多人/远距离姿态 | YOLO26n-pose + ByteTrack | 人体框、17 个 COCO 关键点、置信度、轨迹 | V1 对照；lying 42.86% 且有 AGPL/Enterprise 门，不进入 V2 默认主链路 |
+| 姿态精度候选 | YOLOX-m HumanArt + RTMPose-m HumanArt | 人体框、COCO-17 关键点、置信度、短时轨迹 | V1-R1 Conditional；lying 95.24%，但 C6c、fall-01 关键点、负样本和 Human-Art artifact 分发门仍 Open |
+| 跌倒时序 | 规则特征 | 框中心下降、宽高比、横卧/静止窗口、关键点质量与 fallback | V1-R1 Conditional design input；先实现离线特征，不输出风险结论 |
+| 时序动作模型 | MMAction2 PoseC3D / ST-GCN 系列 | 骨架序列动作分类 | V1-R1 Defer；只有规则基线、目标设备和足够标注片段完成后才启动 |
+| 人脸几何 | MediaPipe Face Landmarker | 478 个 3D 人脸点、52 个 blendshape、变换矩阵 | V1-R1 Defer，不直接当 FACS AU |
+| FACS AU | OpenFace | AU presence/intensity、头姿、眼动等 | V1-R1 Defer；无 P0 任务、标签和许可终审 |
+| 中文 VAD/ASR | FunASR FSMN-VAD + Paraformer-zh + CT-Punc | 语音段、中文转写、时间戳、标点 | V1-R1 Conditional default；固定权重/模型卡按 SHA-256 追溯，等待 C6c 远场与打包门 |
 | 多语种 ASR 对照 | OpenAI Whisper small | 多语种转写、语言和时间段信息 | V1-M3 同集对照完成；普通话 CER 23.36% 对 FunASR 6.57%，不晋级普通话主链路；仅在新多语种/方言 held-out 证据下重开 |
-| 声学特征 | openSMILE eGeMAPS | F0、HNR、Jitter、Shimmer、能量、谱特征等 | 只输出客观声学量，不直接输出疾病判断 |
-| 环境声音 | YAMNet | 521 类通用音频事件及 embedding | 低优先级；先确认跌倒撞击/呼救是否在实际音频中可分 |
+| 声学特征 | openSMILE eGeMAPS | F0、HNR、Jitter、Shimmer、能量、谱特征等 | V1-R1 Defer；无目标设备、标签和 P0 验收指标 |
+| 环境声音 | YAMNet | 521 类通用音频事件及 embedding | V1-R1 Defer；先关闭跌倒视觉主线和实际音频证据 |
 | 睡眠信息 | 字段映射与 fail-closed 路线 gate | 心率/呼吸/在离床/睡眠摘要等实际开放字段 | 不选睡眠模型；19 direct、5 derived、11 not-assumed 已冻结，E2/E3 真实 schema 前不输出标准值 |
 
 模型依据：
@@ -299,14 +299,16 @@ V1 不在没有参考设备的情况下声称心率、呼吸或睡眠分期准�
 2. 对摄像头执行设备列表、能力集、直播、回放、抓图、告警和音频探测。
 3. 对睡眠仪获取一份真实 API/导出样例及字段说明。
 4. 使用 C6c 录制首批白天、夜视、远近距离视频与受控音频。
-5. 在冻结的真实样本上运行已打通的 YOLO26 pose/FunASR 基线，并加入 RTMPose、MediaPipe 或 Whisper 对照。
+5. 在冻结的真实样本上运行 YOLO26 对照、HumanArt + RTMPose 候选和 FunASR；不重复无门槛增加 MediaPipe/Whisper。
 
 设备无关基线已在 Slurm L40 上通过 E1 smoke，见 [V1-M2a 初测报告](reports/v1-m2a-multimodal-smoke.md)。该结果不改变前四项真实设备任务的证据状态。
 
-V1-M3 姿态同集对比已经冻结模型、摘要、阈值和报告契约，见 [姿态模型对比设计](v1-m3-pose-model-comparison.md)。它只复用公开 URFD 视频；最终是否进入 V2 仍取决于 L40 结果、C6c V1-M2c 复测和许可证 Review。
+V1-M3 姿态同集对比已经冻结模型、摘要、阈值和报告契约，见[姿态模型对比设计](v1-m3-pose-model-comparison.md)和[正式报告](reports/v1-m3-pose-model-comparison.md)。HumanArt + RTMPose 已成为准确率有条件候选；最终是否进入 V2 仍取决于 C6c V1-M2c 复测、负样本和许可证 Review。
 
 V1-M3 语音同集对比已经完成，见 [语音模型对比设计](v1-m3-speech-model-comparison.md)和[正式报告](reports/v1-m3-speech-model-comparison.md)。FunASR 保留为普通话默认候选，Whisper small 不晋级；该结论只来自六条 clean FLEURS 普通话，不代表 C6c 远场、方言、老人或背景噪声效果。
 
 V1-M3 睡眠路线不训练模型，而采用绑定《监测方案》的字段 policy 和 fail-closed mapping gate，见[睡眠字段路线](v1-m3-sleep-field-route.md)和[正式评审报告](reports/v1-m3-sleep-field-route.md)。通用萤石睡觉检测服务的宣传能力不会自动映射到 CS-EP-SDNL1；真实 E2/E3 schema、单位、时间和缺失语义确认前，所有标准化值与多夜派生保持关闭。
+
+V1 的 E1 采用/候选/放弃状态、许可证纠偏和 V2 硬门已汇总到 [V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。该预 Review 不会提升两台目标设备的证据等级。
 
 萤石通用 SDK 能力可参考[官方 SDK 说明](https://open.ys7.com/doc/zh/book/4.x/android-sdk.html)；CS-EP-SDNL1 硬件参数可参考[萤石官方商品页](https://www.ys7.com/item/994492.html)。最终判断必须以测试账号的真实能力集和接口响应为准。

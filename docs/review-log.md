@@ -209,8 +209,8 @@
 | 录制有明确同意的 C6c 正常行走、起坐、模拟跌倒、遮挡/夜视样本 | 待指定 | 2026-07-29 | Open |
 | 验证 C6c 音视频是否同容器及 PTS/时钟偏差 | 待指定 | 2026-07-29 | Open |
 | 建立近场、远场、电视背景和目标人群语音参考转写 | 待指定 | 2026-07-31 | Open |
-| 在同一固定样本比较 YOLO26n-pose 与 RTMPose | 待指定 | 2026-08-05 | Open |
-| 形成 V2 姿态模型许可证决定 | 待指定 | 2026-08-09 | Open |
+| 在同一固定样本比较 YOLO26n-pose 与 RTMPose | Codex | 2026-07-22 | Done（REV-006） |
+| 形成 V2 姿态模型许可证决定 | 待指定 | 2026-08-09 | In progress（REV-009；artifact 分发仍 Open） |
 
 ### 未决问题
 
@@ -264,9 +264,9 @@
 |---|---|---|---|
 | 获取 C6c 同意录制样本并验证音视频 PTS/时钟偏差 | 待指定 | 2026-07-29 | Open |
 | 获取 CS-EP-SDNL1 真实 API/SDK/导出字段样例 | 待指定 | 2026-07-29 | Open |
-| 在当前六段视频对比 RTMPose/MMPose 的 lying 阶段覆盖率 | 待指定 | 2026-08-05 | Open |
+| 在当前六段视频对比 RTMPose/MMPose 的 lying 阶段覆盖率 | Codex | 2026-07-22 | Done（REV-006） |
 | 设计人体检测 fallback 与短时轨迹容错基线 | 待指定 | 2026-08-05 | Open |
-| 完成 URFD/FLEURS/Ultralytics 的比赛使用与分发审查 | 待指定 | 2026-08-09 | Open |
+| 完成 URFD/FLEURS/Ultralytics 的比赛使用与分发审查 | 待指定 | 2026-08-09 | In progress（REV-009） |
 
 ### 未决问题
 
@@ -317,7 +317,7 @@
 | 按冻结阈值采集并评测 C6c 场景矩阵 | 待指定 | 2026-08-01 | Open |
 | 增加空房、家具、宠物、局部人体负样本 | 待指定 | 2026-08-03 | Open |
 | 实现并评测关键点质量门与 box-only fallback | 待指定 | 2026-08-05 | Open |
-| 完成 OpenMMLab/训练数据/URFD/比赛分发审查 | 待指定 | 2026-08-09 | Open |
+| 完成 OpenMMLab/训练数据/URFD/比赛分发审查 | 待指定 | 2026-08-09 | In progress（REV-009；HumanArt artifact 未清门） |
 
 ### 未决问题
 
@@ -367,7 +367,7 @@
 |---|---|---|---|
 | 按 M2c 规程采集 C6c 授权普通话、方言、电视背景、距离和静音/噪声样本 | 待指定 | 2026-08-01 | Open |
 | 为真实设备集增加人工 VAD 区间或语音存在标签，分开评测 VAD 与 ASR | 待指定 | 2026-08-03 | Open |
-| 完成 FunASR 模型、Whisper 权重和比赛分发条款审查 | 待指定 | 2026-08-09 | Open |
+| 完成 FunASR 模型、Whisper 权重和比赛分发条款审查 | 待指定 | 2026-08-09 | In progress（REV-009；模型卡已固定，打包未完成） |
 | 在 V1-R1 前关闭 CS-EP-SDNL1 睡眠字段采用/接口保留/放弃决定 | Codex | 2026-07-22 | Done（REV-008；真机证据仍 Open） |
 
 ### 未决问题
@@ -426,3 +426,58 @@
 1. CS-EP-SDNL1 当前下架后，开放平台兼容性、服务授权和技术支持是否仍可获得？
 2. 目标账号实际可取得的是 50 ms 原始/近实时数据、分钟聚合、日级睡眠报告，还是只允许 App 查看？
 3. 睡眠分期、awake、翻身和体动分别使用什么 epoch、日界线、算法版本与缺失语义？
+
+---
+
+## REV-009 V1-R1 E1 探索收敛预 Review
+
+- 日期：2026-07-22
+- 状态：Accepted as E1 pre-review；V1-R1 milestone remains In progress
+- 参与人：项目组、Codex
+- 评审范围：V1-M1～M3 证据、模型/字段采用状态、许可证边界与 V2-D1 输入门
+- 输入材料：[V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)、REV-003～REV-008、许可证修正 `f4aa1c5`
+
+### 发现
+
+1. 设备无关 Pipeline、固定集评测、姿态/语音对比和睡眠字段 gate 都已得到可复现 E1 证据，但 C6c 与 CS-EP-SDNL1 仍只有 E0；模型表现不能替代目标设备接入。
+2. M2a/M2b 的独立视频/WAV 共享零点只能验证窗口契约，不能进入 V2 自然音视频同步声明；容器 track/PTS、offset 和 drift 仍未实现。
+3. HumanArt + RTMPose 的 lying 覆盖显著优于 YOLO26n，但 fall-01 关键点仍不可用；V2 跌倒特征需要 box-only fallback 和显式 keypoint quality gate。
+4. 历史 HumanArt ModelBinding 将 MMPose 实现 Apache-2.0 写成模型 artifact license，语义过宽。Human-Art 官方数据授权限定非商业使用且 annotations 为 CC-BY-NC-SA-4.0，最终权重分发不能自动继承框架许可证。
+5. FunASR 三个冻结 model card 记录 Apache License 2.0，Whisper 代码与权重为 MIT；但项目本身没有顶层 LICENSE 或最终第三方 NOTICE。
+6. 《监测方案》中的 HRV、SpO2、AHI、体温、血压、原始雷达以及自动诈骗/认知/抑郁评分都没有当前设备或评测证据，不能进入 V2 已实现清单。
+
+### 决定
+
+1. Adopt 公共契约、运行 provenance、离线回放/评测接口、E0～E4、隐私边界和睡眠 fail-closed gate。
+2. HumanArt + RTMPose 与 FunASR 只作为 V2 有条件候选；YOLO26n 和 Whisper small 分别只保留为姿态/普通话实验对照。
+3. 不选择睡眠模型；direct fields 逐字段等待 E2/E3 mapping，multi-night derived 与 not-assumed 保持关闭。
+4. 跌倒作为 V2 P0，但下一实现先输出 box/keypoint 时序特征与 fallback reason，不提前冻结 RiskAssessment 或告警分数。
+5. MediaPipe、openSMILE、Face/OpenFace、YAMNet、骨架时序模型以及诈骗/认知/抑郁自动评分当前 Defer。
+6. V1-R1 的 E1 决策基线验收通过；里程碑保持 In progress，等待真机分类、最终姿态分发路线和负责人关闭。
+
+### 验证
+
+- 自动化：41 passed；`pip check` 无 broken requirements。
+- 许可证 fail-closed：`f4aa1c5` 将两个 HumanArt ModelBinding 改为 `model-artifact-license-review-required`，并新增回归测试。
+- 姿态：candidate overall 163/170、lying 20/21；fall-01 lying `>=0.5` 关键点可见率仍为 0。
+- 语音：FunASR 9/137，Whisper 32/137；两者全零静音探针通过。
+- 睡眠：19 direct 中 0 ready，5 derived disabled，11 not-assumed closed。
+- 设备：C6c 与 SDNL1 能力矩阵最高仍为 E0。
+
+### 行动项
+
+| 行动 | 负责人 | 截止日期 | 状态 |
+|---|---|---|---|
+| 实现 ffprobe/PyAV 容器轨道与 PTS 探针 | Codex | 2026-07-23 | Open |
+| 实现 box-only 跌倒特征、关键点质量门和 fallback reason 的 E1 离线实验 | Codex | 2026-07-24 | Open |
+| 评测一个不依赖 Human-Art 训练条款的姿态候选 | Codex | 2026-07-25 | Open |
+| 取得 C6c/SDNL1 E2/E3 或可复核 blocked 证据 | 待指定 | 2026-08-01 | Open |
+| 决定项目 LICENSE、最终模型分发路线并生成 THIRD_PARTY_NOTICES | 待指定 | 2026-08-09 | Open |
+| 为 V2 硬门指定最终负责人和演示降级声明 | 待指定 | 2026-08-09 | Open |
+
+### 未决问题
+
+1. 比赛提交物是否公开源代码、是否允许非商业权重、是否要求分发模型文件？
+2. 不依赖 Human-Art 的姿态候选在 lying 和空场负样本上的性能是否仍足够？
+3. C6c 原始媒体能否同时取得视频、音频和可用 PTS，还是必须设计分流降级？
+4. SDNL1 无开发接口时，比赛演示是否接受明确 blocked 并仅保留接口契约？

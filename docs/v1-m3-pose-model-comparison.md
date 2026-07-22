@@ -15,7 +15,7 @@ V1-M2b 已确认当前 YOLO26n-pose + ByteTrack 基线在六段 URFD 视频上�
 | Variant | 检测器 | 姿态模型 | 推理 | 输入 | 许可证记录 |
 |---|---|---|---|---|---|
 | `yolo26n-pose` | YOLO26n-pose 内置人体框 | YOLO26n-pose COCO-17 | PyTorch / Ultralytics | 640 | AGPL-3.0 或 Enterprise，V2 仍需决定 |
-| `rtmpose-m-humanart` | YOLOX-m HumanArt | RTMPose-m HumanArt COCO-17 | ONNXRuntime | 640×640 / 192×256 | OpenMMLab 实现与导出按 Apache-2.0 记录，训练数据条款另审 |
+| `rtmpose-m-humanart` | YOLOX-m HumanArt | RTMPose-m HumanArt COCO-17 | ONNXRuntime | 640×640 / 192×256 | 实现为 Apache-2.0；Human-Art annotations 为 CC-BY-NC-SA-4.0/non-commercial，artifact 标记 review-required |
 
 候选模型清单冻结在 `configs/v1-m3-pose-models.json`：
 

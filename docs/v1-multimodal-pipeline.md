@@ -1,6 +1,6 @@
 # V1 视频与语言多模态采集 Pipeline
 
-状态：Implemented Baseline v0.2
+状态：Implemented Baseline v0.3；V1-R1 决策已同步
 
 更新时间：2026-07-22
 
@@ -43,13 +43,15 @@ V1 没有直接采用通用视觉语言大模型。当前需要的是逐帧坐�
 
 | 候选 | 当前结论 | 后续触发条件 |
 |---|---|---|
-| RTMPose / MMPose | V2 重点备选，许可证路线更宽松，但本轮尚未建立相同输入和相同指标的实测 | Ultralytics 许可证与提交策略冲突，或目标摄像头样本上精度明显更优 |
-| MediaPipe Pose | 适合快速单人端侧原型；本轮选择了同时提供人框和 track_id 的统一后端 | 需要 CPU/移动端部署对比时加入 |
-| Whisper | 多语言能力强，但本轮中文、离线、时间戳链路优先采用 Paraformer | 出现方言、多语言或远场中文识别短板时加入固定样本对比 |
+| HumanArt + RTMPose | 同集 lying 覆盖从 42.86% 提到 95.24%，进入 V2 准确率有条件候选；Human-Art model artifact 分发门仍 Open | 通过 C6c、负样本、fall-01 质量和许可证 Review 后才可冻结 |
+| MediaPipe Pose | V1-R1 Defer；当前没有 CPU/移动端部署硬需求 | CPU/移动端成为明确比赛部署门时加入新固定集 |
+| Whisper small | 同集普通话 CER 23.36%，对 FunASR 6.57%；不晋级普通话主链路 | 新方言、多语言或噪声 held-out 证明重开价值 |
 | Silero VAD | 轻量 VAD 候选；当前为了减少框架和时间语义分叉采用 FSMN-VAD | FunASR VAD 在噪声和远场样本上覆盖率不合格时加入 |
 | 端到端音视频大模型 | 暂不进入 P0 主链路 | 有独立 GPU 预算、任务标注和可解释评测集后再评估 |
 
 “选定基线”只表示它用于 V1 打通链路，不等于已经晋级 V2。
+
+V1-R1 进一步明确：YOLO26n 只保留为 V1 对照；FunASR 和 HumanArt + RTMPose 都是有条件候选；睡眠不走模型路线。完整决策和分发硬门见 [V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。
 
 ## 4. 模块设计
 

@@ -83,8 +83,10 @@ runs/20260722T053908Z-9b8096cd/reports/pose-model-comparison-report.json
 3. fall-01 类困难横卧不能只使用关键点规则。后续同时保留人体框宽高比、框中心下降、横卧持续时间和静止特征，并为关键点设置显式质量门。
 4. 0.05 检测阈值是在同一固定集扫描后选定，后续 C6c/held-out 集必须冻结此值，不能继续按结果调参。
 5. 增加空房、家具、宠物和局部人体负样本，测量低阈值带来的误报；当前固定集无法完成这项结论。
-6. Apache-2.0 实现记录不自动解决 Human-Art/组成训练集、URFD 派生数据和最终比赛分发条款；V1-R1 前完成许可证 Review。
+6. Apache-2.0 实现记录不自动解决 Human-Art/组成训练集、URFD 派生数据和最终比赛分发条款；V1-R1 已将 HumanArt artifact 改为 review-required，但最终分发决定仍 Open。
 7. 本次 Review 只验收 V1-M3 姿态切片；语言切片已在 REV-007 关闭，睡眠字段路线已在 REV-008 关闭，因此当前 V1-M3 在 E1 探索范围为 Done。
+
+许可证元数据更正：本报告对应的历史 run 使用代码 `0674be9`，其 HumanArt ModelBinding 中 `license=Apache-2.0` 只能解释为实现许可证，不能作为权重分发结论。提交 `f4aa1c5` 已将当前绑定改为 `model-artifact-license-review-required`；该更正不改变本报告的覆盖率和性能结果。
 
 ## 7. 下一步
 

@@ -1,6 +1,6 @@
 # 信息侧模块详细技术路线
 
-状态：Implementation Baseline v0.3
+状态：Implementation Baseline v0.4
 
 更新时间：2026-07-22
 
@@ -282,17 +282,15 @@ V1-M2b 使用固定 SHA-256 的 URFD/FLEURS 子集验证多样本处理。每个
 
 ### 阶段 B：基础提取器
 
-- 已验证基线：YOLO26n-pose + ByteTrack。
-- 已验证基线：FunASR FSMN-VAD + Paraformer-zh + CT-Punc。
-- 待对比：MediaPipe Pose Landmarker。
-- 睡眠字段映射。
+- V1 对照：YOLO26n-pose + ByteTrack；不作为 V2 默认模型。
+- V2 普通话有条件候选：FunASR FSMN-VAD + Paraformer-zh + CT-Punc。
+- 睡眠：无值字段 profile + fail-closed mapping gate，不选择推理模型。
 
 ### 阶段 C：候选增强
 
-- MMPose/RTMPose。
-- openSMILE eGeMAPS。
-- Face Landmarker/OpenFace 可用性。
-- YAMNet 环境声音。
+- V2 姿态准确率有条件候选：YOLOX-m HumanArt + RTMPose-m HumanArt。
+- 跌倒特征输入：box-only 横卧/下降/静止与 keypoint quality gate。
+- MediaPipe、openSMILE、Face/OpenFace、YAMNet 当前 Defer，不继续无标签扩展。
 
 ### 阶段 D：V2 晋级
 
@@ -304,7 +302,7 @@ V1-M2b 使用固定 SHA-256 的 URFD/FLEURS 子集验证多样本处理。每个
 - 错误案例和限制可解释。
 - 能支撑跌倒主线或明确的增强演示。
 
-当前模型只冻结为 V1 baseline。YOLO 的 AGPL/Enterprise 路线、RTMPose 替代方案和目标设备固定样本精度必须在 V1-R1 前完成，不能把“链路跑通”当成 V2 晋级。
+V1-R1 已完成 E1 决策收敛：YOLO26n 为 V1 对照，HumanArt + RTMPose 为准确率有条件候选，FunASR 为普通话有条件候选，Whisper small 不晋级普通话主链路。Human-Art-trained artifact 不能继承 MMPose 实现的 Apache-2.0 标记，目标设备、负样本和分发门关闭前仍不得晋级。完整账本见 [V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。
 
 ## 9. 时间与多模态对齐
 
