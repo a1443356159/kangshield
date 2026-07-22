@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import numpy as np
 
 from kangshield.information.rtmpose_backend import (
+    HUMANART_ANNOTATION_LICENSE,
+    HUMANART_MODEL_ARTIFACT_LICENSE,
     IoUTrackAssigner,
     bbox_center_scale,
     bbox_iou,
@@ -10,6 +15,25 @@ from kangshield.information.rtmpose_backend import (
     decode_yolox_end2end,
     preprocess_yolox,
 )
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_humanart_artifacts_never_inherit_the_framework_license():
+    assert HUMANART_MODEL_ARTIFACT_LICENSE == "model-artifact-license-review-required"
+    assert HUMANART_ANNOTATION_LICENSE == "CC-BY-NC-SA-4.0-noncommercial"
+
+    config = json.loads(
+        (PROJECT_ROOT / "configs" / "v1-m3-pose-models.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    for model in config["models"]:
+        assert model["license"] == HUMANART_MODEL_ARTIFACT_LICENSE
+        assert model["implementation_license"] == "Apache-2.0"
+        assert model["training_data_terms"] == HUMANART_ANNOTATION_LICENSE
+        assert model["distribution_status"] == "blocked_pending_review"
 
 
 def test_iou_tracker_preserves_and_expires_tracks():

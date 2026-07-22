@@ -2,8 +2,9 @@
 
 The preprocessing and SimCC decoding follow the Apache-2.0 MMPose/RTMLib
 reference implementations and the pipeline metadata shipped with the pinned
-ONNX exports.  This module intentionally does not depend on MMCV, MMEngine,
-MMPose, or MMDetection.
+ONNX exports.  Apache-2.0 describes the implementation, not the licensing
+status of Human-Art-trained model artifacts.  This module intentionally does
+not depend on MMCV, MMEngine, MMPose, or MMDetection.
 """
 
 from __future__ import annotations
@@ -25,6 +26,12 @@ YOLOX_M_HUMANART_URL = (
 RTMPOSE_M_HUMANART_URL = (
     "https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/"
     "rtmpose-m_8xb256-420e_humanart-256x192-8430627b_20230611.zip"
+)
+HUMANART_MODEL_ARTIFACT_LICENSE = "model-artifact-license-review-required"
+HUMANART_ANNOTATION_LICENSE = "CC-BY-NC-SA-4.0-noncommercial"
+HUMANART_LICENSE_SOURCE = (
+    "https://docs.google.com/document/d/"
+    "19j-6GFOCYBDU4CxwRSKgORndse_j5iHGK0RCJ2TvXNQ/edit"
 )
 
 
@@ -365,7 +372,15 @@ class HumanArtRTMPoseBackend:
             "execution_provider": requested_provider,
             "active_providers": self.active_providers,
             "implementation_reference": "MMPose v1.3.2 / RTMLib 0.0.15",
+            "implementation_license": "Apache-2.0",
             "training_domain": "Human-Art combined human pose datasets",
+            "training_data_terms": HUMANART_ANNOTATION_LICENSE,
+            "model_artifact_distribution_status": "blocked_pending_review",
+            "license_sources": [
+                "https://github.com/open-mmlab/mmpose",
+                "https://github.com/IDEA-Research/HumanArt",
+                HUMANART_LICENSE_SOURCE,
+            ],
         }
         self._bindings = [
             ModelBinding(
@@ -374,7 +389,7 @@ class HumanArtRTMPoseBackend:
                 model_name=self.pose_path.name,
                 model_version="8430627b-20230611",
                 model_digest=pose_digest,
-                license="Apache-2.0",
+                license=HUMANART_MODEL_ARTIFACT_LICENSE,
                 device=self.device,
                 configuration={
                     **common,
@@ -391,7 +406,7 @@ class HumanArtRTMPoseBackend:
                 model_name=self.detector_path.name,
                 model_version="c2c7a14a-20230928",
                 model_digest=detector_digest,
-                license="Apache-2.0",
+                license=HUMANART_MODEL_ARTIFACT_LICENSE,
                 device=self.device,
                 configuration={
                     **common,
