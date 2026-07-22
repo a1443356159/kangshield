@@ -307,6 +307,6 @@ V1-M3 姿态同集对比已经冻结模型、摘要、阈值和报告契约，�
 
 V1-M3 语音同集对比已经完成，见 [语音模型对比设计](v1-m3-speech-model-comparison.md)和[正式报告](reports/v1-m3-speech-model-comparison.md)。FunASR 保留为普通话默认候选，Whisper small 不晋级；该结论只来自六条 clean FLEURS 普通话，不代表 C6c 远场、方言、老人或背景噪声效果。
 
-V1-M3 睡眠路线不训练模型，而采用绑定《监测方案》的字段 policy 和 fail-closed mapping gate，见 [睡眠字段路线](v1-m3-sleep-field-route.md)。通用萤石睡觉检测服务的宣传能力不会自动映射到 CS-EP-SDNL1；真实 E2/E3 schema、单位、时间和缺失语义确认前，所有标准化值与多夜派生保持关闭。
+V1-M3 睡眠路线不训练模型，而采用绑定《监测方案》的字段 policy 和 fail-closed mapping gate，见[睡眠字段路线](v1-m3-sleep-field-route.md)和[正式评审报告](reports/v1-m3-sleep-field-route.md)。通用萤石睡觉检测服务的宣传能力不会自动映射到 CS-EP-SDNL1；真实 E2/E3 schema、单位、时间和缺失语义确认前，所有标准化值与多夜派生保持关闭。
 
 萤石通用 SDK 能力可参考[官方 SDK 说明](https://open.ys7.com/doc/zh/book/4.x/android-sdk.html)；CS-EP-SDNL1 硬件参数可参考[萤石官方商品页](https://www.ys7.com/item/994492.html)。最终判断必须以测试账号的真实能力集和接口响应为准。

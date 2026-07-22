@@ -299,7 +299,7 @@
 1. HumanArt + RTMPose 晋级为 V2 姿态有条件候选，YOLO26n-pose 保留为 V1 baseline；不在 V1-M2c 前冻结最终模型。
 2. C6c 复测冻结 0.05 阈值，必须覆盖夜视、距离、遮挡、正常动作、横卧和空场负样本。
 3. 跌倒特征设计同时保留 box-only 横卧/下降/静止代理和关键点分支；关键点分支设置质量门，禁止在 fall-01 类低质量帧上强算几何量。
-4. V1-M3 姿态切片验收通过；完整 V1-M3 保持 In progress，等待语言对照和睡眠字段路线关闭。
+4. V1-M3 姿态切片验收通过；本次不升级整体状态。语言对照和睡眠字段路线后来分别由 REV-007、REV-008 关闭。
 5. 模型实现、训练数据和比赛分发许可证在 V1-R1 前单独审查；Apache-2.0 框架记录不代替数据条款审查。
 
 ### 验证
@@ -349,7 +349,7 @@
 1. FunASR FSMN-VAD + SeACo Paraformer + CT-Punc 保留为 V2 普通话默认候选，最终采用仍受 C6c V1-M2c 门约束。
 2. Whisper small 不晋级普通话主链路；保留 adapter 和固定权重，只有新多语种、方言、噪声或 C6c held-out 证据才重开。
 3. 不在当前六条上继续调 beam、prompt、语言或后处理并回报同集提升；任何新候选先冻结新评测集和决定规则。
-4. V1-M3 语言切片验收通过；完整 V1-M3 保持 In progress，等待睡眠字段路线关闭。
+4. V1-M3 语言切片验收通过；本次不升级整体状态。睡眠字段路线后来由 REV-008 关闭，V1-M3 在 E1 探索范围转为 Done。
 5. 报告继续只保存字符数、编辑数和聚合，完整转写只留在受控且被 Git 忽略的 FeatureEvent。
 
 ### 验证
@@ -368,10 +368,61 @@
 | 按 M2c 规程采集 C6c 授权普通话、方言、电视背景、距离和静音/噪声样本 | 待指定 | 2026-08-01 | Open |
 | 为真实设备集增加人工 VAD 区间或语音存在标签，分开评测 VAD 与 ASR | 待指定 | 2026-08-03 | Open |
 | 完成 FunASR 模型、Whisper 权重和比赛分发条款审查 | 待指定 | 2026-08-09 | Open |
-| 在 V1-R1 前关闭 CS-EP-SDNL1 睡眠字段采用/接口保留/放弃决定 | 待指定 | 2026-08-09 | Open |
+| 在 V1-R1 前关闭 CS-EP-SDNL1 睡眠字段采用/接口保留/放弃决定 | Codex | 2026-07-22 | Done（REV-008；真机证据仍 Open） |
 
 ### 未决问题
 
 1. C6c 麦克风在 1/3/5 米、电视背景和夜间环境下，FunASR 的 VAD 漏检、误激活和 CER 分别是多少？
 2. 实际目标人群是否存在足够多的方言或中英混说，使多语种候选的价值超过当前普通话准确率损失？
 3. V2 是否允许常驻加载 FunASR，还是需要进程预热/模型服务来隐藏约 35 秒冷启动？
+
+---
+
+## REV-008 V1-M3 睡眠字段路线 Review
+
+- 日期：2026-07-22
+- 状态：Accepted for V1-M3 sleep field slice
+- 参与人：项目组、Codex
+- 评审范围：《监测方案》指标分层、目标设备公开证据、字段发现、语义门、多夜派生前置条件与隐私
+- 输入材料：[睡眠字段路线设计](v1-m3-sleep-field-route.md)、[正式评审报告](reports/v1-m3-sleep-field-route.md)、提交 `5635e95`、正式运行 `20260722T072520Z-77a0f3b6`
+
+### 发现
+
+1. 《监测方案》要求的生理、睡眠和节律指标明显宽于当前 synthetic fixture；聚合心率/呼吸不能推出 HRV、SpO2、AHI 或连续活动节律。
+2. CS-EP-SDNL1 官方商品页只证明产品参数，通用雷达套件和睡觉检测服务也不能证明目标型号 API schema；公开产品文档未取得请求响应、单位、时间粒度和兼容型号证据。
+3. 正式 E1 运行在 19 个 direct-if-exposed 字段中得到 4 个名称候选、15 个未观察字段和 0 个 ready 字段；候选是时间、心率、呼吸率和在床状态。
+4. fixture 或 E1 输入即使伪造 confirmed mapping 也会被拒绝；只有 E2/E3 非 fixture 数据与单位、时间、值域、缺失语义全部确认，单字段才可 `ready_for_adapter`。
+5. 5 组多夜派生全部 `blocked_source_fields`，11 个 not-assumed 字段保持关闭；adapter ready 也不等于派生 ready 或医学准确率通过。
+6. 两份正式 JSON 报告未持久化原始值；身份、设备序列号和 8 个完整原始字段值片段泄漏计数均为 0。
+
+### 决定
+
+1. 睡眠信息不选模型，采用 SleepProfile v0.2 + fail-closed route gate。
+2. 固定 19 个 direct-if-exposed、5 组 multi-night derived 和 11 个 not-assumed；策略绑定《监测方案》摘要，源文件漂移即阻断。
+3. `ready_for_adapter` 只授权后续单字段 adapter，不授权值输出、派生计算或准确率声明。
+4. V1-M3 睡眠字段切片通过；姿态、语言、睡眠三条 E1 路线均已决策，V1-M3 在 E1 探索范围标记 Done。
+5. V1-M1 与 V1-M2c 状态不提升，仍需 C6c 和 CS-EP-SDNL1 的 E2/E3 真机证据。
+
+### 验证
+
+- 自动化：40 passed；`pip check` 无 broken requirements。
+- 代码：`5635e95`；正式 manifest completed、`code_dirty=false`。
+- 输入：E1 fixture，2 records、4 fields；fixture SHA-256 `9e43065c24f020ccdb56e12f38a4c1571eefe8d9d7d6c0d0b9989a927b0e7b2a`。
+- 策略：19 direct、5 derived、11 not-assumed；policy SHA-256 `a696329e2e66efbc9091ee305aae38410c5bccfcd2def39cb6f577357a06aece`。
+- 来源：《监测方案》SHA-256 `1f094fe453ce32de7dc3dcb0935b7dd3036e36495140639ec36a6279361fccb0`。
+- 隐私：`values_persisted=false`；身份和完整原始值片段泄漏计数均为 0。
+
+### 行动项
+
+| 行动 | 负责人 | 截止日期 | 状态 |
+|---|---|---|---|
+| 使用有权限账号读取并版本化保存目标产品接口文档 | 待指定 | 2026-07-26 | Open |
+| 向萤石确认 CS-EP-SDNL1 与睡觉检测/健康服务的兼容性、固件和权限条件 | 待指定 | 2026-07-26 | Open |
+| 取得至少一晚脱敏 E2 API/SDK/导出样例并完成字段语义 mapping | 待指定 | 2026-08-01 | Open |
+| 完成至少连续三晚 E3 完整率、重复、断点和延迟审计 | 待指定 | 2026-08-04 | Open |
+
+### 未决问题
+
+1. CS-EP-SDNL1 当前下架后，开放平台兼容性、服务授权和技术支持是否仍可获得？
+2. 目标账号实际可取得的是 50 ms 原始/近实时数据、分钟聚合、日级睡眠报告，还是只允许 App 查看？
+3. 睡眠分期、awake、翻身和体动分别使用什么 epoch、日界线、算法版本与缺失语义？

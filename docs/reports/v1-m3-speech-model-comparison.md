@@ -101,4 +101,4 @@ FunASR 汇总 segment coverage 约为模型 VAD 的语音区间；Whisper 的 se
 2. Whisper small 在当前 V1-M3 语音切片结论为“不晋级普通话主链路”，不因更快冷加载和较低显存改写准确率结论。
 3. 保留 Whisper backend、模型摘要与 runner，便于未来在新的多语种、方言或噪声 held-out 集上复测；禁止继续在这六条上调 beam/prompt/语言后宣称独立提升。
 4. C6c 复测至少包含安静/电视背景、1/3/5 米、男女或不同说话人、老人或年龄相近授权说话人、方言/普通话、静音和非语音噪声，并分别报告 CER、VAD 漏检/误激活和 RTF。
-5. V1-M3 语言切片通过 Review；完整 V1-M3 仍为 In progress，等待睡眠字段路线形成采用/接口保留/放弃结论。
+5. 本次语言切片通过 Review；睡眠字段路线随后在 REV-008 关闭，因此当前 V1-M3 在 E1 探索范围为 Done。

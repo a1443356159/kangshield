@@ -1,6 +1,6 @@
 # V1-M3 睡眠字段路线与 Fail-Closed Gate
 
-状态：Implemented，等待干净提交的 E1 路线报告与 Review
+状态：Accepted for V1-M3 sleep field slice
 
 基准日期：2026-07-22
 
@@ -131,3 +131,9 @@ kangshield-info assess-sleep-route sanitized-sdnl1-export.json \
 6. 固件、服务产品、API/SDK 版本和证据 run。
 
 取得 ready field 后仍只授权实现 adapter；至少连续三晚完成完整率、重复、断点和延迟报告后，才讨论日级派生。生命体征/分期准确率还需要独立参考设备，不能由本 gate 验收。
+
+## 8. 正式 E1 运行与 Review
+
+干净提交 `5635e95` 的正式运行 `20260722T072520Z-77a0f3b6` 为 completed，且 `code_dirty=false`。19 个 direct fields 中 4 个为 `candidate_unconfirmed`、15 个为 `not_observed`、0 个为 `ready_for_adapter`；5 个 derived 全部关闭。身份和完整原始值泄漏扫描均为 0。
+
+完整统计、摘要与决定见[睡眠字段路线评审报告](reports/v1-m3-sleep-field-route.md)。本切片通过 Review，只关闭 V1-M3 的 E1 路线决策；V1-M1/V1-M2c 真实设备证据门保持不变。

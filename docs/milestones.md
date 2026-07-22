@@ -23,7 +23,7 @@
 | V1-M2a 设备无关多模态链路 | 07-22～07-23 | Done | 视频/语言回放、姿态、VAD/ASR、窗口、Slurm 报告 | 干净提交在 L40 上完成 E1 smoke，warm/cold 口径分离 |
 | V1-M2b 公开真实场景固定集与对齐评测 | 07-22～07-23 | Done | URFD/FLEURS 固定集、批量 Pipeline、标签/CER/覆盖率与 Slurm 报告 | 六 case 在干净提交和 L40 上可重复完成，公开数据边界固定为 E1 |
 | V1-M2c 目标设备样本与时间基 | 07-29～08-01 | Planned | C6c 音视频样本、时间基、睡眠样例与统一产物 | 目标设备视频、音频、睡眠样例可追溯且时间语义明确 |
-| V1-M3 模型快速对比 | 08-02～08-07 | In progress | 姿态、VAD/ASR、睡眠字段的对比报告 | 至少一条视频和一条音频基线可重复运行 |
+| V1-M3 模型快速对比 | 08-02～08-07 | Done | 姿态、VAD/ASR、睡眠字段的对比报告 | E1 姿态、语音与睡眠路线均可重复并完成采用/候选/放弃决定；真机门仍属 M2c |
 | V1-R1 探索 Review | 08-08～08-09 | Planned | V1 结论、淘汰项、V2 输入清单 | 决定每类特征的采用/候选/放弃状态 |
 | V2-D1 设计冻结 | 08-10～08-12 | Planned | V2 架构、Schema、测试矩阵、任务分工 | 跌倒主线、平台接入和演示脚本闭合 |
 | V2-M1 主链路实现 | 08-13～08-20 | Planned | 真实设备/回放、识别、风险、告警基础链路 | 一次跌倒场景可完整追踪 |
@@ -45,7 +45,7 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 | V1-M3 姿态同集对比 / M2c 采集准备 | `0674be9` / `3c1dc32` | `origin/main` | 2026-07-22 已验证 | HumanArt + RTMPose ONNX 链路、L40 同集报告、条件候选决定，以及 C6c/睡眠仪采集规程；不代表 M2c 已取得实机证据 |
 | V1-M3 语音同集对比 | `270fdc1` / `271bf94` | `origin/main` | 2026-07-22 已验证 | FunASR 与 Whisper small 的固定六 case、静音、性能和隐私对比；FunASR 保留默认候选，结论只属于 E1 |
 
-这里的“推送验证”只证明代码已到达远端。V1-M1 仍为 In progress，必须取得 C6c 与 CS-EP-SDNL1 的 E2/E3 证据后才能进入 Review/Done。V1-M2a 和 V1-M2b 的 Done 只关闭设备无关 E1 链路及公开固定集评测，不会提升真实设备证据等级。V1-M3 已验收姿态和语言两个 E1 切片，仍等待睡眠字段路线；M2c 只有模板和规程，没有真实媒体或睡眠字段证据。
+这里的“推送验证”只证明代码已到达远端。V1-M1 仍为 In progress，必须取得 C6c 与 CS-EP-SDNL1 的 E2/E3 证据后才能进入 Review/Done。V1-M2a 和 V1-M2b 的 Done 只关闭设备无关 E1 链路及公开固定集评测，不会提升真实设备证据等级。V1-M3 的姿态、语言和睡眠字段三个 E1 切片均已验收，因此仅在 E1 探索范围标记 Done；M2c 只有模板和规程，没有真实媒体或睡眠字段证据。
 
 ## 4. 当前阶段任务
 
@@ -138,7 +138,7 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 - [x] 在干净提交 `0674be9` 上完成 L40 双 variant 对比（job `1760`）。
 - [x] Review 横卧覆盖、fall-01 关键点质量和性能；候选有条件进入 V2，许可证门仍 Open。
 
-设计见 [V1-M3 姿态模型对比](v1-m3-pose-model-comparison.md)，实测证据见 [同集对比报告](reports/v1-m3-pose-model-comparison.md)。姿态与下述语言切片完成仍不等于整个 V1-M3 Done；睡眠字段路线需在 V1-R1 前形成采用/接口保留/放弃结论。
+设计见 [V1-M3 姿态模型对比](v1-m3-pose-model-comparison.md)，实测证据见 [同集对比报告](reports/v1-m3-pose-model-comparison.md)。姿态切片已通过 REV-006；语言和睡眠路线随后分别在 REV-007、REV-008 关闭。
 
 当前语言切片：
 
@@ -149,16 +149,16 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 - [x] 在干净提交 `270fdc1` 的 L40 上复现 FunASR `9/137` 并完成 Whisper 六 case 正式对比（job `1761`）。
 - [x] Review CER、静音、性能和真实设备缺口；FunASR 保留默认候选，Whisper small 不晋级普通话主链路。
 
-语言切片设计见 [V1-M3 语音模型同集对比](v1-m3-speech-model-comparison.md)，正式证据见 [同集对比报告](reports/v1-m3-speech-model-comparison.md)。语言切片已通过 Review；完整 V1-M3 仍需关闭睡眠字段路线。
+语言切片设计见 [V1-M3 语音模型同集对比](v1-m3-speech-model-comparison.md)，正式证据见 [同集对比报告](reports/v1-m3-speech-model-comparison.md)。语言切片已通过 Review；后续 REV-008 已关闭睡眠字段路线。
 
 当前睡眠字段路线：
 
 - [x] 按《监测方案》冻结 19 个 direct-if-exposed、5 组 multi-night derived 和 11 个 not-assumed 字段。
 - [x] 实现无值 SleepProfile v0.2、mapping evidence/语义 gate、SleepRouteAssessment 严格契约与 CLI。
 - [x] fixture、伪 confirmed E1 拒绝、E2 单字段解锁和监测方案摘要漂移均有自动化测试；全套 40 passed。
-- [ ] 在干净提交上生成 E1 路线报告，审计身份/数值不落报告并完成 Review。
+- [x] 在干净提交 `5635e95` 上生成 E1 路线报告，审计身份/数值不落报告并完成 Review。
 
-本切片只决定“不训练睡眠模型、保留字段接口和派生前置条件”，不会替代 V1-M2c 的真实 SDNL1 API/SDK/导出证据。设计见 [V1-M3 睡眠字段路线](v1-m3-sleep-field-route.md)。
+本切片只决定“不训练睡眠模型、保留字段接口和派生前置条件”，不会替代 V1-M2c 的真实 SDNL1 API/SDK/导出证据。设计见 [V1-M3 睡眠字段路线](v1-m3-sleep-field-route.md)，正式证据见[睡眠字段路线评审报告](reports/v1-m3-sleep-field-route.md)。姿态、语言与睡眠三个 E1 切片均已 Review，V1-M3 在 E1 探索范围标记 Done。
 
 每个候选模型必须记录：
 
