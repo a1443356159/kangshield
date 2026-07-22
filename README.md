@@ -23,6 +23,8 @@
 - [V1-M2b 公开真实场景固定集与对齐评测](docs/v1-m2b-public-dataset-benchmark.md)
 - [V1-M2b 公开固定集初测报告](docs/reports/v1-m2b-public-dataset-benchmark.md)
 - [V1-M3 姿态模型对比设计](docs/v1-m3-pose-model-comparison.md)
+- [V1-M3 姿态模型同集对比报告](docs/reports/v1-m3-pose-model-comparison.md)
+- [V1-M2c 目标设备样本与时间基采集规程](docs/v1-m2c-device-sample-protocol.md)
 
 ## V1 初步开发
 

@@ -274,3 +274,53 @@
 2. RTMPose/MMPose 能否在相同算力与许可证约束下显著改善横卧检出？
 3. 目标老人远场普通话、方言和电视背景下的 CER/VAD 覆盖率是多少？
 4. 比赛材料是否会分发 URFD 派生媒体，若会，如何满足 BY-NC-SA 条款？
+
+---
+
+## REV-006 V1-M3 姿态模型同集对比 Review
+
+- 日期：2026-07-22
+- 状态：Accepted for V1-M3 pose slice
+- 参与人：项目组、Codex
+- 评审范围：横卧姿态覆盖、关键点质量、ONNXRuntime 兼容性、性能与 V2 候选状态
+- 输入材料：[V1-M3 设计](v1-m3-pose-model-comparison.md)、[同集对比报告](reports/v1-m3-pose-model-comparison.md)、提交 `0674be9`、Slurm job `1760`
+
+### 发现
+
+1. 完整 MMPose + MMCV 在当前 Python 3.13/Torch 2.13/CUDA 13 环境没有直接可用的严格匹配构建；官方 ONNX 导出可以绕开框架运行时依赖，并在 L40 上实际启用 CUDAExecutionProvider。
+2. YOLOX-m HumanArt + RTMPose-m HumanArt 将整体覆盖从 89.41% 提到 95.88%，将 lying 从 42.86% 提到 95.24%；改善集中在 fall-01/02 已知漏检。
+3. fall-01 的候选 lying 覆盖为 7/8，但 `>=0.5` 关键点可见比例为 0；人物框成功与关键点几何可用是两个不同验收门。
+4. 候选 L40 推理 RTF 0.123668，慢于基线 0.079518，但两者都达到当前单路 5 fps 回放实时要求。
+5. 0.05 检测阈值在本固定集扫描后确定，且固定集没有人物存在负标签；当前提升不是 held-out 泛化或误报结论。
+6. 两 variant 的 tracker 不同；候选 100% tracking coverage 只证明每个框被分配了 ID，不能证明轨迹比 ByteTrack 更稳定。
+
+### 决定
+
+1. HumanArt + RTMPose 晋级为 V2 姿态有条件候选，YOLO26n-pose 保留为 V1 baseline；不在 V1-M2c 前冻结最终模型。
+2. C6c 复测冻结 0.05 阈值，必须覆盖夜视、距离、遮挡、正常动作、横卧和空场负样本。
+3. 跌倒特征设计同时保留 box-only 横卧/下降/静止代理和关键点分支；关键点分支设置质量门，禁止在 fall-01 类低质量帧上强算几何量。
+4. V1-M3 姿态切片验收通过；完整 V1-M3 保持 In progress，等待语言对照和睡眠字段路线关闭。
+5. 模型实现、训练数据和比赛分发许可证在 V1-R1 前单独审查；Apache-2.0 框架记录不代替数据条款审查。
+
+### 验证
+
+- 自动化：28 passed；`pip check` 无 broken requirements。
+- Slurm：job `1760`，`COMPLETED`，exit `0:0`，NVIDIA L40，elapsed 00:00:19。
+- 代码：`0674be9`；parent + 12 child manifests 全部 completed、`code_dirty=false`。
+- 覆盖：baseline 152/170，candidate 163/170；lying 9/21 对 20/21。
+- 性能：candidate inference RTF 0.123668；进程显存为推理后快照 1,124 MiB，不声明为采样峰值。
+
+### 行动项
+
+| 行动 | 负责人 | 截止日期 | 状态 |
+|---|---|---|---|
+| 按冻结阈值采集并评测 C6c 场景矩阵 | 待指定 | 2026-08-01 | Open |
+| 增加空房、家具、宠物、局部人体负样本 | 待指定 | 2026-08-03 | Open |
+| 实现并评测关键点质量门与 box-only fallback | 待指定 | 2026-08-05 | Open |
+| 完成 OpenMMLab/训练数据/URFD/比赛分发审查 | 待指定 | 2026-08-09 | Open |
+
+### 未决问题
+
+1. C6c 实际夜视和目标机位下，fall-01 类型横卧是否仍只能得到低质量关键点？
+2. 低至 0.05 的人物阈值在空场、家具和宠物场景会产生多少误报？
+3. box-only fallback 与关键点分支怎样组合，才能提高召回而不把弯腰、躺床当成跌倒？

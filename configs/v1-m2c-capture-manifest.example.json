@@ -1,0 +1,83 @@
+{
+  "schema_version": "1.0",
+  "template_only": true,
+  "capture_id": "replace-with-local-capture-id",
+  "captured_start_at": "YYYY-MM-DDTHH:MM:SS+08:00",
+  "captured_end_at": "YYYY-MM-DDTHH:MM:SS+08:00",
+  "operator_ref": "replace-with-pseudonymous-ref",
+  "participant_ref": "replace-with-pseudonymous-ref",
+  "consent_ref": "local-controlled-reference-not-a-name",
+  "devices": [
+    {
+      "device_ref": "salted-pseudonymous-camera-ref",
+      "model": "CS-C6c-V101-1J4WF",
+      "firmware_version": "unknown-until-inspected",
+      "capability_snapshot_ref": "local-relative-reference",
+      "acquisition_method": "replace-with-live-recording-or-sdk-export"
+    },
+    {
+      "device_ref": "salted-pseudonymous-sleep-ref",
+      "model": "CS-EP-SDNL1",
+      "firmware_version": "unknown-until-inspected",
+      "capability_snapshot_ref": "local-relative-reference",
+      "acquisition_method": "replace-with-api-sdk-or-app-export"
+    }
+  ],
+  "camera_placement": {
+    "height_cm": null,
+    "pitch_degrees": null,
+    "room_zone": "replace-with-generic-zone",
+    "distance_markers_cm": [],
+    "notes": []
+  },
+  "clips": [
+    {
+      "scenario_id": "C01",
+      "scenario": "empty_room_static",
+      "lighting": "day",
+      "night_vision": false,
+      "distance_band": "near_or_mid_or_far",
+      "occlusion": "none_or_description",
+      "relative_path": "camera/C01-original-container.mp4",
+      "sha256": "replace-after-capture",
+      "byte_size": null,
+      "media_start_at": "YYYY-MM-DDTHH:MM:SS+08:00",
+      "duration_ms": null,
+      "tracks": {
+        "video_present": null,
+        "audio_present": null,
+        "video_codec": null,
+        "audio_codec": null,
+        "video_time_base": null,
+        "audio_time_base": null
+      },
+      "synchronization_events_ms": [],
+      "ground_truth_windows": [],
+      "safety": {
+        "simulated_fall": false,
+        "safety_mat": false,
+        "spotter_present": false
+      },
+      "issues": []
+    }
+  ],
+  "sleep_exports": [
+    {
+      "source_kind": "api_response_or_sdk_export_or_app_export",
+      "relative_path": "sleep/replace-with-export.json",
+      "sha256": "replace-after-export",
+      "requested_at": "YYYY-MM-DDTHH:MM:SS+08:00",
+      "covered_start_at": null,
+      "covered_end_at": null,
+      "device_timezone": null,
+      "documentation_version": null,
+      "known_units": {},
+      "issues": []
+    }
+  ],
+  "limitations": [
+    "this_example_is_not_device_evidence",
+    "actual_manifest_and_media_must_remain_in_gitignored_controlled_storage",
+    "template_placeholders_must_not_be_reported_as_observed_values"
+  ]
+}
