@@ -37,6 +37,53 @@ def _source_type(value: str) -> SourceType:
         raise argparse.ArgumentTypeError(f"source type must be one of: {choices}") from error
 
 
+def _add_stream_capture_arguments(
+    command: argparse.ArgumentParser,
+    *,
+    ready_help: str,
+) -> None:
+    command.add_argument(
+        "--endpoint-env",
+        default="KANG_STREAM_ENDPOINT",
+        help="Environment variable containing the endpoint; its value is never persisted",
+    )
+    command.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    command.add_argument(
+        "--evidence-level", type=_evidence, default=EvidenceLevel.E1
+    )
+    command.add_argument(
+        "--source-type",
+        type=_source_type,
+        default=SourceType.NETWORK_STREAM,
+    )
+    command.add_argument("--device-ref")
+    command.add_argument("--elder-ref")
+    command.add_argument("--duration-s", type=float, default=10.0)
+    command.add_argument("--minimum-duration-s", type=float, default=1.0)
+    command.add_argument("--open-timeout-s", type=float, default=10.0)
+    command.add_argument("--read-timeout-s", type=float, default=5.0)
+    command.add_argument("--max-packets", type=int, default=200_000)
+    command.add_argument(
+        "--max-packets-per-stream",
+        type=int,
+        default=200_000,
+        help="Maximum packets scanned per output stream during the timing probe",
+    )
+    command.add_argument(
+        "--transport", choices=("auto", "tcp", "udp"), default="auto"
+    )
+    command.add_argument(
+        "--allow-video-only",
+        action="store_true",
+        help="Allow capture without audio; same-container multimodal readiness remains false",
+    )
+    command.add_argument(
+        "--require-ready",
+        action="store_true",
+        help=ready_help,
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="kangshield-info",
@@ -56,48 +103,26 @@ def build_parser() -> argparse.ArgumentParser:
             "Matroska artifact"
         ),
     )
-    stream_capture.add_argument(
-        "--endpoint-env",
-        default="KANG_STREAM_ENDPOINT",
-        help="Environment variable containing the endpoint; its value is never persisted",
+    _add_stream_capture_arguments(
+        stream_capture,
+        ready_help=(
+            "Exit 2 after writing the report unless the requested capture is replay-ready"
+        ),
     )
-    stream_capture.add_argument("--runs-dir", type=Path, default=Path("runs"))
-    stream_capture.add_argument(
-        "--evidence-level", type=_evidence, default=EvidenceLevel.E1
+
+    stream_qualification = subparsers.add_parser(
+        "qualify-stream",
+        help=(
+            "Run multiple independent bounded opens and gate repeated stream capture"
+        ),
     )
-    stream_capture.add_argument(
-        "--source-type",
-        type=_source_type,
-        default=SourceType.NETWORK_STREAM,
+    _add_stream_capture_arguments(
+        stream_qualification,
+        ready_help=(
+            "Exit 2 after writing all reports unless every scheduled open is ready"
+        ),
     )
-    stream_capture.add_argument("--device-ref")
-    stream_capture.add_argument("--elder-ref")
-    stream_capture.add_argument("--duration-s", type=float, default=10.0)
-    stream_capture.add_argument(
-        "--minimum-duration-s", type=float, default=1.0
-    )
-    stream_capture.add_argument("--open-timeout-s", type=float, default=10.0)
-    stream_capture.add_argument("--read-timeout-s", type=float, default=5.0)
-    stream_capture.add_argument("--max-packets", type=int, default=200_000)
-    stream_capture.add_argument(
-        "--max-packets-per-stream",
-        type=int,
-        default=200_000,
-        help="Maximum packets scanned per output stream during the timing probe",
-    )
-    stream_capture.add_argument(
-        "--transport", choices=("auto", "tcp", "udp"), default="auto"
-    )
-    stream_capture.add_argument(
-        "--allow-video-only",
-        action="store_true",
-        help="Allow capture without audio; same-container multimodal readiness remains false",
-    )
-    stream_capture.add_argument(
-        "--require-ready",
-        action="store_true",
-        help="Exit 2 after writing the report unless the requested capture is replay-ready",
-    )
+    stream_qualification.add_argument("--attempt-count", type=int, default=3)
 
     media = subparsers.add_parser(
         "probe-media",
@@ -800,17 +825,28 @@ def _print_result(run: RunArtifacts, details: dict) -> None:
     )
 
 
-def _capture_stream_command(args: argparse.Namespace) -> int:
-    from .stream_capture import (
-        StreamCaptureConfig,
-        capture_stream,
-        endpoint_from_environment,
+def _stream_capture_config(args: argparse.Namespace):
+    from .stream_capture import StreamCaptureConfig
+
+    return StreamCaptureConfig(
+        duration_s=args.duration_s,
+        minimum_duration_s=args.minimum_duration_s,
+        open_timeout_s=args.open_timeout_s,
+        read_timeout_s=args.read_timeout_s,
+        max_packets=args.max_packets,
+        packet_scan_limit_per_stream=args.max_packets_per_stream,
+        transport=args.transport,
+        require_audio=not args.allow_video_only,
     )
 
-    endpoint = endpoint_from_environment(args.endpoint_env)
-    audio_required = not args.allow_video_only
+
+def _stream_run_configuration(
+    args: argparse.Namespace,
+    *,
+    command: str,
+) -> dict:
     configuration = {
-        "command": "capture-stream",
+        "command": command,
         "source_type": args.source_type.value,
         "endpoint_supplied_via_environment": True,
         "endpoint_variable_persisted": False,
@@ -824,8 +860,22 @@ def _capture_stream_command(args: argparse.Namespace) -> int:
         "max_packets": args.max_packets,
         "max_packets_per_stream": args.max_packets_per_stream,
         "transport": args.transport,
-        "audio_required": audio_required,
+        "audio_required": not args.allow_video_only,
     }
+    if command == "qualify-stream":
+        configuration["attempt_count"] = args.attempt_count
+    return configuration
+
+
+def _capture_stream_command(args: argparse.Namespace) -> int:
+    from .stream_capture import (
+        capture_stream,
+        endpoint_from_environment,
+    )
+
+    endpoint = endpoint_from_environment(args.endpoint_env)
+    capture_config = _stream_capture_config(args)
+    configuration = _stream_run_configuration(args, command="capture-stream")
     with RunArtifacts(
         args.runs_dir,
         stage="v1-stream-capture",
@@ -842,16 +892,7 @@ def _capture_stream_command(args: argparse.Namespace) -> int:
                 source_type=args.source_type,
                 device_ref=args.device_ref,
                 elder_ref=args.elder_ref,
-                config=StreamCaptureConfig(
-                    duration_s=args.duration_s,
-                    minimum_duration_s=args.minimum_duration_s,
-                    open_timeout_s=args.open_timeout_s,
-                    read_timeout_s=args.read_timeout_s,
-                    max_packets=args.max_packets,
-                    packet_scan_limit_per_stream=args.max_packets_per_stream,
-                    transport=args.transport,
-                    require_audio=audio_required,
-                ),
+                config=capture_config,
             )
             run.record_asset(report.media_probe.asset)
             run.record_observation(report.media_probe.observation)
@@ -893,6 +934,85 @@ def _capture_stream_command(args: argparse.Namespace) -> int:
         },
     )
     if args.require_ready and not ready:
+        return 2
+    return 0
+
+
+def _qualify_stream_command(args: argparse.Namespace) -> int:
+    from .stream_capture import endpoint_from_environment
+    from .stream_qualification import (
+        StreamQualificationConfig,
+        qualify_stream,
+    )
+
+    endpoint = endpoint_from_environment(args.endpoint_env)
+    capture_config = _stream_capture_config(args)
+    configuration = _stream_run_configuration(args, command="qualify-stream")
+    with RunArtifacts(
+        args.runs_dir,
+        stage="v1-stream-qualification",
+        evidence_level=args.evidence_level,
+        configuration=configuration,
+    ) as run:
+        with run.step("qualify-stream") as step:
+            result = qualify_stream(
+                endpoint=endpoint,
+                artifacts_dir=run.artifacts_dir,
+                evidence_level=args.evidence_level,
+                source_type=args.source_type,
+                device_ref=args.device_ref,
+                elder_ref=args.elder_ref,
+                config=StreamQualificationConfig(
+                    attempt_count=args.attempt_count,
+                    capture=capture_config,
+                ),
+            )
+            capture_iterator = iter(result.capture_reports)
+            for attempt in result.report.attempts:
+                if attempt.status == "failed":
+                    continue
+                capture = next(capture_iterator)
+                run.record_asset(capture.media_probe.asset)
+                run.record_observation(capture.media_probe.observation)
+                if attempt.output_artifact not in run.manifest.artifacts:
+                    run.manifest.artifacts.append(attempt.output_artifact)
+                    run.save_manifest()
+                capture_report_path = run.write_report(
+                    Path(attempt.capture_report_artifact).name,
+                    capture,
+                )
+                step.outputs.extend(
+                    [attempt.output_artifact, run.relative(capture_report_path)]
+                )
+            parent_path = run.write_report(
+                "stream-qualification.json",
+                result.report,
+            )
+            step.outputs.append(run.relative(parent_path))
+    _print_result(
+        run,
+        {
+            "endpoint_scheme": result.report.endpoint_scheme,
+            "attempt_count": result.report.attempt_count,
+            "captured_attempt_count": result.report.captured_attempt_count,
+            "ready_attempt_count": result.report.ready_attempt_count,
+            "not_ready_attempt_count": result.report.not_ready_attempt_count,
+            "failed_attempt_count": result.report.failed_attempt_count,
+            "track_signatures_consistent": (
+                result.report.track_signatures_consistent
+            ),
+            "scheduled_reopen_sequence_proven": (
+                result.report.scheduled_reopen_sequence_proven
+            ),
+            "repeated_capture_gate_ready": (
+                result.report.repeated_capture_gate_ready
+            ),
+            "device_platform_integration_proven": (
+                result.report.device_platform_integration_proven
+            ),
+        },
+    )
+    if args.require_ready and not result.report.repeated_capture_gate_ready:
         return 2
     return 0
 
@@ -1970,6 +2090,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "capture-stream":
         return _capture_stream_command(args)
+    if args.command == "qualify-stream":
+        return _qualify_stream_command(args)
     if args.command == "probe-media":
         return _probe_media_command(args)
     if args.command == "assess-m2c-capture":

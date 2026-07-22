@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import StrEnum
+from pathlib import PurePosixPath
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -1810,6 +1811,192 @@ class StreamCaptureReport(ContractModel):
     risk_assessment_emitted: Literal[False] = False
     alert_emitted: Literal[False] = False
     limitations: list[str] = Field(default_factory=list)
+
+
+class StreamQualificationTrackSignature(ContractModel):
+    """Path-free media layout used to compare independent stream opens."""
+
+    stream_type: Literal["video", "audio"]
+    codec_name: str | None = None
+    time_base: str | None = None
+
+
+class StreamQualificationAttempt(ContractModel):
+    attempt_index: int = Field(ge=1)
+    status: Literal["captured_ready", "captured_not_ready", "failed"]
+    elapsed_ms: int = Field(ge=0)
+    failure_code: str | None = Field(
+        default=None,
+        pattern=r"^[a-z][a-z0-9_]*$",
+        max_length=64,
+    )
+    output_artifact: str | None = None
+    capture_report_artifact: str | None = None
+    captured_media_span_ms: int | None = Field(default=None, ge=0)
+    termination_reason: Literal[
+        "duration_limit",
+        "end_of_stream",
+        "packet_limit",
+        "wall_time_limit",
+    ] | None = None
+    capture_artifact_ready: bool = False
+    same_container_multimodal_ready: bool = False
+    track_signature: list[StreamQualificationTrackSignature] = Field(
+        default_factory=list
+    )
+    audio_minus_video_start_ms: float | None = None
+
+    @model_validator(mode="after")
+    def validate_attempt_state(self):
+        artifact_fields = (
+            self.output_artifact,
+            self.capture_report_artifact,
+            self.captured_media_span_ms,
+            self.termination_reason,
+        )
+        if self.status == "failed":
+            if not self.failure_code:
+                raise ValueError("failed stream attempt requires failure_code")
+            if any(value is not None for value in artifact_fields):
+                raise ValueError("failed stream attempt cannot reference artifacts")
+            if (
+                self.capture_artifact_ready
+                or self.same_container_multimodal_ready
+                or self.track_signature
+                or self.audio_minus_video_start_ms is not None
+            ):
+                raise ValueError("failed stream attempt cannot publish capture facts")
+            return self
+
+        if self.failure_code is not None:
+            raise ValueError("captured stream attempt cannot include failure_code")
+        if any(value is None for value in artifact_fields):
+            raise ValueError("captured stream attempt requires artifact facts")
+        output_path = PurePosixPath(self.output_artifact)
+        report_path = PurePosixPath(self.capture_report_artifact)
+        if (
+            output_path.is_absolute()
+            or len(output_path.parts) != 2
+            or output_path.parts[0] != "artifacts"
+            or output_path.suffix != ".mkv"
+            or any(part in {"", ".", ".."} for part in output_path.parts)
+            or "\\" in self.output_artifact
+        ):
+            raise ValueError("stream output artifact must be artifacts/*.mkv")
+        if (
+            report_path.is_absolute()
+            or len(report_path.parts) != 2
+            or report_path.parts[0] != "reports"
+            or report_path.suffix != ".json"
+            or any(part in {"", ".", ".."} for part in report_path.parts)
+            or "\\" in self.capture_report_artifact
+        ):
+            raise ValueError("stream capture report must be reports/*.json")
+        if self.capture_artifact_ready and not self.track_signature:
+            raise ValueError("ready capture artifact requires track signature")
+        return self
+
+
+class StreamQualificationReport(ContractModel):
+    """Aggregate receipt for multiple independent bounded stream opens."""
+
+    schema_version: str = "1.0"
+    qualification_version: str
+    evidence_level: EvidenceLevel
+    source_type: SourceType
+    endpoint_scheme: Literal["rtsp", "rtsps", "http", "https", "file", "local"]
+    endpoint_supplied_via_environment: Literal[True] = True
+    endpoint_value_persisted: Literal[False] = False
+    endpoint_digest_persisted: Literal[False] = False
+    endpoint_variable_persisted: Literal[False] = False
+    endpoint_log_messages_persisted: Literal[False] = False
+    transport: Literal["auto", "tcp", "udp"]
+    attempt_count: int = Field(ge=2, le=20)
+    requested_duration_ms_per_attempt: int = Field(gt=0)
+    minimum_duration_ms_per_attempt: int = Field(gt=0)
+    audio_required: bool
+    attempts: list[StreamQualificationAttempt] = Field(default_factory=list)
+    captured_attempt_count: int = Field(ge=0)
+    ready_attempt_count: int = Field(ge=0)
+    not_ready_attempt_count: int = Field(ge=0)
+    failed_attempt_count: int = Field(ge=0)
+    unique_track_signature_count: int = Field(ge=0)
+    track_signatures_consistent: bool
+    scheduled_reopen_sequence_proven: bool
+    repeated_capture_gate_ready: bool
+    m2c_capture_bundle_ready: Literal[False] = False
+    involuntary_disconnect_recovery_proven: Literal[False] = False
+    long_running_stability_proven: Literal[False] = False
+    network_impairment_tolerance_proven: Literal[False] = False
+    device_platform_integration_proven: Literal[False] = False
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_qualification_counts_and_gate(self):
+        if len(self.attempts) != self.attempt_count:
+            raise ValueError("attempt list must match attempt_count")
+        if [item.attempt_index for item in self.attempts] != list(
+            range(1, self.attempt_count + 1)
+        ):
+            raise ValueError("stream attempt indexes must be contiguous")
+        captured = sum(item.status != "failed" for item in self.attempts)
+        ready = sum(item.status == "captured_ready" for item in self.attempts)
+        not_ready = sum(
+            item.status == "captured_not_ready" for item in self.attempts
+        )
+        failed = sum(item.status == "failed" for item in self.attempts)
+        signature_keys = {
+            tuple(
+                (track.stream_type, track.codec_name, track.time_base)
+                for track in item.track_signature
+            )
+            for item in self.attempts
+            if item.track_signature
+        }
+        if self.unique_track_signature_count != len(signature_keys):
+            raise ValueError("unique track signature count is inconsistent")
+        signature_attempt_count = sum(
+            bool(item.track_signature) for item in self.attempts
+        )
+        expected_consistency = bool(
+            captured > 0
+            and signature_attempt_count == captured
+            and len(signature_keys) == 1
+        )
+        if self.track_signatures_consistent is not expected_consistency:
+            raise ValueError("track signature consistency is inconsistent")
+        for item in self.attempts:
+            if item.status == "failed":
+                continue
+            requested_ready = (
+                item.same_container_multimodal_ready
+                if self.audio_required
+                else item.capture_artifact_ready
+            )
+            if (item.status == "captured_ready") is not requested_ready:
+                raise ValueError("attempt status must match requested readiness")
+        if (
+            self.captured_attempt_count != captured
+            or self.ready_attempt_count != ready
+            or self.not_ready_attempt_count != not_ready
+            or self.failed_attempt_count != failed
+            or captured != ready + not_ready
+        ):
+            raise ValueError("stream qualification attempt counts are inconsistent")
+        if self.scheduled_reopen_sequence_proven is not (ready >= 2):
+            raise ValueError("scheduled reopen proof must require two ready attempts")
+        expected_gate = bool(
+            ready == self.attempt_count
+            and failed == 0
+            and not_ready == 0
+            and self.track_signatures_consistent
+            and self.unique_track_signature_count == 1
+        )
+        if self.repeated_capture_gate_ready is not expected_gate:
+            raise ValueError("repeated capture gate is inconsistent")
+        return self
 
 
 class M2cClipReadiness(ContractModel):

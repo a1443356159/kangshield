@@ -36,6 +36,10 @@ TerminationReason = Literal[
 class StreamCaptureError(RuntimeError):
     """A deliberately sanitized stream capture failure."""
 
+    def __init__(self, message: str, *, code: str):
+        super().__init__(message)
+        self.code = code
+
 
 @dataclass(frozen=True)
 class StreamCaptureConfig:
@@ -132,6 +136,28 @@ def _validate_endpoint_evidence(
         raise ValueError("fixture stream endpoint protocol is not supported")
 
 
+def validate_stream_capture_request(
+    *,
+    endpoint: str,
+    evidence_level: EvidenceLevel,
+    source_type: SourceType,
+    device_ref: str | None,
+    config: StreamCaptureConfig,
+) -> str:
+    """Validate stable request facts without persisting the endpoint."""
+
+    endpoint_scheme = _endpoint_scheme(endpoint)
+    if config.transport != "auto" and endpoint_scheme not in {"rtsp", "rtsps"}:
+        raise ValueError("tcp/udp transport selection is only valid for RTSP")
+    _validate_endpoint_evidence(
+        endpoint_scheme=endpoint_scheme,
+        evidence_level=evidence_level,
+        source_type=source_type,
+        device_ref=device_ref,
+    )
+    return endpoint_scheme
+
+
 def _load_av() -> Any:
     try:
         import av
@@ -207,15 +233,18 @@ def _capture_packets(
             audios = list(input_container.streams.audio)
             if len(videos) != 1:
                 raise StreamCaptureError(
-                    "stream must expose exactly one video track"
+                    "stream must expose exactly one video track",
+                    code="video_track_layout_invalid",
                 )
             if len(audios) > 1:
                 raise StreamCaptureError(
-                    "stream must expose at most one audio track"
+                    "stream must expose at most one audio track",
+                    code="audio_track_layout_invalid",
                 )
             if config.require_audio and len(audios) != 1:
                 raise StreamCaptureError(
-                    "stream does not expose the required single audio track"
+                    "stream does not expose the required single audio track",
+                    code="required_audio_track_missing",
                 )
 
             selected = [videos[0], *audios]
@@ -268,7 +297,8 @@ def _capture_packets(
                     if packet_time is None:
                         missing_timestamp_counts[source_index] += 1
                         raise StreamCaptureError(
-                            "selected stream packet is missing a usable timestamp"
+                            "selected stream packet is missing a usable timestamp",
+                            code="packet_timestamp_missing",
                         )
 
                     if media_origin_seconds is None:
@@ -290,10 +320,14 @@ def _capture_packets(
 
         if not first_video_packet_keyframe or media_origin_seconds is None:
             raise StreamCaptureError(
-                "stream ended before a decodable video keyframe was captured"
+                "stream ended before a decodable video keyframe was captured",
+                code="video_keyframe_missing",
             )
         if track_counts.get(video_stream_index, 0) <= 0:
-            raise StreamCaptureError("stream capture produced no video packets")
+            raise StreamCaptureError(
+                "stream capture produced no video packets",
+                code="video_packets_missing",
+            )
         if config.require_audio:
             audio_packet_count = sum(
                 track_counts[index]
@@ -301,9 +335,15 @@ def _capture_packets(
                 if stream_type == "audio"
             )
             if audio_packet_count <= 0:
-                raise StreamCaptureError("stream capture produced no audio packets")
+                raise StreamCaptureError(
+                    "stream capture produced no audio packets",
+                    code="audio_packets_missing",
+                )
         if copied_packet_count <= 0 or not temporary.is_file():
-            raise StreamCaptureError("stream capture produced no media artifact")
+            raise StreamCaptureError(
+                "stream capture produced no media artifact",
+                code="media_artifact_missing",
+            )
 
         temporary.chmod(0o600)
         temporary.replace(output_path)
@@ -317,7 +357,8 @@ def _capture_packets(
         output_path.unlink(missing_ok=True)
         error_type = type(error).__name__
         raise StreamCaptureError(
-            f"stream capture failed during {phase} ({error_type})"
+            f"stream capture failed during {phase} ({error_type})",
+            code=f"{phase}_failed",
         ) from None
     finally:
         log_capture.__exit__(None, None, None)
@@ -432,14 +473,12 @@ def capture_stream(
     if output_path.exists():
         raise FileExistsError(output_path)
 
-    endpoint_scheme = _endpoint_scheme(endpoint)
-    if config.transport != "auto" and endpoint_scheme not in {"rtsp", "rtsps"}:
-        raise ValueError("tcp/udp transport selection is only valid for RTSP")
-    _validate_endpoint_evidence(
-        endpoint_scheme=endpoint_scheme,
+    endpoint_scheme = validate_stream_capture_request(
+        endpoint=endpoint,
         evidence_level=evidence_level,
         source_type=source_type,
         device_ref=device_ref,
+        config=config,
     )
     stats = _capture_packets(
         endpoint=endpoint,
@@ -506,7 +545,13 @@ def capture_stream(
                 "this_stage_does_not_emit_risk_assessment_or_alert",
             ],
         )
-    except Exception:
+    except Exception as error:
         output_path.unlink(missing_ok=True)
-        raise
+        if isinstance(error, StreamCaptureError):
+            raise
+        raise StreamCaptureError(
+            "stream capture failed during output verification "
+            f"({type(error).__name__})",
+            code="output_verification_failed",
+        ) from None
     return report

@@ -94,6 +94,20 @@ def test_stream_capture_parser_defaults_to_env_only_bounded_multimodal_gate():
     assert args.require_ready is False
 
 
+def test_stream_qualification_parser_freezes_independent_reopen_defaults():
+    args = build_parser().parse_args(["qualify-stream"])
+    assert args.command == "qualify-stream"
+    assert args.endpoint_env == "KANG_STREAM_ENDPOINT"
+    assert args.source_type.value == "network_stream"
+    assert args.evidence_level.value == "E1"
+    assert args.attempt_count == 3
+    assert args.duration_s == 10.0
+    assert args.minimum_duration_s == 1.0
+    assert args.transport == "auto"
+    assert args.allow_video_only is False
+    assert args.require_ready is False
+
+
 def test_multimodal_parser_supports_legacy_wav_and_same_container_audio():
     legacy = build_parser().parse_args(
         ["run-multimodal", "capture.avi", "speech.wav"]

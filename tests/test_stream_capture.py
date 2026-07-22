@@ -10,6 +10,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from kangshield.information.artifacts import RunArtifacts
 from kangshield.information.cli import main
@@ -17,6 +18,7 @@ from kangshield.information.contracts import (
     EvidenceLevel,
     ModelBinding,
     SourceType,
+    StreamQualificationReport,
 )
 from kangshield.information.multimodal_pipeline import (
     MultimodalPipelineConfig,
@@ -26,6 +28,10 @@ from kangshield.information.stream_capture import (
     StreamCaptureConfig,
     StreamCaptureError,
     capture_stream,
+)
+from kangshield.information.stream_qualification import (
+    StreamQualificationConfig,
+    qualify_stream,
 )
 
 
@@ -357,6 +363,7 @@ def test_capture_failure_never_persists_endpoint_credentials(
             ]
         )
 
+    assert caught.value.code == "open_failed"
     run_dirs = list((tmp_path / "runs").iterdir())
     assert len(run_dirs) == 1
     run_text = "\n".join(
@@ -387,7 +394,10 @@ def test_post_capture_probe_failure_removes_unregistered_raw_media(
         raise RuntimeError("synthetic probe failure")
 
     monkeypatch.setattr(stream_capture, "probe_media", fail_probe)
-    with pytest.raises(RuntimeError, match="synthetic probe failure"):
+    with pytest.raises(
+        StreamCaptureError,
+        match="failed during output verification",
+    ) as caught:
         capture_stream(
             endpoint=str(source),
             output_path=output,
@@ -395,4 +405,308 @@ def test_post_capture_probe_failure_removes_unregistered_raw_media(
             source_type=SourceType.FIXTURE,
             config=StreamCaptureConfig(duration_s=1.0),
         )
+    assert caught.value.code == "output_verification_failed"
+    assert "synthetic probe failure" not in str(caught.value)
     assert not output.exists()
+
+
+def test_stream_qualification_reopens_and_gates_stable_ready_captures(tmp_path):
+    source = tmp_path / "private-qualification-source.mkv"
+    artifacts = tmp_path / "artifacts"
+    artifacts.mkdir(mode=0o700)
+    secret_metadata = "qualification-private-metadata"
+    _write_av_container(source, seconds=3, metadata_value=secret_metadata)
+
+    with _http_endpoint(tmp_path, source.name) as endpoint:
+        result = qualify_stream(
+            endpoint=endpoint,
+            artifacts_dir=artifacts,
+            evidence_level=EvidenceLevel.E1,
+            source_type=SourceType.FIXTURE,
+            config=StreamQualificationConfig(
+                attempt_count=3,
+                capture=StreamCaptureConfig(
+                    duration_s=0.8,
+                    minimum_duration_s=0.5,
+                    open_timeout_s=2.0,
+                    read_timeout_s=2.0,
+                ),
+            ),
+        )
+
+    report = result.report
+    serialized = report.model_dump_json()
+    assert report.attempt_count == 3
+    assert report.captured_attempt_count == 3
+    assert report.ready_attempt_count == 3
+    assert report.not_ready_attempt_count == 0
+    assert report.failed_attempt_count == 0
+    assert report.unique_track_signature_count == 1
+    assert report.track_signatures_consistent is True
+    assert report.scheduled_reopen_sequence_proven is True
+    assert report.repeated_capture_gate_ready is True
+    assert report.involuntary_disconnect_recovery_proven is False
+    assert report.long_running_stability_proven is False
+    assert report.network_impairment_tolerance_proven is False
+    assert report.device_platform_integration_proven is False
+    assert len(result.capture_reports) == 3
+    assert endpoint not in serialized
+    assert source.name not in serialized
+    assert secret_metadata not in serialized
+    for index, attempt in enumerate(report.attempts, start=1):
+        assert attempt.attempt_index == index
+        assert attempt.status == "captured_ready"
+        assert attempt.capture_artifact_ready is True
+        assert attempt.same_container_multimodal_ready is True
+        assert attempt.output_artifact == f"artifacts/stream-capture-{index:03d}.mkv"
+        assert attempt.capture_report_artifact == (
+            f"reports/stream-capture-{index:03d}.json"
+        )
+        artifact = artifacts / f"stream-capture-{index:03d}.mkv"
+        assert artifact.is_file()
+        assert stat.S_IMODE(artifact.stat().st_mode) == 0o600
+
+    inconsistent_count = report.model_dump(mode="json")
+    inconsistent_count["ready_attempt_count"] = 2
+    with pytest.raises(ValidationError, match="attempt counts are inconsistent"):
+        StreamQualificationReport.model_validate(inconsistent_count)
+
+    false_gate = report.model_dump(mode="json")
+    false_gate["repeated_capture_gate_ready"] = False
+    with pytest.raises(ValidationError, match="capture gate is inconsistent"):
+        StreamQualificationReport.model_validate(false_gate)
+
+    path_traversal = report.model_dump(mode="json")
+    path_traversal["attempts"][0]["output_artifact"] = "../private.mkv"
+    with pytest.raises(ValidationError, match=r"artifacts/\*\.mkv"):
+        StreamQualificationReport.model_validate(path_traversal)
+
+
+def test_stream_qualification_keeps_scheduled_reopen_distinct_from_stability(
+    tmp_path,
+    monkeypatch,
+):
+    from kangshield.information import stream_qualification
+
+    source = tmp_path / "source.mkv"
+    artifacts = tmp_path / "artifacts"
+    artifacts.mkdir(mode=0o700)
+    _write_av_container(source, seconds=2)
+    original_capture = stream_qualification.capture_stream
+    call_count = 0
+
+    def capture_with_changed_signature(**kwargs):
+        nonlocal call_count
+        call_count += 1
+        report = original_capture(**kwargs)
+        if call_count == 2:
+            report = report.model_copy(deep=True)
+            assert report.media_probe.container_timing is not None
+            report.media_probe.container_timing.streams[0].codec_name = "changed-codec"
+        return report
+
+    monkeypatch.setattr(
+        stream_qualification,
+        "capture_stream",
+        capture_with_changed_signature,
+    )
+    result = qualify_stream(
+        endpoint=str(source),
+        artifacts_dir=artifacts,
+        source_type=SourceType.FIXTURE,
+        config=StreamQualificationConfig(
+            attempt_count=2,
+            capture=StreamCaptureConfig(
+                duration_s=0.8,
+                minimum_duration_s=0.5,
+            ),
+        ),
+    )
+
+    assert result.report.ready_attempt_count == 2
+    assert result.report.unique_track_signature_count == 2
+    assert result.report.track_signatures_consistent is False
+    assert result.report.scheduled_reopen_sequence_proven is True
+    assert result.report.repeated_capture_gate_ready is False
+    assert result.report.involuntary_disconnect_recovery_proven is False
+
+
+def test_stream_qualification_continues_after_sanitized_attempt_failure(
+    tmp_path,
+    monkeypatch,
+):
+    from kangshield.information import stream_qualification
+
+    source = tmp_path / "source.mkv"
+    artifacts = tmp_path / "artifacts"
+    artifacts.mkdir(mode=0o700)
+    _write_av_container(source, seconds=2)
+    endpoint = str(source)
+    original_capture = stream_qualification.capture_stream
+    call_count = 0
+
+    def fail_once_with_private_code(**kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise StreamCaptureError(
+                f"private failure at {endpoint}",
+                code=f"private:{endpoint}",
+            )
+        return original_capture(**kwargs)
+
+    monkeypatch.setattr(
+        stream_qualification,
+        "capture_stream",
+        fail_once_with_private_code,
+    )
+    result = qualify_stream(
+        endpoint=endpoint,
+        artifacts_dir=artifacts,
+        source_type=SourceType.FIXTURE,
+        config=StreamQualificationConfig(
+            attempt_count=2,
+            capture=StreamCaptureConfig(
+                duration_s=0.8,
+                minimum_duration_s=0.5,
+            ),
+        ),
+    )
+
+    serialized = result.report.model_dump_json()
+    assert result.report.failed_attempt_count == 1
+    assert result.report.ready_attempt_count == 1
+    assert result.report.repeated_capture_gate_ready is False
+    assert result.report.attempts[0].failure_code == "stream_capture_failed"
+    assert result.report.attempts[1].status == "captured_ready"
+    assert len(result.capture_reports) == 1
+    assert endpoint not in serialized
+    assert not (artifacts / "stream-capture-001.mkv").exists()
+    assert (artifacts / "stream-capture-002.mkv").is_file()
+
+
+def test_qualify_stream_cli_records_owner_only_attempts_and_fail_closed_gate(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    source = tmp_path / "video-only.mkv"
+    _write_av_container(source, seconds=2, include_audio=False)
+    monkeypatch.setenv("PRIVATE_QUALIFICATION_ENDPOINT", str(source))
+
+    exit_code = main(
+        [
+            "qualify-stream",
+            "--endpoint-env",
+            "PRIVATE_QUALIFICATION_ENDPOINT",
+            "--source-type",
+            "fixture",
+            "--attempt-count",
+            "2",
+            "--duration-s",
+            "0.8",
+            "--minimum-duration-s",
+            "0.5",
+            "--runs-dir",
+            str(tmp_path / "runs"),
+            "--require-ready",
+        ]
+    )
+    output = json.loads(capsys.readouterr().out)
+    run_dir = Path(output["run_dir"])
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    report = json.loads(
+        (run_dir / "reports" / "stream-qualification.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert exit_code == 2
+    assert output["failed_attempt_count"] == 2
+    assert output["repeated_capture_gate_ready"] is False
+    assert manifest["status"] == "completed"
+    assert manifest["configuration"]["attempt_count"] == 2
+    assert "PRIVATE_QUALIFICATION_ENDPOINT" not in json.dumps(manifest)
+    assert str(source) not in json.dumps(manifest)
+    assert report["captured_attempt_count"] == 0
+    assert report["failed_attempt_count"] == 2
+    assert report["scheduled_reopen_sequence_proven"] is False
+    assert {item["failure_code"] for item in report["attempts"]} == {
+        "required_audio_track_missing"
+    }
+    assert not list((run_dir / "artifacts").glob("*.mkv"))
+    for path in run_dir.rglob("*"):
+        expected = 0o700 if path.is_dir() else 0o600
+        assert stat.S_IMODE(path.stat().st_mode) == expected
+
+
+def test_qualify_stream_cli_writes_parent_child_reports_and_ledgers(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    source = tmp_path / "input.mkv"
+    _write_av_container(source, seconds=2)
+    monkeypatch.setenv("KANG_QUALIFICATION_ENDPOINT", str(source))
+
+    exit_code = main(
+        [
+            "qualify-stream",
+            "--endpoint-env",
+            "KANG_QUALIFICATION_ENDPOINT",
+            "--source-type",
+            "fixture",
+            "--attempt-count",
+            "2",
+            "--duration-s",
+            "0.8",
+            "--minimum-duration-s",
+            "0.5",
+            "--runs-dir",
+            str(tmp_path / "runs"),
+            "--require-ready",
+        ]
+    )
+    output = json.loads(capsys.readouterr().out)
+    run_dir = Path(output["run_dir"])
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    parent = json.loads(
+        (run_dir / "reports" / "stream-qualification.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert exit_code == 0
+    assert output["ready_attempt_count"] == 2
+    assert output["repeated_capture_gate_ready"] is True
+    assert manifest["status"] == "completed"
+    asset_rows = [
+        json.loads(line)
+        for line in (run_dir / "source_assets.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    assert len(asset_rows) == 2
+    assert set(manifest["inputs"]) == {row["asset_id"] for row in asset_rows}
+    assert len(
+        (run_dir / "observations.jsonl").read_text(encoding="utf-8").splitlines()
+    ) == 2
+    assert parent["captured_attempt_count"] == 2
+    assert parent["ready_attempt_count"] == 2
+    assert parent["unique_track_signature_count"] == 1
+    assert parent["repeated_capture_gate_ready"] is True
+    expected_artifacts = {
+        "artifacts/stream-capture-001.mkv",
+        "artifacts/stream-capture-002.mkv",
+        "reports/stream-capture-001.json",
+        "reports/stream-capture-002.json",
+        "reports/stream-qualification.json",
+    }
+    assert set(manifest["artifacts"]) == expected_artifacts
+    assert "KANG_QUALIFICATION_ENDPOINT" not in json.dumps(manifest)
+    assert str(source) not in json.dumps(manifest)
+    for relative in expected_artifacts:
+        assert (run_dir / relative).is_file()
+    for path in run_dir.rglob("*"):
+        expected = 0o700 if path.is_dir() else 0o600
+        assert stat.S_IMODE(path.stat().st_mode) == expected
