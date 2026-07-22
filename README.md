@@ -45,6 +45,7 @@
 - [V1-R1 G4 事件标注、候选评测与就绪门](docs/v1-g4-event-evaluation-readiness.md)
 - [V1-R1 G4 事件评估 E1 初测报告](docs/reports/v1-g4-event-evaluation-smoke.md)
 - [V1-R1 G4 跌倒候选 episode 设计](docs/v1-g4-fall-event-candidates.md)
+- [V1-R1 G4 跌倒候选 episode 公开压力报告](docs/reports/v1-g4-fall-candidate-public-stress.md)
 
 ## V1 初步开发
 
@@ -165,7 +166,7 @@ kangshield-info benchmark-fall-candidates \
   --caucafall-run runs/<clean-three-variant-adl-parent>
 ```
 
-该命令只在 label-blind 生成完成后读取公开标签做 E1 汇总；精确候选窗口留在被忽略的 derived-sensitive FeatureEvent。公开开发集结果不能作为 C6c 准确率或独立泛化证据，也不会产生风险或告警。冻结语义见[候选 episode 设计](docs/v1-g4-fall-event-candidates.md)。
+该命令只在 label-blind 生成完成后读取公开标签做 E1 汇总；精确候选窗口留在被忽略的 derived-sensitive FeatureEvent。公开开发集结果不能作为 C6c 准确率或独立泛化证据，也不会产生风险或告警。冻结语义见[候选 episode 设计](docs/v1-g4-fall-event-candidates.md)，正式结果见[公开压力报告](docs/reports/v1-g4-fall-candidate-public-stress.md)。
 
 准备并运行静态居家人物检测压力集：
 

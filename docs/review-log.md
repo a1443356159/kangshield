@@ -847,3 +847,59 @@
 1. 真实 candidate episode 的触发点取首次满足规则、持续确认完成还是回溯 onset；三者会直接改变 delay 语义，必须在看 held-out 结果前冻结。
 2. 多人在同一 clip 中是每人独立 candidate、场景级 candidate，还是人工确认队列；当前单路 episode 契约尚未表达 person/track 归属。
 3. 比赛验收更关注每小时 FP、每夜/每日 FP，还是 negative-clip activation；C6c 真实暴露时长到位后再冻结对外主指标。
+
+---
+
+## REV-017 首版 G4 Candidate Episode Policy 与公开压力 Review
+
+- 日期：2026-07-23
+- 状态：Accepted
+- 参与人：项目组、Codex
+- 评审范围：首版非 fixture 候选生成策略、episode 状态机、来源 fail-closed、公开开发压力与 C6c held-out 前冻结边界
+- 输入材料：[候选 episode 设计](v1-g4-fall-event-candidates.md)、[正式公开压力报告](reports/v1-g4-fall-candidate-public-stress.md)、实现提交 `dc6cace`、正式运行 `20260722T165156Z-3dd84457`
+
+### 发现
+
+1. Candidate generation 已从 event evaluator 中保持独立。生成 API 只接收 `FallMotionFrameValue`，不接收 benchmark case、phase annotation 或 action label；标签在全部 episode 生成后才进入 E1 汇总。
+2. Policy 在查看未来 C6c held-out 输出前冻结：transition 为 600 ms horizontal + 1500 ms 内 rapid descent；settled fallback 为 1200 ms horizontal + low motion；gap 450 ms、release 600 ms、refractory 3000 ms，track 缺失/变化清空时序状态。
+3. 三模型 × 18 case 共 54 项公开压力中，YOLO/RTMPose/Keypoint R-CNN 的 URFD simulated-fall 激活分别为 0/3、1/3、3/3。结果强依赖上游姿态/track，不支持把一个规则的表现外推到另一 variant。
+4. 15 个 negative case/variant、149,868 ms 曝光中，YOLO 和 Keypoint R-CNN 都是 0 episode；RTMPose 在 CAUCAFall `s01-walk` 产生 1 个 transition episode，即 24.021139 episodes/hour。分母只有约 2.5 分钟，不能称长期家庭误报率。
+5. 5 个 episode 全部来自 transition 路径，settled fallback 为 0。该结果不构成删除或采用 settled 路径的依据，后续必须在床上躺卧、地面停留和 C6c 困难负样本上原样评估。
+6. Keypoint R-CNN 的 3/3 不能覆盖 lying keypoint gate 4/21、CAUCAFall torso-horizontal no-fall 反例和权重分发门；RTMPose 的 1/3 + 行走负候选也不能推翻其现有条件准确率候选身份。公开开发压力不用于最终模型排名。
+7. 正式 run 为 clean、completed、E1、0 issue；登记 127 个摘要化 SourceAsset，生成 5 个可反查来源 feature 的 derived-sensitive episode。三次独立执行的父报告 SHA-256 完全一致。
+8. 父 manifest/report/SourceAsset 不含本地路径、候选窗口、candidate ID、track ID、bbox 或 keypoints；RiskAssessment 与 Alert 继续 Literal false。
+
+### 决定
+
+1. 接受 `v1-g4-event-candidate-policy-v0.1.0`、`FallEventCandidatePolicy`、`FallEventCandidateEpisode`、状态机、公开压力报告契约、CLI/Make 入口和严格 source hierarchy 校验，作为 V1 首个非 fixture candidate-generator 基线。
+2. 冻结 transition/settled 路径、起点回溯、release、refractory、track/gap reset 和 transition 优先语义。修改任一语义必须升级 policy/version 并全量重跑，禁止在看到 C6c held-out 输出后原地调参。
+3. 将 REV-016 中“设计并 Review 第一版真实 candidate-generator policy”行动项标记为已由本 Review 关闭；它不再 blocked on E2 capture。目标域准确性与事件指标仍 blocked on C6c E2 capture/annotation。
+4. C6c 首轮三路 G4 feature 必须原样使用 policy digest `380151c86ddaf6b79328ca516a778111fe8a7b2c2caa61e209a055bc8942dd08`，再以同一 digest 进入 REV-016 event evaluator。
+5. 保持模型决定不变：YOLO 为 V1 对照，RTMPose 为有条件准确率候选，Keypoint R-CNN 为未选 fallback；本切片不授权最终选型或权重分发。
+6. 不将公开结果表述为 precision、recall、F1、灵敏度、特异度、C6c 准确率或独立泛化；candidate episode 也不授权 RiskAssessment 或 Alert。
+7. V1-R1 保持 In progress；C6c 正负/床上躺卧/空场持续/宠物/多人、双标注裁决后的事件指标、许可证和负责人仍是硬门。
+
+### 验证
+
+- 自动化：94 passed；`pip check` 无 broken requirements；`compileall` 与 `git diff --check` 通过。
+- 正式执行：run `20260722T165156Z-3dd84457`，commit `dc6cace`、clean、completed、E1、0 issue；54 个 variant/case evaluation，127 个 SourceAsset，5 个 episode。
+- 策略摘要：candidate policy `380151c86ddaf6b79328ca516a778111fe8a7b2c2caa61e209a055bc8942dd08`；fall feature policy `3bedf218e9e413c1ab168134b8333db5cdebf764d5f8c9ece65ba212ea9d5eda`。
+- 正式产物：manifest `19abd1d4776450022b350497c52bbb12aa55629d46666a1038323999317c42d6`；父报告 `797974b75b6e16be86d4e836d8045ec2c6ca5dc2b53d0631c9a80759735e7d83`。
+- 可重复性：两次开发运行与一次正式运行的父报告 3/3 SHA-256 一致。
+- 隐私：manifest/report/SourceAsset 中本地路径、候选 start/end/detected、candidate/track ID、bbox/keypoints、risk/alert true 均为 0 命中。
+
+### 行动项
+
+| 行动 | 负责人 | 截止日期 | 状态 |
+|---|---|---|---|
+| 按 REV-014 取得含 C11/C12、床上躺卧、空场持续与安全模拟跌倒的 C6c E2 held-out 包 | 待指定采集人 | 2026-08-01 | Open |
+| 指定两名独立标注者与裁决人，完成内容抽查、访问控制和删除责任记录 | 项目组 | 2026-08-02 | Open |
+| 对 C6c 三路 clean G4 feature 原样执行 frozen candidate policy | Codex | 2026-08-03 | Blocked on E2 capture |
+| 以同一 candidate-policy digest 生成 event bundle 并执行 REV-016 scorer | Codex | 2026-08-03 | Blocked on capture and annotation |
+| 单独评审多人 candidate 归属、身份切换和跨 track episode 去重 | 项目组 | 2026-08-04 | Open |
+
+### 未决问题
+
+1. 当前 largest-bbox 只能形成场景级单主目标 candidate；C6c 多人数据到位后，是升级为 per-person episode 还是继续场景级人工确认队列？
+2. 比赛对外主指标最终采用 episodes/hour、negative-clip activation 还是每夜/每日误触发；必须在真实曝光和评分细则到位后冻结。
+3. 如果 frozen policy 在 C6c 上失败，是降级为人工姿态证据工具，还是在独立开发集上设计 v0.2.0 并保留 C6c held-out；不能用同一 held-out 既调参又报最终指标。

@@ -149,3 +149,5 @@ make PYTHON=.venv/bin/python benchmark-g4-fall-candidates
 - 风险与告警始终为 false。
 
 它不会关闭以下 V1-R1 门：C6c E2 正负/床上躺卧/空场持续、多人物身份策略、双人标注与裁决、真实事件指标、最终模型许可证和 RiskAssessment/Alert 设计。下一步是在不修改本 policy 的前提下，从 C6c clean feature run 导出三路 candidate stream，再交给既有事件 evaluator。
+
+正式 E1 结果见[跌倒候选 episode 公开压力报告](reports/v1-g4-fall-candidate-public-stress.md)。

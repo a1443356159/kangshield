@@ -191,7 +191,7 @@ V1-R1 将架构能力分为三层：
 2. 只进入候选接口的实现：HumanArt + RTMPose、TorchVision Keypoint R-CNN fallback、FunASR 和跌倒 box/keypoint 特征；在目标设备、负样本或许可证门关闭前不能成为正式能力。
 3. 不进入当前主路径的能力：YOLO26n 默认姿态、Whisper 普通话主链路、睡眠模型、自动诈骗/认知/抑郁评分，以及无设备证据的 HRV/SpO2/AHI 等字段。
 
-V2-D1 可以在真机到位前继续设计 adapter seam；媒体 PTS、采集包 readiness、G4 跌倒运动特征、静态人物检测压力和事件评估工具均已完成，但真实 G2/G3/G4 仍未关闭。G4 当前只提供离线 feature/fallback、静态 person-detection 与 E1 scorer 契约证据，不能进入 RiskAssessment 或告警。系统必须同时保留三种运行声明：真实平台接入、受控文件回放、能力 blocked。三者不得共享同一个“已接入”状态。
+V2-D1 可以在真机到位前继续设计 adapter seam；媒体 PTS、采集包 readiness、G4 跌倒运动特征、首版 label-blind candidate、静态人物检测压力和事件评估工具均已完成，但真实 G2/G3/G4 仍未关闭。G4 当前只提供离线 feature/candidate/fallback、静态 person-detection 与 E1 scorer 契约证据，不能进入 RiskAssessment 或告警。系统必须同时保留三种运行声明：真实平台接入、受控文件回放、能力 blocked。三者不得共享同一个“已接入”状态。
 
 完整决策 ID、许可证边界和硬门见 [V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。
 

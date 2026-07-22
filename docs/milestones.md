@@ -54,7 +54,7 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 | V1-R1 G4 Open Images 静态人物检测压力 | `40359c1` / `fad9491` / `c77525e` | `origin/main` | 2026-07-22 已验证 | 逐图 CC BY 2.0 / 标注 CC BY 4.0 归因、12-case r2、确定性准备/lock、三模型 L40 与 REV-015；只关闭静态 furniture/pet/multi-person 人物检测子门 |
 | V1-R1 G4 双标注/裁决/事件评估 E1 工具 | `b0b2e97` / `5413b46` | `origin/main` | 2026-07-22 已验证 | 12-clip 确定性 bundle、pairwise agreement、adjudication、三 candidate stream TP/FP/FN/误触发/delay、严格 provenance 与 REV-016；不代表真实模型或 C6c 事件性能 |
 
-这里的“推送验证”只证明代码已到达远端。V1-M1 仍为 In progress，必须取得 C6c 与 CS-EP-SDNL1 的 E2/E3 证据后才能进入 Review/Done。V1-M2a 和 V1-M2b 的 Done 只关闭设备无关 E1 链路及公开固定集评测，不会提升真实设备证据等级。V1-M3 的姿态、语言和睡眠字段三个 E1 切片均已验收，因此仅在 E1 探索范围标记 Done；M2c 已有采集规程、容器时间戳工具和采集包 readiness gate，但仍没有真实 C6c 媒体或 SDNL1 字段证据。V1-R1 G4 的离线特征、公开压力与双标注/裁决/事件 scorer 也都只属于 E1，不能替代 C6c 正负视频、真实候选策略/指标、床上躺卧、多人 tracking 或跌倒风险/告警验收。
+这里的“推送验证”只证明代码已到达远端。V1-M1 仍为 In progress，必须取得 C6c 与 CS-EP-SDNL1 的 E2/E3 证据后才能进入 Review/Done。V1-M2a 和 V1-M2b 的 Done 只关闭设备无关 E1 链路及公开固定集评测，不会提升真实设备证据等级。V1-M3 的姿态、语言和睡眠字段三个 E1 切片均已验收，因此仅在 E1 探索范围标记 Done；M2c 已有采集规程、容器时间戳工具和采集包 readiness gate，但仍没有真实 C6c 媒体或 SDNL1 字段证据。V1-R1 G4 的离线特征、首版候选状态机、公开压力与双标注/裁决/事件 scorer 也都只属于 E1，不能替代 C6c 正负视频、冻结策略的真实候选/事件指标、床上躺卧、多人 tracking 或跌倒风险/告警验收。
 
 ## 4. 当前阶段任务
 
@@ -198,12 +198,13 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 - [x] 完成一个不依赖 HumanArt 的公开权重候选评测；因 lying gate 4/21 和 COCO/ImageNet 分发仍 Open，只保留 fallback。
 - [x] 在干净修正提交 `fad9491` / job `1766` 上完成 Open Images r2 静态家具无人、宠物无人和室内多人三模型压力；首轮标注异常 run 被拒绝，正式结果保持无风险/告警。
 - [x] 在干净提交 `b0b2e97` 上完成双人 interval/onset agreement、裁决、三 candidate stream TP/FP/FN、误触发/小时与 delay 的 E1 正式工具运行；fixture 指标不用于模型比较。
-- [ ] 使用 C6c 正负视频继续补空场持续、床上躺卧、宠物移动和真实多人 tracking，冻结真实候选策略后复用事件评估口径。
+- [x] 在查看未来 C6c held-out 输出前冻结首版 label-blind candidate episode 状态机；在干净提交 `dc6cace` 上复用 URFD/CAUCAFall 三路 G4 特征完成 54 项 E1 公开压力，结果如实保留 YOLO/RTMPose 漏候选与 RTMPose 行走负候选。
+- [ ] 使用 C6c 正负视频继续补空场持续、床上躺卧、宠物移动和真实多人 tracking，按已冻结 policy 生成真实候选并复用事件评估口径。
 - [ ] 用 E2/E3 证据把 C6c 与 SDNL1 从 Unknown 归类为 available、limited 或 blocked。
 - [ ] 决定 V2 最终姿态权重和项目分发许可证，生成第三方 NOTICE；HumanArt 与 Keypoint R-CNN 均未关闭该门。
 - [ ] 为硬门指定负责人和截止日期，并删除无法完成的 V2 能力声明。
 
-预 Review 见 [V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。G4 基础设计与证据见[跌倒运动特征设计](v1-g4-fall-motion-features.md)和[正式报告](reports/v1-g4-fall-motion-features.md)，扩展 ADL 子门见 [CAUCAFall 设计](v1-g4-caucafall-adl-stress.md)和[压力报告](reports/v1-g4-caucafall-adl-stress.md)，静态人物检测子门见 [Open Images 设计](v1-g4-openimages-static-home-stress.md)与[正式报告](reports/v1-g4-openimages-static-home-stress.md)，事件工具子门见[事件评估设计](v1-g4-event-evaluation-readiness.md)与[初测报告](reports/v1-g4-event-evaluation-smoke.md)。E1 工具与公开压力集完成不等于 V1-R1 Done；真机视频、真实候选/事件指标、床上躺卧/时序多人、最终姿态分发路线和责任人仍是验收门。
+预 Review 见 [V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。G4 基础设计与证据见[跌倒运动特征设计](v1-g4-fall-motion-features.md)和[正式报告](reports/v1-g4-fall-motion-features.md)，扩展 ADL 子门见 [CAUCAFall 设计](v1-g4-caucafall-adl-stress.md)和[压力报告](reports/v1-g4-caucafall-adl-stress.md)，静态人物检测子门见 [Open Images 设计](v1-g4-openimages-static-home-stress.md)与[正式报告](reports/v1-g4-openimages-static-home-stress.md)，候选生成子门见[episode 设计](v1-g4-fall-event-candidates.md)与[公开压力报告](reports/v1-g4-fall-candidate-public-stress.md)，事件工具子门见[事件评估设计](v1-g4-event-evaluation-readiness.md)与[初测报告](reports/v1-g4-event-evaluation-smoke.md)。E1 工具与公开压力集完成不等于 V1-R1 Done；真机视频、真实候选/事件指标、床上躺卧/时序多人、最终姿态分发路线和责任人仍是验收门。
 
 ## 5. 里程碑决策优先级
 

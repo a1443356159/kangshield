@@ -87,6 +87,8 @@
 4. 不接受 fixture 三行结果作为姿态模型比较、跌倒 precision/recall、C6c 域内表现或阈值调优依据。
 5. 本轮只关闭“双人一致性/裁决/事件 scorer E1 工具”子门。真实候选策略、C6c 正负视频、内容抽查、多人 tracking、许可证、RiskAssessment 和 Alert 仍 Open，V1-R1 保持 In progress。
 
+后续 REV-017 已在查看 C6c held-out 输出前冻结首版非 fixture candidate policy，并完成公开 E1 压力；该后续进展不改变本 fixture scorer 报告的历史结论。C6c 真实候选/事件指标仍 Open，见[候选公开压力报告](v1-g4-fall-candidate-public-stress.md)。
+
 ## 8. 下一步
 
 1. 按 REV-014 取得 C6c E2 核心包，并把 C11/C12 安全模拟跌倒、弯腰、床上躺卧和空场持续纳入同一 held-out revision。
