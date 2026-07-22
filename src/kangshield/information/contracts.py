@@ -1206,6 +1206,49 @@ class FallFeatureCaptureReport(ContractModel):
         return self
 
 
+class FallEventBundleAssemblyReport(ContractModel):
+    """Path-free receipt for one atomically assembled evaluator bundle."""
+
+    schema_version: Literal["1.0"] = "1.0"
+    assembler_version: str = Field(min_length=1)
+    bundle_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    fixture: bool
+    evidence_level: EvidenceLevel
+    source_type: SourceType
+    capture_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    candidate_generator_policy_sha256: str = Field(
+        pattern=r"^[0-9a-f]{64}$"
+    )
+    annotation_set_count: int = Field(ge=2)
+    variant_ids: list[str] = Field(min_length=1)
+    copied_source_file_count: int = Field(ge=1)
+    preflight_decision: Literal[
+        "event_metrics_ready_for_review",
+        "tooling_only",
+        "capture_gate_closed",
+        "not_ready",
+    ]
+    preflight_quality_status: QualityStatus
+    provenance_gate_passed: bool
+    event_metrics_ready_for_review: bool
+    source_paths_persisted: Literal[False] = False
+    raw_media_copied: Literal[False] = False
+    copied_sensitive_file_mode: Literal["0600"] = "0600"
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_assembly_report(self) -> "FallEventBundleAssemblyReport":
+        if len(self.variant_ids) != len(set(self.variant_ids)):
+            raise ValueError("event bundle assembly variants must be unique")
+        if self.fixture and self.evidence_level is not EvidenceLevel.E1:
+            raise ValueError("fixture event bundle assembly must remain E1")
+        if self.fixture != (self.source_type is SourceType.FIXTURE):
+            raise ValueError("event bundle fixture marker disagrees with source type")
+        return self
+
+
 class FallCandidatePredictionEvent(ContractModel):
     candidate_id: str = Field(min_length=1)
     start_ms: int = Field(ge=0)

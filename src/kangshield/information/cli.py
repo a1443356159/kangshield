@@ -123,6 +123,45 @@ def build_parser() -> argparse.ArgumentParser:
         help="Exit 2 unless real E2+ event metrics are ready for review",
     )
 
+    event_bundle = subparsers.add_parser(
+        "assemble-event-evaluation-bundle",
+        help="Atomically assemble and preflight a self-contained event bundle",
+    )
+    event_bundle.add_argument("capture_manifest", type=Path)
+    event_bundle.add_argument("readiness_report", type=Path)
+    event_bundle.add_argument("readiness_run_manifest", type=Path)
+    event_bundle.add_argument("candidate_policy", type=Path)
+    event_bundle.add_argument("adjudication", type=Path)
+    event_bundle.add_argument(
+        "--annotation",
+        type=Path,
+        action="append",
+        required=True,
+        help="Repeat for each independent annotation set",
+    )
+    event_bundle.add_argument(
+        "--prediction-source",
+        type=Path,
+        nargs=2,
+        action="append",
+        required=True,
+        metavar=("PREDICTION", "RUN_MANIFEST"),
+        help="Repeat for each pose variant",
+    )
+    event_bundle.add_argument("--output", type=Path, required=True)
+    event_bundle.add_argument(
+        "--evaluation-policy",
+        type=Path,
+        default=Path("configs/v1-g4-event-evaluation-policy.json"),
+    )
+    event_bundle.add_argument(
+        "--evidence-level", type=_evidence, default=EvidenceLevel.E1
+    )
+    event_bundle.add_argument(
+        "--source-type", type=_source_type, default=SourceType.FIXTURE
+    )
+    event_bundle.add_argument("--evaluation-id")
+
     candidate_export = subparsers.add_parser(
         "export-fall-candidates",
         help=(
@@ -935,6 +974,48 @@ def _export_fall_candidates_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def _assemble_event_evaluation_bundle_command(args: argparse.Namespace) -> int:
+    from .event_bundle import assemble_fall_event_evaluation_bundle
+
+    assembly = assemble_fall_event_evaluation_bundle(
+        output_dir=args.output,
+        capture_manifest_path=args.capture_manifest,
+        capture_readiness_report_path=args.readiness_report,
+        capture_assessment_run_manifest_path=args.readiness_run_manifest,
+        candidate_policy_path=args.candidate_policy,
+        annotation_paths=args.annotation,
+        adjudication_path=args.adjudication,
+        prediction_sources=[tuple(pair) for pair in args.prediction_source],
+        evaluation_policy_path=args.evaluation_policy,
+        evidence_level=args.evidence_level,
+        source_type=args.source_type,
+        evaluation_id=args.evaluation_id,
+    )
+    print(
+        json.dumps(
+            {
+                "bundle": str(assembly.bundle_path),
+                "bundle_sha256": assembly.report.bundle_sha256,
+                "preflight": str(assembly.preflight_path),
+                "assembly_report": str(assembly.assembly_report_path),
+                "variant_ids": assembly.report.variant_ids,
+                "preflight_decision": assembly.report.preflight_decision,
+                "provenance_gate_passed": (
+                    assembly.report.provenance_gate_passed
+                ),
+                "event_metrics_ready_for_review": (
+                    assembly.report.event_metrics_ready_for_review
+                ),
+                "risk_assessment_emitted": False,
+                "alert_emitted": False,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+    return 0
+
+
 def _capture_fall_features_command(args: argparse.Namespace) -> int:
     from .fall_adl_benchmark import build_fall_adl_pose_backend
     from .fall_feature_capture import run_fall_feature_capture
@@ -1513,6 +1594,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _assess_m2c_capture_command(args)
     if args.command == "assess-event-evaluation":
         return _assess_event_evaluation_command(args)
+    if args.command == "assemble-event-evaluation-bundle":
+        return _assemble_event_evaluation_bundle_command(args)
     if args.command == "export-fall-candidates":
         return _export_fall_candidates_command(args)
     if args.command == "capture-fall-features":

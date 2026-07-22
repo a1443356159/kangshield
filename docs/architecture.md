@@ -97,6 +97,8 @@ G4 capture feature producer 位于 M2c readiness 与 export bridge 之间：“�
 
 G4 capture export bridge 把开发状态机接到真实事件 evaluator，而不让两侧私下约定 JSON：“capture manifest + capture-bound `FallFeatureCaptureSet` + clean feature source run → 逐 clip 摘要/时间轴校验 → frozen candidate state machine → `FallCandidatePredictionSet` + clean candidate source run”。prediction 使用 evaluator 的公开契约，candidate run configuration 绑定 capture/model/feature/candidate policy 与 prediction SHA-256；时间戳、candidate ID 和窗口只留在 derived-sensitive prediction，timestamp-free summary 不保存路径或窗口。当前 E1 rule-bearing fixture 已验证三 variant 状态机到 evaluator 的接口，真实 C6c 数据仍 Open。
 
+G4 event-bundle assembler 将 capture/readiness、双标注/裁决、冻结 candidate policy 与三路 prediction/source manifest 复制到 owner-only staging，调用原 evaluator 完成 strict preflight 后才原子发布。bundle 只使用相对路径、大小和 SHA-256，不复制 capture 原媒体；失败会删除 staging 且不覆盖既有输出。“组装成功”与 `event_metrics_ready_for_review` 分离，fixture、camera、数据或 provenance 门仍由 evaluator 如实关闭。
+
 ## 5. V1 运行形态
 
 V1 采用一次运行一个目录的离线流水线：

@@ -78,6 +78,7 @@ src/kangshield/information/
 ├── fall_feature_capture.py # capture clip 的 pose→G4 feature producer
 ├── fall_candidates.py    # 无标签候选状态机、来源门与公开压力汇总
 ├── fall_candidate_export.py # capture-bound G4 特征到 evaluator prediction
+├── event_bundle.py       # 三路 prediction 与标注的原子 bundle 组装/preflight
 ├── speech_backend.py     # FunASR VAD/ASR/标点和词面标签
 ├── multimodal_pipeline.py # 特征落盘、时间窗对齐和性能报告
 ├── dataset_preparation.py # 公开固定源校验、媒体转换、case/lock
@@ -335,6 +336,19 @@ kangshield-info export-fall-candidates \
 ```
 
 该命令不读 annotation/adjudication，只读取 capture 的安全索引、逐 clip `video.fall_motion_frame` 和冻结策略；它校验上游 run、artifact、摘要、variant/model/feature policy、clip order/duration、observation、时间轴和 derived-sensitive 标记，输出 evaluator 直接消费的公开 `FallCandidatePredictionSet` 与 `v1-g4-fall-event-candidates` source run。精确窗口不进入 timestamp-free summary，风险和告警仍为 false。设计见 [G4 Candidate Export Bridge](v1-g4-candidate-export-bridge.md)。
+
+三路 candidate source 到位后，由原子组装器生成 self-contained evaluator bundle：
+
+```text
+kangshield-info assemble-event-evaluation-bundle \
+  <capture.json> <readiness.json> <readiness-run.json> \
+  <candidate-policy.json> <adjudication.json> \
+  --annotation <annotation-a.json> --annotation <annotation-b.json> \
+  --prediction-source <prediction.json> <candidate-run-manifest.json> \
+  --output <new-private-bundle-directory>
+```
+
+组装器不修改标签/候选，不复制原媒体，也不覆盖目录；它在 `0700` staging 中以 `0600` 复制敏感 JSON，生成相对路径/大小/摘要引用，调用同一 evaluator preflight 后才原子 rename。正式可评审状态仍由 evaluator gates 决定。设计见 [G4 Event Bundle 组装](v1-g4-event-bundle-assembly.md)。
 
 ## 8. 模型接入路线
 

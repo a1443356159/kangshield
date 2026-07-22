@@ -103,6 +103,36 @@ def test_event_evaluation_parser_defaults_to_fixture_and_real_readiness_closed()
     assert args.require_ready is False
 
 
+def test_event_bundle_parser_requires_explicit_sensitive_inputs():
+    args = build_parser().parse_args(
+        [
+            "assemble-event-evaluation-bundle",
+            "capture.json",
+            "readiness.json",
+            "readiness-run.json",
+            "candidate-policy.json",
+            "adjudication.json",
+            "--annotation",
+            "annotation-a.json",
+            "--annotation",
+            "annotation-b.json",
+            "--prediction-source",
+            "yolo.json",
+            "yolo-run.json",
+            "--output",
+            "event-bundle",
+        ]
+    )
+    assert args.command == "assemble-event-evaluation-bundle"
+    assert len(args.annotation) == 2
+    assert args.prediction_source == [
+        [Path("yolo.json"), Path("yolo-run.json")]
+    ]
+    assert args.evidence_level.value == "E1"
+    assert args.source_type.value == "fixture"
+    assert args.evaluation_policy.name == "v1-g4-event-evaluation-policy.json"
+
+
 def test_fall_feature_parser_defaults_to_candidate_and_clean_source():
     args = build_parser().parse_args(
         [
