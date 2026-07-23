@@ -4,7 +4,7 @@
 
 基准日期：2026-07-23
 
-证据快照：截至 `f5bb761` 的 V1-M1～V1-M3 报告、许可证 fail-closed 修正 `f4aa1c5`、G4 离线特征实现 `782026b`、CAUCAFall ADL 压力实现 `336bbe9`、Keypoint R-CNN 候选实现 `eae5f56` / G4 派生接入 `d956203`、Open Images 静态人物检测实现 `40359c1` / 标注审计修正 `fad9491`、双标注/裁决/事件评估工具 `b0b2e97`、首版 candidate episode 生成器 `dc6cace`、capture producer `7a8dc23` / tracker 修复与加固 `b233abe` / `b4b72f7`、event bundle assembler `7b64719`，同容器音轨 adapter `8c6df2d` / bitexact smoke `eca6231` / 路径脱敏 `195c966`、owner-only artifact 修复 `d1d4b5a` / `8b4b52d`，正式 Slurm runtime/submit 契约 `673560d` / `667ad8d` / `b54d8b8`、比赛提交分发就绪门 `6c32364`、候选 runtime closure `876ce07`、有界流采集 adapter `8cbd91f`、重复开流资格门 `fea40f7` / 轨道签名加固 `c8bda16`，以及受控流故障矩阵 `4e637a1`
+证据快照：截至 `f5bb761` 的 V1-M1～V1-M3 报告、许可证 fail-closed 修正 `f4aa1c5`、G4 离线特征实现 `782026b`、CAUCAFall ADL 压力实现 `336bbe9`、Keypoint R-CNN 候选实现 `eae5f56` / G4 派生接入 `d956203`、Open Images 静态人物检测实现 `40359c1` / 标注审计修正 `fad9491`、双标注/裁决/事件评估工具 `b0b2e97`、首版 candidate episode 生成器 `dc6cace`、capture producer `7a8dc23` / tracker 修复与加固 `b233abe` / `b4b72f7`、event bundle assembler `7b64719`，同容器音轨 adapter `8c6df2d` / bitexact smoke `eca6231` / 路径脱敏 `195c966`、owner-only artifact 修复 `d1d4b5a` / `8b4b52d`，正式 Slurm runtime/submit 契约 `673560d` / `667ad8d` / `b54d8b8`、比赛提交分发就绪门 `6c32364`、候选 runtime closure `876ce07`、有界流采集 adapter `8cbd91f`、重复开流资格门 `fea40f7` / 轨道签名加固 `c8bda16`、受控流故障矩阵 `4e637a1`，以及流会话 Supervisor / 受控恢复 `6a68371`
 
 ## 1. Review 目标与状态语义
 
@@ -29,7 +29,7 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 
 | 切片 | 最高证据 | Review 结果 | 仍未证明 |
 |---|---|---|---|
-| V1-M1 采集骨架 | E1 fixture/HTTP | 契约、运行目录、媒体/睡眠/萤石快照探针、有界采集与三次独立开流格式 gate 可用；raw 均 owner-only | 两台目标设备任何真实开发能力、C6c RTSP/鉴权/非自愿重连/长稳 |
+| V1-M1 采集骨架 | E1 fixture/HTTP | 契约、运行目录、媒体/睡眠/萤石快照探针、有界采集、三次独立开流格式 gate、故障识别和分段 session/受控恢复可用；raw 均 owner-only | 两台目标设备任何真实开发能力、C6c RTSP/鉴权/同连接或非自愿重连/packet loss/长稳 |
 | V1-M2a 多模态链路 | E1 public/synthetic | 独立 WAV harness 与同容器 PTS/16 kHz/VAD-ASR/窗口链路均可重复；owner-only L40 jobs `1777` / `1782` 已通过 | 自然 capture clock、C6c 取流和端到端直播延迟 |
 | V1-M2b 固定集 | E1 public | 6 case、170 视频帧、137 参考字符的批量评测可重复 | 目标机位精度、人物负样本误报和自然跨模态对齐 |
 | V1-M3 姿态 | E1 public | HumanArt + RTMPose 为准确率条件参考；Keypoint R-CNN 仅保留 fallback | C6c 场景、困难横卧关键点、两条权重路线的许可证/分发终审 |
@@ -60,6 +60,7 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 | R1-D16 | 有界网络音视频流采集接缝 | Adopt as E1 adapter seam | `8cbd91f` 以环境端点、首视频关键帧、timeout/时长/packet 上限和 owner-only 原子 Matroska 完成 loopback HTTP E1；job `1782` 用同一 artifact SHA-256 完成真实姿态/语言 Pipeline | C6c 必须另做 RTSP/鉴权/音轨、长稳/重连、丢包抖动与双同步事件 E2/E3；单次 clip 不代表平台接入 |
 | R1-D17 | 重复开流资格门 | Adopt as E1 pre-capture gate | `fea40f7` / `c8bda16` 将多次独立 open、固定失败码、父/子 ledger 和 codec/time-base/视频尺寸帧率/音频采样率声道签名冻结；3/3 HTTP E1 ready | C6c 短 E2 可复用，但 scheduled reopen 不代表非自愿断线恢复、长稳或网络损伤容忍；每个 raw 仍受同意/留存约束 |
 | R1-D18 | 受控流故障识别矩阵 | Adopt as E1 adapter safety gate | `4e637a1` 固定完整/分块延迟/503/双 stall/截断/reset 七场景、实际 server 遥测、有界状态和严格父 gate；7/7 E1 执行且 0 unexpected ready | 只证明 loopback HTTP 安全识别；RTSP、packet loss、packet-level jitter、恢复、容忍、长稳和 C6c 都须另做 E2/E3 |
+| R1-D19 | 流会话 Supervisor 与受控恢复 | Adopt as E1 segmented-session seam | `6a68371` 冻结独立 segment/raw、start/finish/gap/interruption/recovery ledger、通用/专用 gate 和 30 分钟硬门；全健康 3/3 与同 endpoint ready→503→ready 均按各自口径通过 | 受控 HTTP 503 后的新 artifact 不是 same-connection reconnect 或非自愿断流恢复；RTSP/packet loss、网络容忍、C6c 和 30～60 分钟实际长稳仍须 E2 |
 
 ## 4. 模型与提取器决策账本
 
@@ -128,6 +129,7 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 | 有界流采集 adapter | 环境端点、首视频关键帧、open/read timeout、时长/packet 上限、owner-only 原子 Matroska、输出 timing probe 与失败清理 | R1-D16 / REV-025 |
 | 重复开流资格 gate | 多次独立 raw/child report、固定失败码、完整音视频轨道签名、严格计数/路径/readiness 父 gate；断线/长稳/损伤声明分离 | R1-D17 / REV-026 |
 | 受控流故障识别 gate | 七个固定 loopback HTTP 行为、实际 request/body/delay/stall/reject/reset/early-close 遥测、有界状态、0 unexpected ready 与失败 partial 清理 | R1-D18 / REV-027 |
+| 分段 session / 外部重开 gate | 独立 raw/child report、start/finish/gap/interruption/recovery ledger、全段/时长/组合 gate、30 分钟硬门，以及同 endpoint full/503/full 实际遥测 | R1-D19 / REV-028 |
 | 姿态候选配置 | 5 fps、RTMPose detector conf 0.05；Keypoint R-CNN conf 0.5 / resize 800～1333；COCO-17 与分数语义分开记录 | REV-006 / REV-013 |
 | 跌倒运动特征契约 | box-only、关键点质量门、同 track 历史、fallback reason、无风险/告警硬约束；单一横卧框或 gate-passed torso-horizontal 均不得直接告警；静态 person detection 结果不得冒充事件指标 | REV-011 / REV-012 / REV-013 / REV-015 |
 | 跌倒候选生成契约 | transition 600 ms + 近期下降、settled 1200 ms + low-motion、gap/track reset、release 600 ms、refractory 3000 ms；label-blind，精确窗口只进 derived-sensitive FeatureEvent | REV-017 |
@@ -141,7 +143,7 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 
 | Gate | 必须取得的证据 | 失败时的降级 |
 |---|---|---|
-| G1 C6c 能力 | 脱敏能力集、直播/回放/抓图调用和一段原始媒体；E1 HTTP 采集/重复开流/故障识别 gate 只作为接收工具证据 | 演示只允许受控流/文件回放，不声称实时萤石接入 |
+| G1 C6c 能力 | 脱敏能力集、直播/回放/抓图调用和一段原始媒体；E1 HTTP 采集/重复开流/故障识别/session 恢复 gate 只作为接收工具证据 | 演示只允许受控流/文件回放，不声称实时萤石接入 |
 | G2 音视频时间基 | C6c 容器 track、time_base、首尾 PTS 与两次同步事件的 offset/drift；E1 packet span 不计入 | 视频与语言分开演示，不做自然融合结论 |
 | G3 C6c 模型复测 | `camera_ready_for_model_retest=true`；至少 8 个 E2 核心 clip，三姿态 variant、空场误触发和远场 ASR；C01～C10 完成后才申请 M2c Review | 保留 E1 离线 demo，模型仍为 conditional |
 | G4 跌倒特征/候选/事件 | E1 feature/fallback、首版 candidate policy、公开压力与双标注/裁决/event scorer 已通过；仍需 C6c 正负视频、空场持续、躺床、宠物移动、多人 tracking 和冻结策略的真实事件指标 | 不生成自动风险，只展示姿态/轨迹派生特征、candidate 与 tooling-only scorer |
@@ -151,7 +153,7 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 
 ## 9. 不等待真机的下一开发顺序
 
-1. `[E1 tools done，REV-010/014/021/025/026]` 使用 PyAV 实现有界 HTTP/RTSP 接收、重复独立开流/格式 gate、容器时间基和同容器音轨到 VAD/ASR 的 PTS adapter，并把采集包、双事件与 held-out 冻结成可执行门；下一步按“单次 C6c 短 E2 → 三次 qualification → 故障/长稳 → C01～C12”执行，不把 E1 HTTP 或 scheduled reopen 当平台/重连结论。
+1. `[E1 tools done，REV-010/014/021/025/026/027/028]` 使用 PyAV 实现有界 HTTP/RTSP 接收、重复独立开流/格式 gate、故障识别、分段 session/gap/recovery ledger、容器时间基和同容器音轨到 VAD/ASR 的 PTS adapter，并把采集包、双事件与 held-out 冻结成可执行门；下一步按“单次 C6c 短 E2 → 三次 qualification → 短 session → 外部注入故障/恢复 → 30～60 分钟长稳 → C01～C12”执行，不把 E1 HTTP、scheduled reopen 或受控 503 后的新 artifact 当平台/same-connection/非自愿断流恢复结论。
 2. `[E1 tools done，REV-011/012/015/016/017]` 已实现仅离线输出的跌倒特征层、首版 label-blind candidate episode、CAUCAFall/Open Images 压力支路，以及双标注/裁决/事件 scorer；保持不输出 RiskAssessment 或 Alert。
 3. 当前下一步是按 REV-014 采集 C01～C12；空场、家具遮挡、床上躺卧和安全模拟跌倒已进入标签契约，宠物移动和真实多人 tracking 作为扩展视频负样本继续 Open。C6c 首轮必须原样使用 REV-017 policy，再复用 REV-016 口径生成事件指标。
 4. `[E1 comparison done，REV-013]` 已评测非 Human-Art 的 Keypoint R-CNN；因 lying gate 4/21 和权重分发仍 Open，只保留 fallback。下一步不再横向增加 checkpoint，而是进入 C6c held-out 与自有训练路线判断。

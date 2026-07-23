@@ -1,6 +1,6 @@
 # V1 视频与语言多模态采集 Pipeline
 
-状态：Implemented Baseline v0.8；有界流采集、重复开流、故障识别、同容器 PTS/owner-only 路径已实现；V1-R1 决策已同步
+状态：Implemented Baseline v0.9；有界流采集、重复开流、故障识别、session supervisor、同容器 PTS/owner-only 路径已实现；V1-R1 决策已同步
 
 更新时间：2026-07-23
 

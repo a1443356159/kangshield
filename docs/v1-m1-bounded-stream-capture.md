@@ -1,6 +1,6 @@
 # V1-M1 有界音视频流采集适配器
 
-状态：Implemented E1 v0.1.0；真实 C6c / RTSP E2 门仍 Open
+状态：Implemented E1 v0.1.0；受控故障/session recovery E1 已补，真实 C6c / RTSP E2 门仍 Open
 
 基准日期：2026-07-23
 

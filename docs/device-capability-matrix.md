@@ -1,6 +1,6 @@
 # 设备能力矩阵
 
-状态：Live Ledger v0.6
+状态：Live Ledger v0.7
 
 更新时间：2026-07-23
 
@@ -29,6 +29,7 @@
 | 服务端有界 RTSP/HTTP 接收与落盘 | 项目 adapter 已实现 | 仅 loopback HTTP fixture | REV-025 / E1 | Tooling ready；Device Unknown |
 | 服务端重复开流与格式稳定 gate | 项目 qualification 已实现 | 仅 3 次 loopback HTTP fixture | REV-026 / E1 | Tooling ready；Device Unknown |
 | 服务端受控故障识别 gate | 项目七场景 HTTP fault matrix 已实现 | 仅 loopback fixture；无 RTSP/packet loss | REV-027 / E1 | Tooling ready；Device Unknown |
+| 服务端分段 session / 外部重开恢复 gate | 项目 supervisor 与 gap/recovery ledger 已实现 | 仅 fixture；受控 HTTP 503，不是非自愿断流 | REV-028 / E1 | Tooling ready；Device Unknown |
 | 服务端可解码视频 | 不由通用功能列表保证 | 未验证 | — | P0 |
 | 音频轨 | 用户确认设备有麦克风；开放取流未知 | 未验证 | — | P0 |
 | 音频编码/采样率 | 无目标 SKU 证据 | 未验证 | — | Unknown |
@@ -56,6 +57,8 @@ REV-025 又把 RTSP/HTTP(S) endpoint 接到有界 codec-copy、首视频关键�
 REV-026 再以三个独立连接检查 requested readiness 和完整轨道签名，见[资格门](v1-m1-stream-qualification.md)与[报告](reports/v1-m1-stream-qualification-smoke.md)。三次 E1 HTTP 都得到 810×1080/10 fps FFV1 + 16 kHz mono PCM，但这是同一 fixture 的计划性 reopen；C6c 的真实格式、RTSP 鉴权、断线恢复、丢包/抖动和长稳仍未验证，设备最高证据仍为 E0。
 
 REV-027 使用同一 E1 child 实际执行完整响应、分块延迟、503、首包/部分 body stall、截断和 TCP reset，见[故障矩阵](v1-m1-stream-fault-matrix.md)与[报告](reports/v1-m1-stream-fault-matrix-smoke.md)。7/7 场景有界且无意外 ready 只证明项目 adapter 的安全识别；没有使用 C6c、RTSP、鉴权、packet loss 或恢复策略，设备最高证据仍为 E0。
+
+REV-028 将多次有界 capture 组织为独立 segment/raw、start/finish/gap/interruption/recovery ledger，并在同一 loopback HTTP endpoint 完成 ready→503→ready，见[Supervisor 设计](v1-m1-stream-session-supervisor.md)与[报告](reports/v1-m1-stream-session-supervisor-smoke.md)。专用恢复 gate 通过只证明外部 supervisor 会在受控拒绝后新开 artifact；same-connection reconnect、非自愿断流、RTSP/packet loss、30～60 分钟长稳和 C6c 仍未验证，设备最高证据仍为 E0。
 
 REV-014 又完成了 E1 采集包/场景标注/held-out readiness gate，见[设计](v1-m2c-capture-readiness-gate.md)与[报告](reports/v1-m2c-capture-readiness-smoke.md)。正式 fixture 虽有 10/10 结构可用 clip，`camera_ready_for_model_retest`、`sleep_sample_ready_for_profiling` 和 `capture_bundle_ready_for_review` 均为 false；因此本能力矩阵仍不提升目标设备证据等级。
 

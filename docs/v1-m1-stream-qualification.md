@@ -1,6 +1,6 @@
 # V1-M1 重复开流资格门
 
-状态：Implemented E1 v0.1.0；受控故障 E1 已补，C6c / RTSP E2 仍 Open
+状态：Implemented E1 v0.1.0；受控故障/session recovery E1 已补，C6c / RTSP E2 仍 Open
 
 基准日期：2026-07-23
 

@@ -1,6 +1,6 @@
 # 信息侧模块详细技术路线
 
-状态：Implementation Baseline v1.6
+状态：Implementation Baseline v1.7
 
 更新时间：2026-07-23
 
