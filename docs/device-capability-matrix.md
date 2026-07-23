@@ -1,6 +1,6 @@
 # 设备能力矩阵
 
-状态：Live Ledger v0.4
+状态：Live Ledger v0.5
 
 更新时间：2026-07-23
 
@@ -27,6 +27,7 @@
 | 抓图 | captureCamera，需设备支持 | 未验证 | — | P0 |
 | 告警列表/消息 | getAlarmList 等通用能力 | 未验证 | — | P0 |
 | 服务端有界 RTSP/HTTP 接收与落盘 | 项目 adapter 已实现 | 仅 loopback HTTP fixture | REV-025 / E1 | Tooling ready；Device Unknown |
+| 服务端重复开流与格式稳定 gate | 项目 qualification 已实现 | 仅 3 次 loopback HTTP fixture | REV-026 / E1 | Tooling ready；Device Unknown |
 | 服务端可解码视频 | 不由通用功能列表保证 | 未验证 | — | P0 |
 | 音频轨 | 用户确认设备有麦克风；开放取流未知 | 未验证 | — | P0 |
 | 音频编码/采样率 | 无目标 SKU 证据 | 未验证 | — | Unknown |
@@ -50,6 +51,8 @@ V1-M2c 已完成 E1 容器轨道/PTS 探针及确定性回归夹具，见[设计
 V1-M2a 随后把该 timing gate 接入同容器音轨解码、16 kHz VAD/ASR 和 FeatureEvent 时间平移，并在工程构造的 +250 ms 公开 A/V 上完成 clean CPU 真实后端运行，见[同容器初测报告](reports/v1-m2a-same-container-audio-smoke.md)。这只证明 adapter seam 可运行；输入仍是 E1 fixture，不能证明 C6c 开放平台能取得音轨，因此上表状态和 E0 上限不变。
 
 REV-025 又把 RTSP/HTTP(S) endpoint 接到有界 codec-copy、首视频关键帧、owner-only Matroska 与输出 timing probe，并由 L40 job `1782` 消费该 artifact，见[设计](v1-m1-bounded-stream-capture.md)与[报告](reports/v1-m1-bounded-stream-capture-smoke.md)。正式输入仍是 loopback HTTP fixture，未使用 C6c、RTSP 或萤石账号；因此只将“项目接收工具”标为 E1 ready，设备的实时预览、视频/音轨与平台能力仍为 Unknown/E0。
+
+REV-026 再以三个独立连接检查 requested readiness 和完整轨道签名，见[资格门](v1-m1-stream-qualification.md)与[报告](reports/v1-m1-stream-qualification-smoke.md)。三次 E1 HTTP 都得到 810×1080/10 fps FFV1 + 16 kHz mono PCM，但这是同一 fixture 的计划性 reopen；C6c 的真实格式、RTSP 鉴权、断线恢复、丢包/抖动和长稳仍未验证，设备最高证据仍为 E0。
 
 REV-014 又完成了 E1 采集包/场景标注/held-out readiness gate，见[设计](v1-m2c-capture-readiness-gate.md)与[报告](reports/v1-m2c-capture-readiness-smoke.md)。正式 fixture 虽有 10/10 结构可用 clip，`camera_ready_for_model_retest`、`sleep_sample_ready_for_profiling` 和 `capture_bundle_ready_for_review` 均为 false；因此本能力矩阵仍不提升目标设备证据等级。
 

@@ -20,6 +20,8 @@
 - [V1 信息采集与模型探索](docs/v1-information-acquisition.md)
 - [V1-M1 有界音视频流采集适配器](docs/v1-m1-bounded-stream-capture.md)
 - [V1-M1 有界音视频流采集 E1 初测报告](docs/reports/v1-m1-bounded-stream-capture-smoke.md)
+- [V1-M1 重复开流资格门](docs/v1-m1-stream-qualification.md)
+- [V1-M1 重复开流资格门 E1 报告](docs/reports/v1-m1-stream-qualification-smoke.md)
 - [V1 视频与语言多模态 Pipeline](docs/v1-multimodal-pipeline.md)
 - [V1-M2a 多模态 Pipeline 初测报告](docs/reports/v1-m2a-multimodal-smoke.md)
 - [V1-M2a 同容器音轨 PTS 对齐初测报告](docs/reports/v1-m2a-same-container-audio-smoke.md)
@@ -105,6 +107,21 @@ unset KANG_STREAM_ENDPOINT
 ```
 
 不要把含账号、密码、token 或签名的 URL 写入命令历史。一次 E2 网络流采集只证明收到一段真实来源媒体，仍不证明萤石平台接入、长稳或断线重连；设计与当前 E1 证据见[有界流采集适配器](docs/v1-m1-bounded-stream-capture.md)和[初测报告](docs/reports/v1-m1-bounded-stream-capture-smoke.md)。
+
+真机短 E2 前先执行三次独立开流资格门：
+
+```bash
+kangshield-info qualify-stream \
+  --evidence-level E2 \
+  --source-type network_stream \
+  --device-ref c6c_demo_01 \
+  --attempt-count 3 \
+  --duration-s 10 \
+  --minimum-duration-s 8 \
+  --require-ready
+```
+
+该命令复用同一环境 endpoint，但为每次连接生成独立 raw/report，并检查视频宽高/帧率和音频采样率/声道等轨道签名。通过只表示计划性重复开流稳定，不代表非自愿断线恢复、丢包抖动或长稳。见[资格门设计](docs/v1-m1-stream-qualification.md)。
 
 生成并验证确定性同容器音视频时间戳夹具：
 

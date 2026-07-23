@@ -1,6 +1,6 @@
 # 开发与证据晋级流程
 
-状态：Active v1.2
+状态：Active v1.3
 
 ## 1. 开发顺序
 
@@ -102,6 +102,22 @@ unset KANG_STREAM_ENDPOINT
 运行前确认录音录像同意、访问人、留存期和删除责任。端点值虽不进入 manifest/report，进程环境仍是敏感边界；禁止把凭据 URL 写入 shell 历史、Slurm 脚本、聊天或文档。输出 raw Matroska 会进入本次 run 的 `artifacts/`，权限固定 `0600`。
 
 先用短时 E2 检查音轨、关键帧、PTS 与隐私扫描，再进入 C01～C12。一次 `same_container_multimodal_ready=true` 只允许把 artifact 交给 `run-multimodal --audio-from-video`，不证明平台 E3、长稳、重连或 drift。完整边界见[有界流采集适配器](v1-m1-bounded-stream-capture.md)。
+
+单次短采集通过后，在同一受控环境执行重复开流 gate：
+
+```bash
+kangshield-info qualify-stream \
+  --evidence-level E2 \
+  --source-type network_stream \
+  --device-ref c6c_demo_01 \
+  --attempt-count 3 \
+  --duration-s 10 \
+  --minimum-duration-s 8 \
+  --transport tcp \
+  --require-ready
+```
+
+逐项查看 attempt status、固定 failure code、`unique_track_signature_count` 和 `repeated_capture_gate_ready`，不能只看进程退出。三次计划性 reopen 成功不等于断线恢复或长稳；后两者必须另做网络故障和 30～60 分钟运行。每次尝试都会保存 raw，采集同意与删除规则按 artifact 数量执行。完整契约见[重复开流资格门](v1-m1-stream-qualification.md)。
 
 完整采集包在任何模型复测前运行：
 
@@ -356,6 +372,7 @@ kangshield-info assess-runtime-closure --require-ready
 27. 比赛提交 profile 的八个 source binding 是否全部 matched，所有 included/undecided 资产是否已清门，五个 owner decision 是否有可审计引用，三个 required release file 是否内容非空且摘要已绑定；RC 是否以 `assess-distribution-readiness --require-ready` 执行，而不是把普通 blocked 审计误写成可发布。
 28. 候选 runtime 是否从非 editable、无 `PYTHONPATH` 的已安装入口审计，根 extras/目标 marker 是否进入实际闭包，八个 closure gate 是否全部通过；是否在此之前误生成 final lock/NOTICE 或把共享开发环境冒充比赛环境。
 29. Stream capture 是否只从环境读取端点、从视频关键帧起录、在 timeout/时长/packet 上限内 clean termination，并经输出 timing probe；raw/report 权限、最短跨度、唯一音视频轨和凭据扫描是否通过；是否把 E1 HTTP 或单次 E2 clip 误写成 C6c 平台、重连或 drift 证据。
+30. Stream qualification 是否为每次独立 open 保留 raw/child report，所有尝试均满足请求 readiness，轨道 codec/time-base/视频尺寸帧率/音频采样率声道是否一致；是否把 scheduled reopen 误写成非自愿断线恢复、长稳或网络损伤容忍。
 
 快速检查：
 

@@ -1,6 +1,6 @@
 # 康盾工程架构与模块设计
 
-状态：Draft v1.3
+状态：Draft v1.4
 
 更新时间：2026-07-23
 
@@ -82,6 +82,8 @@ V1-M3 在 M3/M7 之间增加“同一 PoseBackend 契约 → 视频-only variant
 V1-M2c 在 M1/M2 之间增加独立容器时间戳探针：“本地原始容器 → PyAV stream/packet 扫描 → ContainerTimingReport”。它确认同容器轨道、time base、PTS/DTS 完整性和首尾容器偏移，但固定 `drift_estimate_available=false`；只有真实录制中的两个跨模态同步事件才能形成 offset/drift 验收。E1 工具通过不会提升 C6c 的设备证据等级。
 
 V1-M1 在网络输入与上述 timing gate 之间增加有界采集接缝：“环境变量端点 → PyAV timeout/packet/time 三重上限 → 首个视频关键帧 → codec-copy Matroska 原子落盘 → StreamCaptureReport”。端点、端点摘要和 FFmpeg 原生日志不落盘；默认必须恰好一条视频轨和一条音轨。HTTP loopback E1 已证明采集 artifact 可被现有同容器 Pipeline 消费，但 `device_platform_integration_proven` 固定为 false，不能替代 C6c RTSP、鉴权、重连或平台 E3 证据。
+
+同一接缝上增加重复开流资格层：“N 次独立 open/capture report → requested readiness → 完整轨道签名一致性 → StreamQualificationReport”。每次连接保留独立 raw/asset，不跨连接拼接时间轴；父报告只保存固定失败码和 path-free codec/time-base/视频尺寸帧率/音频采样率声道。`scheduled_reopen_sequence_proven` 与断线恢复、长稳和网络损伤容忍三个固定 false 声明分开，防止三段短 clip 被外推成实时稳定性。
 
 M2a/M2c 之间再复用该报告形成同容器语言入口：“单音视频容器 → strict timing gate → PyAV 单声道 16 kHz → SpeechBackend → 按 audio-minus-video offset 平移 FeatureEvent”。解码器不自行选择轨道或推断零点；多轨、缺 PTS、扫描截断和音频 PTS 逆序均失败。相同容器只形成一个 SourceAsset/Observation，Pipeline report 显式区分 `same_container_pts` 与历史 `separate_files_synthetic_common_zero`。这关闭的是 adapter seam，不是 C6c 取流或 drift 证据。
 
@@ -176,6 +178,10 @@ StaticHomeImageCase 固定 Open Images validation 图片摘要、尺寸、场景
 
 StreamCaptureReport 是一次有界网络/fixture remux 的隐私安全 receipt：保存协议、transport、时长/timeout/packet 上限、termination、关键帧起点、逐轨复制计数、owner-only artifact 引用和嵌套 MediaProbeReport；不保存端点值、摘要、环境变量名或原生日志。`capture_artifact_ready` 与 `same_container_multimodal_ready` 分开发布，后者要求单音轨、可测 start offset 和无逆序音频 PTS。报告固定不证明设备平台、风险或告警。
 
+### StreamQualificationReport
+
+StreamQualificationAttempt 将每次独立 open 标为 captured-ready、captured-not-ready 或 failed；失败只发布 allowlisted code，成功只引用受控 raw/child report 和 path-free track signature。父报告校验连续 attempt index、计数、请求 readiness、唯一签名数和 gate 逻辑；全部尝试 ready 且 codec/time-base/视频尺寸帧率/音频采样率声道一致时，才发布 `repeated_capture_gate_ready=true`。M2c bundle、设备平台、非自愿断线恢复、长稳、网络损伤、风险和告警均保持 false。
+
 ### ContainerTimingReport
 
 MediaStreamTiming 保存每条视频/音频轨的 codec、time base、声明时间、逐包 PTS/DTS 完整性、时间范围、步长与技术元数据；ContainerTimingReport 汇总轨道数、同容器状态和首尾相对偏移。报告不保存容器 metadata value 或源路径，并把扫描截断显式降级为 partial。duration delta 只是轨道时间范围差，不得解释为 drift。
@@ -221,7 +227,7 @@ V1-R1 将架构能力分为三层：
 2. 只进入候选接口的实现：HumanArt + RTMPose、TorchVision Keypoint R-CNN fallback、FunASR 和跌倒 box/keypoint 特征；在目标设备、负样本或许可证门关闭前不能成为正式能力。
 3. 不进入当前主路径的能力：YOLO26n 默认姿态、Whisper 普通话主链路、睡眠模型、自动诈骗/认知/抑郁评分，以及无设备证据的 HRV/SpO2/AHI 等字段。
 
-V2-D1 可以在真机到位前继续设计 adapter seam；有界 HTTP 流采集 E1、媒体 PTS、采集包 readiness、G4 跌倒运动特征、首版 label-blind candidate、静态人物检测压力、事件评估工具，以及 G5 分发/候选 runtime closure 工具均已完成，但 C6c RTSP/平台接入、真实 G2/G3/G4、提交包 G5 决策和最终运行环境仍未关闭。当前共享环境的 closure 仅 3/8 ready，只能作为构建隔离候选环境的缺口清单。G4 当前只提供离线 feature/candidate/fallback、静态 person-detection 与 E1 scorer 契约证据，不能进入 RiskAssessment 或告警；G5 工具通过也不等于提交包就绪。系统必须同时保留三种运行声明：真实平台接入、受控流/文件回放、能力 blocked。三者不得共享同一个“已接入”状态。
+V2-D1 可以在真机到位前继续设计 adapter seam；有界 HTTP 流采集与重复开流资格 E1、媒体 PTS、采集包 readiness、G4 跌倒运动特征、首版 label-blind candidate、静态人物检测压力、事件评估工具，以及 G5 分发/候选 runtime closure 工具均已完成，但 C6c RTSP/平台接入、真实断线/长稳、G2/G3/G4、提交包 G5 决策和最终运行环境仍未关闭。当前共享环境的 closure 仅 3/8 ready，只能作为构建隔离候选环境的缺口清单。G4 当前只提供离线 feature/candidate/fallback、静态 person-detection 与 E1 scorer 契约证据，不能进入 RiskAssessment 或告警；G5 工具通过也不等于提交包就绪。系统必须同时保留三种运行声明：真实平台接入、受控流/文件回放、能力 blocked。三者不得共享同一个“已接入”状态。
 
 完整决策 ID、许可证边界和硬门见 [V1-R1 探索收敛与 V2 输入清单](v1-r1-exploration-review.md)。
 

@@ -1,6 +1,6 @@
 # V1 视频与语言多模态采集 Pipeline
 
-状态：Implemented Baseline v0.6；有界流采集、同容器 PTS/owner-only 路径已实现；V1-R1 决策已同步
+状态：Implemented Baseline v0.7；有界流采集、重复开流资格、同容器 PTS/owner-only 路径已实现；V1-R1 决策已同步
 
 更新时间：2026-07-23
 
@@ -35,6 +35,7 @@ flowchart LR
 - 兼容旧的独立无压缩 PCM WAV 输入；这种布局仍明确标记为 `separate_files_synthetic_common_zero`，只能验证工程窗口，不能证明自然同步。
 - 当前是离线回放，不把结果写成直播时延。
 - `capture-stream` 可把一个 RTSP/HTTP(S) 输入在 timeout/时长/packet 上限内，从首个视频关键帧开始 remux 为同容器 artifact；endpoint 不落盘。它仍是“先采集、后推理”的两阶段链路，不是连续实时推理服务。
+- `qualify-stream` 在正式样本采集前重复上述独立连接并检查完整轨道签名；每个合格 artifact 都可单独进入本 Pipeline，但 qualification 不执行模型，也不把多个 clip 合并成连续推理。
 - 单个起点偏移不能估计时钟漂移；真实 G2 仍需两次跨模态同步事件。
 
 ## 2. V1 基线模型
@@ -214,6 +215,8 @@ unset KANG_STREAM_ENDPOINT
 
 不要把含凭据的 endpoint 写成 shell 字面量。采集 ready 与 Pipeline timing gate 独立校验；一次 E2 clip 不证明 C6c 平台 E3、长时稳定或断线重连。
 
+真机批量采集前，先把同一 endpoint 交给 `qualify-stream --attempt-count 3 --require-ready`。只有父 gate 和选中 child 的独立 timing gate 都通过，才将该 child artifact 交给本 Pipeline；仍不得由三次短开流推断长期实时推理容量。
+
 提交 Slurm：
 
 ```bash
@@ -239,11 +242,12 @@ Slurm 脚本请求 1 张 L40、8 CPU、20 分钟，并强制从本地缓存加�
 - [x] Slurm L40 公开样本 smoke 完成。
 - [x] 确定性同容器样例完成单音轨解码、16 kHz 重采样、正负 offset、事件平移、单来源登记和 fail-closed PTS 测试。
 - [x] 有界 HTTP 流 E1 已生成 owner-only 同容器 artifact，并由实际 L40 job `1782` 完成姿态、语言和窗口链路。
+- [x] 三次独立 HTTP 开流 E1 均 ready、完整轨道签名稳定，并选取一个 child artifact 进入 L40 下游复核。
 - [ ] 真实 C6c 同容器音视频或可靠同步样本完成。
 - [ ] 固定居家场景集上的姿态漏检、跟踪稳定性、ASR 字错率和噪声测试完成。
 - [ ] V2 姿态许可证/替代模型决策完成。
 
-前八项关闭的是“设备无关采集接缝、回放链路与同容器实现”，后三项属于 V1 真实数据和模型对比，不得由 synthetic/public smoke 替代。
+前九项关闭的是“设备无关采集/重复开流接缝、回放链路与同容器实现”，后三项属于 V1 真实数据和模型对比，不得由 synthetic/public smoke 替代。
 
 历史独立 video/WAV 的 Slurm 结果见 [V1-M2a 初测报告](reports/v1-m2a-multimodal-smoke.md)；同容器 PTS、真实后端 CPU 与 owner-only L40 证据见[同容器音轨初测报告](reports/v1-m2a-same-container-audio-smoke.md)；网络式输入到该入口的 E1 证据见[有界流采集报告](reports/v1-m1-bounded-stream-capture-smoke.md)。
 

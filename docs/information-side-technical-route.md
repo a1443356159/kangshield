@@ -1,6 +1,6 @@
 # 信息侧模块详细技术路线
 
-状态：Implementation Baseline v1.4
+状态：Implementation Baseline v1.5
 
 更新时间：2026-07-23
 
@@ -70,6 +70,7 @@ src/kangshield/information/
 ├── media_probe.py        # 文件、WAV、OpenCV 视频事实与质量探测
 ├── container_timing.py   # PyAV 轨道/包时间戳、容器偏移与扫描上限
 ├── stream_capture.py     # RTSP/HTTP 有界 remux、关键帧起点与采集 readiness
+├── stream_qualification.py # 多次独立开流、格式签名和重复采集 gate
 ├── sleep_profile.py      # JSON/CSV 字段发现与映射候选
 ├── ezviz_snapshot.py     # SDK/API 脱敏快照分析与证据分级
 ├── extractor.py          # 通用模型插件 Protocol
@@ -237,7 +238,25 @@ kangshield-info capture-stream \
 
 E1 loopback HTTP run `20260722T225832Z-cfed1858` 已产生 4050 ms、40 video + 38 audio packets 的 owner-only artifact；Slurm job `1782` 又以相同 SHA-256 输入完成真实同容器多模态 run `20260722T225924Z-c98c3772`，warm RTF 为 0.573977。该证据不覆盖 RTSP、鉴权、重连、丢包/抖动、C6c 音轨或实际 clock/drift。设计和完整结果见[有界流采集适配器](v1-m1-bounded-stream-capture.md)与[初测报告](reports/v1-m1-bounded-stream-capture-smoke.md)。
 
-### 7.3 目标设备采集包就绪门
+### 7.3 重复开流资格门
+
+```text
+kangshield-info qualify-stream \
+  --endpoint-env KANG_STREAM_ENDPOINT \
+  --attempt-count 3 \
+  --source-type network_stream \
+  --evidence-level E2 \
+  --device-ref <opaque-ref> \
+  --duration-s 10 \
+  --minimum-duration-s 8 \
+  --require-ready
+```
+
+该命令不在一个文件里静默重连，而是顺序执行 2～20 次完全独立的 open：每次产生自己的 raw、SourceAsset、Observation 和 StreamCaptureReport；父报告只聚合固定失败码、请求 readiness 与 path-free 轨道签名。轨道签名同时比较 codec/time-base、视频宽高/像素格式/帧率和音频采样率/声道/layout，避免清晰度或音频格式漂移漏过 gate。
+
+所有尝试 ready 且唯一签名数为 1 时，`repeated_capture_gate_ready=true`；至少两次 ready 只打开 `scheduled_reopen_sequence_proven`。非自愿断线恢复、长稳、网络损伤容忍、设备平台与 M2c bundle 始终为 false。clean `c8bda16` 的三次 loopback HTTP E1 均 ready，但不覆盖 RTSP/C6c。设计与证据见[重复开流资格门](v1-m1-stream-qualification.md)和[正式报告](reports/v1-m1-stream-qualification-smoke.md)。
+
+### 7.4 目标设备采集包就绪门
 
 ```text
 kangshield-info assess-m2c-capture <capture-manifest.json> \
@@ -248,7 +267,7 @@ kangshield-info assess-m2c-capture <capture-manifest.json> \
 
 E1 fixture、template、synthetic 或顶层 fixture marker 永远不能打开真机门。真实集至少需要 8 个核心结构可用 clip 和一个双事件音频 clip；完整 Review 还要求 C01～C10 与一份真实 SDNL1 导出。设计与 E1 结果见[采集包就绪门](v1-m2c-capture-readiness-gate.md)和[初测报告](reports/v1-m2c-capture-readiness-smoke.md)。
 
-### 7.4 睡眠导出字段发现
+### 7.5 睡眠导出字段发现
 
 命令目标：
 
@@ -273,7 +292,7 @@ kangshield-info assess-sleep-route <json-or-csv> \
 
 它用绑定《监测方案》摘要的 policy 将字段分成 direct-if-exposed、multi-night derived 和 not-assumed，并逐项检查 evidence、source path、单位、时间、值域及缺失语义。route report 不包含值；`ready_for_adapter` 也只授权后续单字段 adapter，不能解释为设备已验收或指标准确。
 
-### 7.5 萤石 SDK/API 快照分析
+### 7.6 萤石 SDK/API 快照分析
 
 命令目标：
 
@@ -298,7 +317,7 @@ kangshield-info inspect-ezviz <sanitized-json> --evidence-level E1|E2|E3
 
 后续获得确认过的接口文档后，再实现 LiveTransport；不让不确定接口固化到核心契约。
 
-### 7.6 视频 + 语言多模态回放
+### 7.7 视频 + 语言多模态回放
 
 ```text
 kangshield-info run-multimodal <video> <pcm-wav>
@@ -311,7 +330,7 @@ kangshield-info run-multimodal <av-container> --audio-from-video
 
 实现、命令、模型决策和限制见 [V1 视频与语言多模态 Pipeline](v1-multimodal-pipeline.md)，正偏移真实后端证据见[同容器音轨初测报告](reports/v1-m2a-same-container-audio-smoke.md)。
 
-### 7.7 公开数据固定集评测
+### 7.8 公开数据固定集评测
 
 ```text
 kangshield-info benchmark-dataset <benchmark-cases.json>
@@ -319,7 +338,7 @@ kangshield-info benchmark-dataset <benchmark-cases.json>
 
 V1-M2b 使用固定 SHA-256 的 URFD/FLEURS 子集验证多样本处理。每个 case 独立运行姿态、跟踪、VAD/ASR 和窗口 Pipeline，再按 URFD 帧阶段标签统计视频覆盖率、按 FLEURS 参考转写统计 corpus CER。两路数据不是自然同步录制，融合窗口只有工程验证含义，结果固定为 E1。数据来源、许可证、准备过程和完整指标口径见 [V1-M2b 数据集评测设计](v1-m2b-public-dataset-benchmark.md)。
 
-### 7.8 跌倒运动特征离线评测
+### 7.9 跌倒运动特征离线评测
 
 ```text
 kangshield-info benchmark-fall-features \
@@ -376,7 +395,7 @@ kangshield-info assemble-event-evaluation-bundle \
 
 组装器不修改标签/候选，不复制原媒体，也不覆盖目录；它在 `0700` staging 中以 `0600` 复制敏感 JSON，生成相对路径/大小/摘要引用，调用同一 evaluator preflight 后才原子 rename。正式可评审状态仍由 evaluator gates 决定。设计见 [G4 Event Bundle 组装](v1-g4-event-bundle-assembly.md)。
 
-### 7.9 比赛提交分发就绪门
+### 7.10 比赛提交分发就绪门
 
 ```text
 kangshield-info assess-distribution-readiness \
@@ -389,7 +408,7 @@ kangshield-info assess-distribution-readiness \
 
 普通审计在正确产出 blocked 报告时返回成功；Release Candidate 使用 `--require-ready`，报告落盘后仍未就绪则返回 `2`。policy 和 repository root 的本地路径不写入 manifest，owner-only `0700/0600` 规则不变。该门禁固定 `legal_advice_provided=false`，项目许可证、最终权重和打包方式必须由具名 owner 决定。设计与基线分别见[分发就绪门设计](v1-r1-distribution-readiness.md)和[正式 E1 报告](reports/v1-r1-distribution-readiness.md)。
 
-### 7.10 候选 Runtime 依赖闭包门
+### 7.11 候选 Runtime 依赖闭包门
 
 ```text
 kangshield-info assess-runtime-closure \
@@ -488,6 +507,7 @@ V1-R1 已完成 E1 决策收敛和可执行分发门禁：YOLO26n 为 V1 对照�
 - OpenCV 可用时可对视频生成基本探测结果。
 - PyAV 可用时可检查容器轨道和逐包 PTS/DTS；required audio 与扫描截断 fail closed。
 - capture-stream 可从有界 HTTP/RTSP 输入生成 owner-only Matroska，经关键帧、最短时长、termination 与 timing gate 后再交给同容器 Pipeline；E1 HTTP 接缝已通过。
+- qualify-stream 可执行多次独立 open、保存每次受控 raw/report，并对请求 readiness 和完整音视频轨道签名 fail closed；E1 HTTP 重复开流已通过，但断线/长稳/损伤声明保持 false。
 - profile-sleep 可发现任意 JSON/CSV 字段且不泄露敏感值。
 - inspect-ezviz 可分析脱敏 Fixture/导出并保留证据等级。
 - 自动化测试覆盖契约、运行产物、三条命令和脱敏。

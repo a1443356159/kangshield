@@ -1336,3 +1336,57 @@
 2. 目标流是否稳定包含单音轨，codec/time base 是否随清晰度、夜视或回放模式改变？
 3. 断流后由 adapter 内重连还是由外部 supervisor 新建 run；跨连接是否允许合成同一 artifact？
 4. 真实人物音视频的同意、30 日暂定留存、访问人与可审计删除责任由谁签字？
+
+---
+
+## REV-026 V1-M1 重复开流与格式稳定资格门 Review
+
+- 日期：2026-07-23
+- 状态：Accepted for E1 repeated-open tooling；C6c / involuntary reconnect / long-run remains Open
+- 参与人：项目组、Codex
+- 评审范围：多次独立 open、父/子 provenance、失败继续与固定错误码、完整轨道签名、gate/路径防篡改、owner-only raw、单次采集异常脱敏和与真实重连/长稳的边界
+- 输入材料：[重复开流资格门](v1-m1-stream-qualification.md)、[正式 E1 报告](reports/v1-m1-stream-qualification-smoke.md)、实现提交 `fea40f7`、签名加固 `c8bda16`、qualification run `20260722T234430Z-1f2b14c9`、Slurm job `1785`
+
+### 发现
+
+1. REV-025 只证明一次有界接收；它不能回答同一 endpoint 能否重复建连，以及不同连接的清晰度、帧率或音频格式是否漂移。
+2. 在单个 Matroska 内自动重连并拼接会模糊连接边界、时间轴和 source provenance。V1 更安全的策略是每次独立 open 生成一个 raw/child report，由父报告做资格判断。
+3. 只比较 codec/time-base 不足以检测 1080p→720p、帧率变化或 16 kHz mono→其他音频布局。首轮实现 review 后，`c8bda16` 将视频宽高/pixel format/rate 和音频 sample rate/channels/layout 纳入签名。
+4. 连接错误可能含 endpoint 或底层 message。父报告只接受固定 failure code，未批准 code 降级为 `stream_capture_failed`；原单次 post-probe 异常也改为固定 `output_verification_failed`。
+5. clean `c8bda16` 的三次 loopback HTTP 均为 captured-ready：每次跨度 2050 ms、音频起点 +250 ms，完整签名唯一；父 gate true。
+6. 三次 artifact 分别拥有独立 SHA-256。Matroska mux 字节不要求相同，稳定性应比较媒体事实而非 byte equality。
+7. 计划性关闭后重新打开不等于流在非自愿断开后恢复；三段短 clip 也不能证明长稳或丢包/抖动容忍。三个声明在契约中固定 false。
+
+### 决定
+
+1. 接受 `stream-qualification-v0.1.0` 作为真实 C6c 短 E2 前的重复开流工程 gate；默认 3 次，允许 2～20 次。
+2. 不在 V1 raw 内跨连接拼接时间轴。每次连接保留独立 SourceAsset、Observation、StreamCaptureReport 和 owner-only Matroska。
+3. 父 gate 要求所有尝试满足请求 readiness、没有 failed/not-ready、每次都有签名且唯一完整签名数为 1。
+4. qualification run 完成但 gate=false 是合法审计；`--require-ready` 在报告写完后返回 2。预期连接失败不使父 run failed，非预期内部错误仍 fail run。
+5. `scheduled_reopen_sequence_proven`、`involuntary_disconnect_recovery_proven`、`long_running_stability_proven` 和 `network_impairment_tolerance_proven` 必须分开；后面三项本版本固定 false。
+6. 下一真机顺序冻结为：单次短 E2 → 三次 qualification → 鉴权/断流/损伤矩阵 → 30～60 分钟长稳 → M2c 场景包。
+
+### 验证
+
+- 自动化：160 passed；新增 6 项覆盖多次真实 remux、父/子 ledger、固定失败码后继续、格式签名漂移、计数/gate/路径篡改、video-only fail-closed 和 parser。
+- 静态检查：`compileall`、全部 shell/sbatch `bash -n`、`pip check`、`git diff --check` 通过。
+- Qualification：clean `c8bda16`、completed、0 issue；3/3 ready，2050 ms × 3，唯一签名 1，gate true；manifest/父报告 SHA-256 为 `aa6d83c295f3410970767c553ee68856a3a77250ed4d61022a1e7292b48846f3` / `e077a2f25e46f19f2c8e66a790d6d3a14034f8ee0e2cd7da02222382f4538e2b`。
+- L40 child：job `1785` 在 clean `c8bda16` 上 `COMPLETED/0:0`（45 s）；输入 SHA-256 与 qualification 第 3 个 raw 一致，NVIDIA L40 产出 10 帧、40 个姿态检测、1 个语音段和 2 个窗口，processing/cold-start RTF 为 1.018485/19.744673。run 完成且 0 issue，目录/文件 `0700/0600`，隐私扫描 0 命中；只证明 child 可被下游消费，不证明实时性或三次推理稳定性。
+- run 的目录/文件为 `0700/0600`；endpoint/端口、环境变量名、fixture 文件名、本地 home/用户名、secret 和 Risk/Alert true 扫描 0 命中。
+
+### 行动项
+
+| 行动 | 负责人 | 截止日期 | 状态 |
+|---|---|---|---|
+| 实现重复开流契约、CLI、失败码、完整格式签名、测试和正式 E1 | Codex | 2026-07-23 | Closed；`fea40f7` / `c8bda16` / REV-026 |
+| 用 C6c endpoint 执行三次 TCP E2 qualification 并确认格式签名 | 设备负责人 / 工程负责人 | 2026-07-29 | Blocked on endpoint/device access |
+| 记录有效、无权限、过期凭据和无音轨的固定失败码 | 工程负责人 | 2026-07-29 | Blocked on test credentials |
+| 以受控代理/网络仿真执行 stall、断流、丢包、抖动与恢复矩阵 | 工程负责人 | 2026-07-31 | Blocked on E2 stream |
+| 执行 30～60 分钟长稳并决定外部 supervisor 的新 run 策略 | 工程负责人 | 2026-07-31 | Blocked on E2 stream |
+
+### 未决问题
+
+1. C6c endpoint 的凭据有效期是否允许三次独立 open；token 刷新由谁负责？
+2. 清晰度、夜视或直播/回放切换时，轨道签名的哪些变化属于预期 profile，哪些必须阻断？
+3. 非自愿断流后由外部 supervisor 新建 run，还是未来协议允许同一 session 下多个独立 artifact；演示 UI 如何表达间断？
+4. 网络故障矩阵使用哪种可审计代理/仿真工具，目标延迟、丢包、抖动和恢复阈值由谁冻结？
