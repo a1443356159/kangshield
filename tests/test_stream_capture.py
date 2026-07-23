@@ -18,6 +18,7 @@ from kangshield.information.contracts import (
     EvidenceLevel,
     ModelBinding,
     SourceType,
+    StreamFaultMatrixReport,
     StreamQualificationReport,
 )
 from kangshield.information.multimodal_pipeline import (
@@ -28,6 +29,10 @@ from kangshield.information.stream_capture import (
     StreamCaptureConfig,
     StreamCaptureError,
     capture_stream,
+)
+from kangshield.information.stream_fault_matrix import (
+    StreamFaultMatrixConfig,
+    exercise_stream_fault_matrix,
 )
 from kangshield.information.stream_qualification import (
     StreamQualificationConfig,
@@ -716,6 +721,247 @@ def test_qualify_stream_cli_writes_parent_child_reports_and_ledgers(
     assert str(source) not in json.dumps(manifest)
     for relative in expected_artifacts:
         assert (run_dir / relative).is_file()
+    for path in run_dir.rglob("*"):
+        expected = 0o700 if path.is_dir() else 0o600
+        assert stat.S_IMODE(path.stat().st_mode) == expected
+
+
+def _fast_fault_matrix_config() -> StreamFaultMatrixConfig:
+    return StreamFaultMatrixConfig(
+        capture=StreamCaptureConfig(
+            duration_s=0.8,
+            minimum_duration_s=0.5,
+            open_timeout_s=0.25,
+            read_timeout_s=0.25,
+        ),
+        stall_duration_s=0.45,
+        prefix_byte_limit=64 * 1024,
+        jitter_chunk_bytes=16 * 1024,
+        jitter_delay_min_s=0.001,
+        jitter_delay_max_s=0.003,
+        elapsed_limit_s=2.0,
+    )
+
+
+def test_stream_fault_matrix_rejects_non_faulting_or_video_only_config():
+    with pytest.raises(ValueError, match="must exceed both stream timeouts"):
+        StreamFaultMatrixConfig(
+            capture=StreamCaptureConfig(
+                open_timeout_s=0.5,
+                read_timeout_s=0.5,
+            ),
+            stall_duration_s=0.5,
+        )
+    with pytest.raises(ValueError, match="jitter delay maximum must be positive"):
+        StreamFaultMatrixConfig(
+            jitter_delay_min_s=0.0,
+            jitter_delay_max_s=0.0,
+        )
+    with pytest.raises(ValueError, match="requires the audio track"):
+        StreamFaultMatrixConfig(
+            capture=StreamCaptureConfig(require_audio=False),
+        )
+
+
+def test_stream_fault_matrix_detects_controlled_failures_without_false_ready(
+    tmp_path,
+):
+    source = tmp_path / "private-fault-source.mkv"
+    artifacts = tmp_path / "artifacts"
+    artifacts.mkdir(mode=0o700)
+    secret_metadata = "fault-private-metadata"
+    _write_av_container(source, seconds=2, metadata_value=secret_metadata)
+
+    result = exercise_stream_fault_matrix(
+        fixture_path=source,
+        artifacts_dir=artifacts,
+        config=_fast_fault_matrix_config(),
+    )
+
+    report = result.report
+    serialized = report.model_dump_json()
+    assert report.scenario_count == 7
+    assert [item.scenario for item in report.cases] == [
+        "healthy_control",
+        "chunk_delay_jitter",
+        "http_rejection",
+        "initial_response_stall",
+        "midstream_stall",
+        "truncated_transfer",
+        "connection_reset",
+    ]
+    assert report.cases[0].actual_status == "captured_ready"
+    assert report.cases[1].actual_status == "captured_ready"
+    assert report.cases[2].actual_status == "failed"
+    assert report.cases[2].failure_code == "open_failed"
+    assert report.cases[3].actual_status == "failed"
+    assert report.cases[3].failure_code == "open_failed"
+    assert all(
+        item.actual_status != "captured_ready" for item in report.cases[2:]
+    )
+    assert all(item.bounded_completion for item in report.cases)
+    assert all(item.expectation_met for item in report.cases)
+    assert all(item.scenario_exercised for item in report.cases)
+    assert report.cases[0].body_bytes_sent > 0
+    assert report.cases[1].delay_event_count > 0
+    assert report.cases[2].rejection_event_count > 0
+    assert report.cases[3].stall_event_count > 0
+    assert report.cases[4].stall_event_count > 0
+    assert report.cases[5].early_close_event_count > 0
+    assert report.cases[6].reset_event_count > 0
+    assert report.unexpected_ready_case_count == 0
+    assert report.all_cases_bounded is True
+    assert report.all_expected_outcomes_met is True
+    assert report.all_scenarios_exercised is True
+    assert report.fault_detection_gate_ready is True
+    assert report.controlled_http_fault_matrix_executed is True
+    assert report.packet_loss_injected is False
+    assert report.rtsp_transport_tested is False
+    assert report.reconnect_attempted is False
+    assert report.involuntary_disconnect_recovery_proven is False
+    assert report.network_impairment_tolerance_proven is False
+    assert report.long_running_stability_proven is False
+    assert report.device_platform_integration_proven is False
+    assert source.name not in serialized
+    assert secret_metadata not in serialized
+    assert "127.0.0.1" not in serialized
+    assert len(result.capture_reports) == report.captured_case_count
+    for case in report.cases:
+        artifact = artifacts / f"stream-fault-{case.case_index:03d}.mkv"
+        if case.actual_status == "failed":
+            assert not artifact.exists()
+        else:
+            assert artifact.is_file()
+            assert stat.S_IMODE(artifact.stat().st_mode) == 0o600
+
+    inconsistent_count = report.model_dump(mode="json")
+    inconsistent_count["failed_case_count"] += 1
+    with pytest.raises(ValidationError, match="counts are inconsistent"):
+        StreamFaultMatrixReport.model_validate(inconsistent_count)
+
+    false_gate = report.model_dump(mode="json")
+    false_gate["fault_detection_gate_ready"] = False
+    with pytest.raises(ValidationError, match="fault detection gate"):
+        StreamFaultMatrixReport.model_validate(false_gate)
+
+    wrong_order = report.model_dump(mode="json")
+    wrong_order["cases"][0], wrong_order["cases"][1] = (
+        wrong_order["cases"][1],
+        wrong_order["cases"][0],
+    )
+    with pytest.raises(ValidationError, match="indexes must be contiguous"):
+        StreamFaultMatrixReport.model_validate(wrong_order)
+
+    path_traversal = report.model_dump(mode="json")
+    captured_index = next(
+        index
+        for index, case in enumerate(path_traversal["cases"])
+        if case["actual_status"] != "failed"
+    )
+    path_traversal["cases"][captured_index]["output_artifact"] = "../raw.mkv"
+    with pytest.raises(ValidationError, match=r"artifacts/\*\.mkv"):
+        StreamFaultMatrixReport.model_validate(path_traversal)
+
+    false_telemetry = report.model_dump(mode="json")
+    false_telemetry["cases"][1]["delay_event_count"] = 0
+    with pytest.raises(ValidationError, match="execution telemetry"):
+        StreamFaultMatrixReport.model_validate(false_telemetry)
+
+    private_failure_code = report.model_dump(mode="json")
+    failed_index = next(
+        index
+        for index, case in enumerate(private_failure_code["cases"])
+        if case["actual_status"] == "failed"
+    )
+    private_failure_code["cases"][failed_index]["failure_code"] = (
+        "private_path_failure"
+    )
+    with pytest.raises(ValidationError, match="failure_code"):
+        StreamFaultMatrixReport.model_validate(private_failure_code)
+
+
+def test_stream_fault_matrix_cli_writes_private_parent_child_ledger(
+    tmp_path,
+    capsys,
+):
+    source = tmp_path / "private-cli-fault-source.mkv"
+    _write_av_container(source, seconds=2)
+
+    exit_code = main(
+        [
+            "exercise-stream-faults",
+            str(source),
+            "--runs-dir",
+            str(tmp_path / "runs"),
+            "--duration-s",
+            "0.8",
+            "--minimum-duration-s",
+            "0.5",
+            "--open-timeout-s",
+            "0.25",
+            "--read-timeout-s",
+            "0.25",
+            "--stall-duration-s",
+            "0.45",
+            "--prefix-byte-limit",
+            str(64 * 1024),
+            "--jitter-chunk-bytes",
+            str(16 * 1024),
+            "--jitter-delay-min-ms",
+            "1",
+            "--jitter-delay-max-ms",
+            "3",
+            "--elapsed-limit-s",
+            "2",
+            "--require-ready",
+        ]
+    )
+    output = json.loads(capsys.readouterr().out)
+    run_dir = Path(output["run_dir"])
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    parent = json.loads(
+        (run_dir / "reports" / "stream-fault-matrix.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert exit_code == 0
+    assert output["scenario_count"] == 7
+    assert output["fault_detection_gate_ready"] is True
+    assert output["scenario_exercised_case_count"] == 7
+    assert output["unexpected_ready_case_count"] == 0
+    assert output["network_impairment_tolerance_proven"] is False
+    assert manifest["status"] == "completed"
+    assert manifest["configuration"]["fixture_path_persisted"] is False
+    assert manifest["configuration"]["endpoint_value_persisted"] is False
+    assert manifest["configuration"]["packet_loss_injected"] is False
+    assert source.name not in json.dumps(manifest)
+    assert str(source) not in json.dumps(manifest)
+    assert parent["fault_detection_gate_ready"] is True
+    captured_cases = [
+        item for item in parent["cases"] if item["actual_status"] != "failed"
+    ]
+    asset_rows = (
+        (run_dir / "source_assets.jsonl").read_text(encoding="utf-8").splitlines()
+    )
+    observation_rows = (
+        (run_dir / "observations.jsonl").read_text(encoding="utf-8").splitlines()
+    )
+    assert len(asset_rows) == len(captured_cases)
+    assert len(observation_rows) == len(captured_cases)
+    assert len(manifest["inputs"]) == len(captured_cases)
+    expected_artifacts = {"reports/stream-fault-matrix.json"}
+    for case in captured_cases:
+        expected_artifacts.add(case["output_artifact"])
+        expected_artifacts.add(case["capture_report_artifact"])
+    assert set(manifest["artifacts"]) == expected_artifacts
+    run_text = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in run_dir.rglob("*.json*")
+    )
+    assert source.name not in run_text
+    assert str(source) not in run_text
+    assert "127.0.0.1" not in run_text
     for path in run_dir.rglob("*"):
         expected = 0o700 if path.is_dir() else 0o600
         assert stat.S_IMODE(path.stat().st_mode) == expected

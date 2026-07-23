@@ -2029,6 +2029,444 @@ class StreamQualificationReport(ContractModel):
         return self
 
 
+StreamFaultScenarioName = Literal[
+    "healthy_control",
+    "chunk_delay_jitter",
+    "http_rejection",
+    "initial_response_stall",
+    "midstream_stall",
+    "truncated_transfer",
+    "connection_reset",
+]
+StreamFaultExpectedStatus = Literal[
+    "captured_ready",
+    "failed",
+    "not_ready_or_failed",
+]
+StreamFaultFailureCode = Literal[
+    "open_failed",
+    "remux_failed",
+    "video_track_layout_invalid",
+    "audio_track_layout_invalid",
+    "required_audio_track_missing",
+    "packet_timestamp_missing",
+    "video_keyframe_missing",
+    "video_packets_missing",
+    "audio_packets_missing",
+    "media_artifact_missing",
+    "output_verification_failed",
+    "stream_capture_failed",
+]
+STREAM_FAULT_SCENARIO_ORDER: tuple[str, ...] = (
+    "healthy_control",
+    "chunk_delay_jitter",
+    "http_rejection",
+    "initial_response_stall",
+    "midstream_stall",
+    "truncated_transfer",
+    "connection_reset",
+)
+STREAM_FAULT_EXPECTED_STATUS: dict[str, str] = {
+    "healthy_control": "captured_ready",
+    "chunk_delay_jitter": "captured_ready",
+    "http_rejection": "failed",
+    "initial_response_stall": "failed",
+    "midstream_stall": "not_ready_or_failed",
+    "truncated_transfer": "not_ready_or_failed",
+    "connection_reset": "not_ready_or_failed",
+}
+
+
+class StreamFaultCaseResult(ContractModel):
+    """Privacy-safe outcome of one controlled loopback HTTP behavior."""
+
+    case_index: int = Field(ge=1)
+    scenario: StreamFaultScenarioName
+    fault_injected: bool
+    expected_status: StreamFaultExpectedStatus
+    actual_status: Literal[
+        "captured_ready",
+        "captured_not_ready",
+        "failed",
+    ]
+    elapsed_ms: int = Field(ge=0)
+    elapsed_limit_ms: int = Field(gt=0)
+    bounded_completion: bool
+    expectation_met: bool
+    body_byte_limit: int | None = Field(default=None, ge=0)
+    stall_duration_ms: int | None = Field(default=None, gt=0)
+    chunk_size_bytes: int | None = Field(default=None, gt=0)
+    chunk_delay_min_ms: int | None = Field(default=None, ge=0)
+    chunk_delay_max_ms: int | None = Field(default=None, ge=0)
+    request_count: int = Field(ge=0)
+    body_bytes_sent: int = Field(ge=0)
+    body_chunk_count: int = Field(ge=0)
+    delay_event_count: int = Field(ge=0)
+    stall_event_count: int = Field(ge=0)
+    rejection_event_count: int = Field(ge=0)
+    reset_event_count: int = Field(ge=0)
+    early_close_event_count: int = Field(ge=0)
+    scenario_exercised: bool
+    failure_code: StreamFaultFailureCode | None = None
+    output_artifact: str | None = None
+    capture_report_artifact: str | None = None
+    captured_media_span_ms: int | None = Field(default=None, ge=0)
+    termination_reason: Literal[
+        "duration_limit",
+        "end_of_stream",
+        "packet_limit",
+        "wall_time_limit",
+    ] | None = None
+    capture_artifact_ready: bool = False
+    same_container_multimodal_ready: bool = False
+
+    @model_validator(mode="after")
+    def validate_fault_case(self):
+        expected_status = STREAM_FAULT_EXPECTED_STATUS[self.scenario]
+        if self.expected_status != expected_status:
+            raise ValueError("fault case expected status is inconsistent")
+        if self.fault_injected is not (self.scenario != "healthy_control"):
+            raise ValueError("fault injection flag is inconsistent")
+        if (self.body_bytes_sent > 0) is not (self.body_chunk_count > 0):
+            raise ValueError("fault case body telemetry is inconsistent")
+        scenario_parameters_valid = bool(
+            (
+                self.scenario == "healthy_control"
+                and self.body_byte_limit is None
+                and self.stall_duration_ms is None
+                and self.chunk_size_bytes is None
+                and self.chunk_delay_min_ms is None
+                and self.chunk_delay_max_ms is None
+            )
+            or (
+                self.scenario == "chunk_delay_jitter"
+                and self.body_byte_limit is None
+                and self.stall_duration_ms is None
+                and self.chunk_size_bytes is not None
+                and self.chunk_delay_min_ms is not None
+                and self.chunk_delay_max_ms is not None
+                and self.chunk_delay_min_ms <= self.chunk_delay_max_ms
+                and self.chunk_delay_max_ms > 0
+            )
+            or (
+                self.scenario == "http_rejection"
+                and self.body_byte_limit == 0
+                and self.stall_duration_ms is None
+                and self.chunk_size_bytes is None
+                and self.chunk_delay_min_ms is None
+                and self.chunk_delay_max_ms is None
+            )
+            or (
+                self.scenario == "initial_response_stall"
+                and self.body_byte_limit == 0
+                and self.stall_duration_ms is not None
+                and self.chunk_size_bytes is None
+                and self.chunk_delay_min_ms is None
+                and self.chunk_delay_max_ms is None
+            )
+            or (
+                self.scenario == "midstream_stall"
+                and self.body_byte_limit is not None
+                and self.body_byte_limit > 0
+                and self.stall_duration_ms is not None
+                and self.chunk_size_bytes is None
+                and self.chunk_delay_min_ms is None
+                and self.chunk_delay_max_ms is None
+            )
+            or (
+                self.scenario in {"truncated_transfer", "connection_reset"}
+                and self.body_byte_limit is not None
+                and self.body_byte_limit > 0
+                and self.stall_duration_ms is None
+                and self.chunk_size_bytes is None
+                and self.chunk_delay_min_ms is None
+                and self.chunk_delay_max_ms is None
+            )
+        )
+        if not scenario_parameters_valid:
+            raise ValueError("fault case injection parameters are inconsistent")
+        irrelevant_events_zero = bool(
+            (
+                self.scenario == "healthy_control"
+                and self.delay_event_count == 0
+                and self.stall_event_count == 0
+                and self.rejection_event_count == 0
+                and self.reset_event_count == 0
+                and self.early_close_event_count == 0
+            )
+            or (
+                self.scenario == "chunk_delay_jitter"
+                and self.stall_event_count == 0
+                and self.rejection_event_count == 0
+                and self.reset_event_count == 0
+                and self.early_close_event_count == 0
+            )
+            or (
+                self.scenario == "http_rejection"
+                and self.delay_event_count == 0
+                and self.stall_event_count == 0
+                and self.reset_event_count == 0
+                and self.early_close_event_count == 0
+            )
+            or (
+                self.scenario
+                in {"initial_response_stall", "midstream_stall"}
+                and self.delay_event_count == 0
+                and self.rejection_event_count == 0
+                and self.reset_event_count == 0
+                and self.early_close_event_count == 0
+            )
+            or (
+                self.scenario == "truncated_transfer"
+                and self.delay_event_count == 0
+                and self.stall_event_count == 0
+                and self.rejection_event_count == 0
+                and self.reset_event_count == 0
+            )
+            or (
+                self.scenario == "connection_reset"
+                and self.delay_event_count == 0
+                and self.stall_event_count == 0
+                and self.rejection_event_count == 0
+                and self.early_close_event_count == 0
+            )
+        )
+        exercised = bool(
+            self.request_count > 0
+            and irrelevant_events_zero
+            and (
+                (self.scenario == "healthy_control" and self.body_bytes_sent > 0)
+                or (
+                    self.scenario == "chunk_delay_jitter"
+                    and self.body_bytes_sent > 0
+                    and self.delay_event_count > 0
+                )
+                or (
+                    self.scenario == "http_rejection"
+                    and self.rejection_event_count > 0
+                    and self.body_bytes_sent == 0
+                )
+                or (
+                    self.scenario == "initial_response_stall"
+                    and self.stall_event_count > 0
+                    and self.body_bytes_sent == 0
+                )
+                or (
+                    self.scenario == "midstream_stall"
+                    and self.stall_event_count > 0
+                    and self.body_bytes_sent > 0
+                )
+                or (
+                    self.scenario == "truncated_transfer"
+                    and self.early_close_event_count > 0
+                    and self.body_bytes_sent > 0
+                )
+                or (
+                    self.scenario == "connection_reset"
+                    and self.reset_event_count > 0
+                    and self.body_bytes_sent > 0
+                )
+            )
+        )
+        if self.scenario_exercised is not exercised:
+            raise ValueError("fault case execution telemetry is inconsistent")
+        if self.bounded_completion is not (
+            self.elapsed_ms <= self.elapsed_limit_ms
+        ):
+            raise ValueError("fault case bounded completion is inconsistent")
+        expected_met = bool(
+            (
+                self.expected_status == "captured_ready"
+                and self.actual_status == "captured_ready"
+            )
+            or (
+                self.expected_status == "failed"
+                and self.actual_status == "failed"
+            )
+            or (
+                self.expected_status == "not_ready_or_failed"
+                and self.actual_status != "captured_ready"
+            )
+        )
+        if self.expectation_met is not expected_met:
+            raise ValueError("fault case expectation result is inconsistent")
+
+        artifact_facts = (
+            self.output_artifact,
+            self.capture_report_artifact,
+            self.captured_media_span_ms,
+            self.termination_reason,
+        )
+        if self.actual_status == "failed":
+            if not self.failure_code:
+                raise ValueError("failed fault case requires failure_code")
+            if any(value is not None for value in artifact_facts):
+                raise ValueError("failed fault case cannot reference artifacts")
+            if self.capture_artifact_ready or self.same_container_multimodal_ready:
+                raise ValueError("failed fault case cannot publish readiness")
+            return self
+
+        if self.failure_code is not None:
+            raise ValueError("captured fault case cannot include failure_code")
+        if any(value is None for value in artifact_facts):
+            raise ValueError("captured fault case requires artifact facts")
+        output_path = PurePosixPath(self.output_artifact)
+        report_path = PurePosixPath(self.capture_report_artifact)
+        if (
+            output_path.is_absolute()
+            or len(output_path.parts) != 2
+            or output_path.parts[0] != "artifacts"
+            or output_path.suffix != ".mkv"
+            or any(part in {"", ".", ".."} for part in output_path.parts)
+            or "\\" in self.output_artifact
+        ):
+            raise ValueError("fault output artifact must be artifacts/*.mkv")
+        if (
+            report_path.is_absolute()
+            or len(report_path.parts) != 2
+            or report_path.parts[0] != "reports"
+            or report_path.suffix != ".json"
+            or any(part in {"", ".", ".."} for part in report_path.parts)
+            or "\\" in self.capture_report_artifact
+        ):
+            raise ValueError("fault capture report must be reports/*.json")
+        expected_actual = (
+            "captured_ready"
+            if self.same_container_multimodal_ready
+            else "captured_not_ready"
+        )
+        if self.actual_status != expected_actual:
+            raise ValueError("fault case status must match requested readiness")
+        return self
+
+
+class StreamFaultMatrixReport(ContractModel):
+    """Aggregate receipt for a fixed controlled HTTP fault matrix."""
+
+    schema_version: str = "1.0"
+    matrix_version: str
+    evidence_level: Literal[EvidenceLevel.E1] = EvidenceLevel.E1
+    source_type: Literal[SourceType.FIXTURE] = SourceType.FIXTURE
+    fixture_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    fixture_byte_size: int = Field(gt=0)
+    fixture_path_persisted: Literal[False] = False
+    endpoint_scheme: Literal["http"] = "http"
+    endpoint_loopback_only: Literal[True] = True
+    endpoint_value_persisted: Literal[False] = False
+    endpoint_port_persisted: Literal[False] = False
+    endpoint_log_messages_persisted: Literal[False] = False
+    requested_duration_ms: int = Field(gt=0)
+    minimum_duration_ms: int = Field(gt=0)
+    open_timeout_ms: int = Field(gt=0)
+    read_timeout_ms: int = Field(gt=0)
+    elapsed_limit_ms: int = Field(gt=0)
+    scenario_count: int = Field(ge=1)
+    cases: list[StreamFaultCaseResult] = Field(default_factory=list)
+    captured_case_count: int = Field(ge=0)
+    ready_case_count: int = Field(ge=0)
+    not_ready_case_count: int = Field(ge=0)
+    failed_case_count: int = Field(ge=0)
+    bounded_case_count: int = Field(ge=0)
+    expectation_met_case_count: int = Field(ge=0)
+    scenario_exercised_case_count: int = Field(ge=0)
+    unexpected_ready_case_count: int = Field(ge=0)
+    all_cases_bounded: bool
+    all_expected_outcomes_met: bool
+    all_scenarios_exercised: bool
+    controlled_http_fault_matrix_executed: bool
+    fault_detection_gate_ready: bool
+    packet_loss_injected: Literal[False] = False
+    rtsp_transport_tested: Literal[False] = False
+    reconnect_attempted: Literal[False] = False
+    involuntary_disconnect_recovery_proven: Literal[False] = False
+    network_impairment_tolerance_proven: Literal[False] = False
+    long_running_stability_proven: Literal[False] = False
+    device_platform_integration_proven: Literal[False] = False
+    m2c_capture_bundle_ready: Literal[False] = False
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_fault_matrix(self):
+        if self.scenario_count != len(STREAM_FAULT_SCENARIO_ORDER):
+            raise ValueError("fault matrix must contain the fixed scenario count")
+        if len(self.cases) != self.scenario_count:
+            raise ValueError("fault case list must match scenario_count")
+        if [item.case_index for item in self.cases] != list(
+            range(1, self.scenario_count + 1)
+        ):
+            raise ValueError("fault case indexes must be contiguous")
+        if tuple(item.scenario for item in self.cases) != (
+            STREAM_FAULT_SCENARIO_ORDER
+        ):
+            raise ValueError("fault cases must use the fixed scenario order")
+        if self.minimum_duration_ms > self.requested_duration_ms:
+            raise ValueError("fault matrix minimum duration exceeds request")
+        for item in self.cases:
+            if item.elapsed_limit_ms != self.elapsed_limit_ms:
+                raise ValueError("fault case elapsed limit is inconsistent")
+            if (
+                item.body_byte_limit is not None
+                and item.body_byte_limit >= self.fixture_byte_size
+            ):
+                raise ValueError("fault case body limit must truncate the fixture")
+            if item.actual_status != "failed" and (
+                item.output_artifact
+                != f"artifacts/stream-fault-{item.case_index:03d}.mkv"
+                or item.capture_report_artifact
+                != f"reports/stream-fault-{item.case_index:03d}.json"
+            ):
+                raise ValueError("fault case artifact names are inconsistent")
+
+        captured = sum(item.actual_status != "failed" for item in self.cases)
+        ready = sum(item.actual_status == "captured_ready" for item in self.cases)
+        not_ready = sum(
+            item.actual_status == "captured_not_ready" for item in self.cases
+        )
+        failed = sum(item.actual_status == "failed" for item in self.cases)
+        bounded = sum(item.bounded_completion for item in self.cases)
+        expected = sum(item.expectation_met for item in self.cases)
+        exercised = sum(item.scenario_exercised for item in self.cases)
+        unexpected_ready = sum(
+            item.actual_status == "captured_ready"
+            and item.expected_status != "captured_ready"
+            for item in self.cases
+        )
+        if (
+            self.captured_case_count != captured
+            or self.ready_case_count != ready
+            or self.not_ready_case_count != not_ready
+            or self.failed_case_count != failed
+            or captured != ready + not_ready
+            or self.bounded_case_count != bounded
+            or self.expectation_met_case_count != expected
+            or self.scenario_exercised_case_count != exercised
+            or self.unexpected_ready_case_count != unexpected_ready
+        ):
+            raise ValueError("fault matrix counts are inconsistent")
+        all_bounded = bounded == self.scenario_count
+        all_expected = expected == self.scenario_count
+        all_exercised = exercised == self.scenario_count
+        if self.all_cases_bounded is not all_bounded:
+            raise ValueError("fault matrix bounded result is inconsistent")
+        if self.all_expected_outcomes_met is not all_expected:
+            raise ValueError("fault matrix expectation result is inconsistent")
+        if self.all_scenarios_exercised is not all_exercised:
+            raise ValueError("fault matrix execution result is inconsistent")
+        if self.controlled_http_fault_matrix_executed is not all_exercised:
+            raise ValueError("controlled HTTP fault matrix result is inconsistent")
+        gate = bool(
+            all_bounded
+            and all_expected
+            and all_exercised
+            and unexpected_ready == 0
+        )
+        if self.fault_detection_gate_ready is not gate:
+            raise ValueError("fault detection gate is inconsistent")
+        return self
+
+
 class M2cClipReadiness(ContractModel):
     """Privacy-safe result for one C6c capture clip."""
 

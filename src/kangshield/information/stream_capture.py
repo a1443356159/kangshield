@@ -24,6 +24,21 @@ from .media_probe import probe_media
 STREAM_CAPTURE_VERSION = "stream-capture-v0.1.0"
 NETWORK_SCHEMES = frozenset({"rtsp", "rtsps", "http", "https"})
 FIXTURE_SCHEMES = NETWORK_SCHEMES | {"file", "local"}
+PUBLIC_STREAM_CAPTURE_FAILURE_CODES = frozenset(
+    {
+        "open_failed",
+        "remux_failed",
+        "video_track_layout_invalid",
+        "audio_track_layout_invalid",
+        "required_audio_track_missing",
+        "packet_timestamp_missing",
+        "video_keyframe_missing",
+        "video_packets_missing",
+        "audio_packets_missing",
+        "media_artifact_missing",
+        "output_verification_failed",
+    }
+)
 Transport = Literal["auto", "tcp", "udp"]
 TerminationReason = Literal[
     "duration_limit",
@@ -39,6 +54,16 @@ class StreamCaptureError(RuntimeError):
     def __init__(self, message: str, *, code: str):
         super().__init__(message)
         self.code = code
+
+
+def public_stream_capture_failure_code(code: str) -> str:
+    """Return an allowlisted path-free code for aggregate reports."""
+
+    return (
+        code
+        if code in PUBLIC_STREAM_CAPTURE_FAILURE_CODES
+        else "stream_capture_failed"
+    )
 
 
 @dataclass(frozen=True)

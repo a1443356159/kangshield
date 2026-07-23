@@ -16,26 +16,12 @@ from .stream_capture import (
     StreamCaptureConfig,
     StreamCaptureError,
     capture_stream,
+    public_stream_capture_failure_code,
     validate_stream_capture_request,
 )
 
 
 STREAM_QUALIFICATION_VERSION = "stream-qualification-v0.1.0"
-_PUBLIC_FAILURE_CODES = frozenset(
-    {
-        "open_failed",
-        "remux_failed",
-        "video_track_layout_invalid",
-        "audio_track_layout_invalid",
-        "required_audio_track_missing",
-        "packet_timestamp_missing",
-        "video_keyframe_missing",
-        "video_packets_missing",
-        "audio_packets_missing",
-        "media_artifact_missing",
-        "output_verification_failed",
-    }
-)
 
 
 @dataclass(frozen=True)
@@ -164,11 +150,7 @@ def qualify_stream(
             )
         except StreamCaptureError as error:
             output_path.unlink(missing_ok=True)
-            failure_code = (
-                error.code
-                if error.code in _PUBLIC_FAILURE_CODES
-                else "stream_capture_failed"
-            )
+            failure_code = public_stream_capture_failure_code(error.code)
             attempts.append(
                 StreamQualificationAttempt(
                     attempt_index=attempt_index,

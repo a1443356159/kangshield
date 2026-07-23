@@ -108,6 +108,24 @@ def test_stream_qualification_parser_freezes_independent_reopen_defaults():
     assert args.require_ready is False
 
 
+def test_stream_fault_matrix_parser_freezes_controlled_http_defaults():
+    args = build_parser().parse_args(
+        ["exercise-stream-faults", "fixture.mkv"]
+    )
+    assert args.command == "exercise-stream-faults"
+    assert args.fixture.name == "fixture.mkv"
+    assert args.duration_s == 2.0
+    assert args.minimum_duration_s == 1.5
+    assert args.open_timeout_s == 1.0
+    assert args.read_timeout_s == 1.0
+    assert args.stall_duration_s == 1.5
+    assert args.prefix_byte_limit == 2 * 1024 * 1024
+    assert args.jitter_chunk_bytes == 256 * 1024
+    assert args.jitter_delay_min_ms == 5.0
+    assert args.jitter_delay_max_ms == 20.0
+    assert args.require_ready is False
+
+
 def test_multimodal_parser_supports_legacy_wav_and_same_container_audio():
     legacy = build_parser().parse_args(
         ["run-multimodal", "capture.avi", "speech.wav"]

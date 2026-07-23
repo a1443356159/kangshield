@@ -124,6 +124,54 @@ def build_parser() -> argparse.ArgumentParser:
     )
     stream_qualification.add_argument("--attempt-count", type=int, default=3)
 
+    stream_fault_matrix = subparsers.add_parser(
+        "exercise-stream-faults",
+        help=(
+            "Run the fixed loopback HTTP fault matrix against a local A/V fixture"
+        ),
+    )
+    stream_fault_matrix.add_argument("fixture", type=Path)
+    stream_fault_matrix.add_argument(
+        "--runs-dir", type=Path, default=Path("runs")
+    )
+    stream_fault_matrix.add_argument("--duration-s", type=float, default=2.0)
+    stream_fault_matrix.add_argument(
+        "--minimum-duration-s", type=float, default=1.5
+    )
+    stream_fault_matrix.add_argument(
+        "--open-timeout-s", type=float, default=1.0
+    )
+    stream_fault_matrix.add_argument(
+        "--read-timeout-s", type=float, default=1.0
+    )
+    stream_fault_matrix.add_argument(
+        "--max-packets", type=int, default=200_000
+    )
+    stream_fault_matrix.add_argument(
+        "--max-packets-per-stream", type=int, default=200_000
+    )
+    stream_fault_matrix.add_argument(
+        "--stall-duration-s", type=float, default=1.5
+    )
+    stream_fault_matrix.add_argument(
+        "--prefix-byte-limit", type=int, default=2 * 1024 * 1024
+    )
+    stream_fault_matrix.add_argument(
+        "--jitter-chunk-bytes", type=int, default=256 * 1024
+    )
+    stream_fault_matrix.add_argument(
+        "--jitter-delay-min-ms", type=float, default=5.0
+    )
+    stream_fault_matrix.add_argument(
+        "--jitter-delay-max-ms", type=float, default=20.0
+    )
+    stream_fault_matrix.add_argument("--elapsed-limit-s", type=float)
+    stream_fault_matrix.add_argument(
+        "--require-ready",
+        action="store_true",
+        help="Exit 2 after writing reports unless the fixed fault gate passes",
+    )
+
     media = subparsers.add_parser(
         "probe-media",
         help="Inspect file facts and WAV/video metadata",
@@ -1013,6 +1061,139 @@ def _qualify_stream_command(args: argparse.Namespace) -> int:
         },
     )
     if args.require_ready and not result.report.repeated_capture_gate_ready:
+        return 2
+    return 0
+
+
+def _exercise_stream_faults_command(args: argparse.Namespace) -> int:
+    from .contracts import STREAM_FAULT_SCENARIO_ORDER
+    from .privacy import sha256_file
+    from .stream_capture import StreamCaptureConfig
+    from .stream_fault_matrix import (
+        StreamFaultMatrixConfig,
+        exercise_stream_fault_matrix,
+    )
+
+    if not args.fixture.is_file():
+        raise FileNotFoundError(args.fixture)
+    fixture_sha256 = sha256_file(args.fixture)
+    fixture_byte_size = args.fixture.stat().st_size
+    capture_config = StreamCaptureConfig(
+        duration_s=args.duration_s,
+        minimum_duration_s=args.minimum_duration_s,
+        open_timeout_s=args.open_timeout_s,
+        read_timeout_s=args.read_timeout_s,
+        max_packets=args.max_packets,
+        packet_scan_limit_per_stream=args.max_packets_per_stream,
+        transport="auto",
+        require_audio=True,
+    )
+    matrix_config = StreamFaultMatrixConfig(
+        capture=capture_config,
+        stall_duration_s=args.stall_duration_s,
+        prefix_byte_limit=args.prefix_byte_limit,
+        jitter_chunk_bytes=args.jitter_chunk_bytes,
+        jitter_delay_min_s=args.jitter_delay_min_ms / 1000.0,
+        jitter_delay_max_s=args.jitter_delay_max_ms / 1000.0,
+        elapsed_limit_s=args.elapsed_limit_s,
+    )
+    configuration = {
+        "command": "exercise-stream-faults",
+        "source_type": SourceType.FIXTURE.value,
+        "evidence_level": EvidenceLevel.E1.value,
+        "fixture_path_persisted": False,
+        "fixture_sha256": fixture_sha256,
+        "fixture_byte_size": fixture_byte_size,
+        "endpoint_loopback_only": True,
+        "endpoint_value_persisted": False,
+        "endpoint_port_persisted": False,
+        "endpoint_log_messages_persisted": False,
+        "duration_s": args.duration_s,
+        "minimum_duration_s": args.minimum_duration_s,
+        "open_timeout_s": args.open_timeout_s,
+        "read_timeout_s": args.read_timeout_s,
+        "max_packets": args.max_packets,
+        "max_packets_per_stream": args.max_packets_per_stream,
+        "stall_duration_s": args.stall_duration_s,
+        "prefix_byte_limit": args.prefix_byte_limit,
+        "jitter_chunk_bytes": args.jitter_chunk_bytes,
+        "jitter_delay_min_ms": args.jitter_delay_min_ms,
+        "jitter_delay_max_ms": args.jitter_delay_max_ms,
+        "elapsed_limit_s": matrix_config.effective_elapsed_limit_s,
+        "scenario_order": list(STREAM_FAULT_SCENARIO_ORDER),
+        "packet_loss_injected": False,
+        "rtsp_transport_tested": False,
+    }
+    with RunArtifacts(
+        args.runs_dir,
+        stage="v1-stream-fault-matrix",
+        evidence_level=EvidenceLevel.E1,
+        configuration=configuration,
+    ) as run:
+        with run.step("exercise-stream-faults") as step:
+            result = exercise_stream_fault_matrix(
+                fixture_path=args.fixture,
+                artifacts_dir=run.artifacts_dir,
+                config=matrix_config,
+            )
+            capture_iterator = iter(result.capture_reports)
+            for case in result.report.cases:
+                if case.actual_status == "failed":
+                    continue
+                capture = next(capture_iterator)
+                run.record_asset(capture.media_probe.asset)
+                run.record_observation(capture.media_probe.observation)
+                if case.output_artifact not in run.manifest.artifacts:
+                    run.manifest.artifacts.append(case.output_artifact)
+                    run.save_manifest()
+                capture_report_path = run.write_report(
+                    Path(case.capture_report_artifact).name,
+                    capture,
+                )
+                step.outputs.extend(
+                    [case.output_artifact, run.relative(capture_report_path)]
+                )
+            parent_path = run.write_report(
+                "stream-fault-matrix.json",
+                result.report,
+            )
+            step.outputs.append(run.relative(parent_path))
+    _print_result(
+        run,
+        {
+            "scenario_count": result.report.scenario_count,
+            "ready_case_count": result.report.ready_case_count,
+            "not_ready_case_count": result.report.not_ready_case_count,
+            "failed_case_count": result.report.failed_case_count,
+            "bounded_case_count": result.report.bounded_case_count,
+            "expectation_met_case_count": (
+                result.report.expectation_met_case_count
+            ),
+            "scenario_exercised_case_count": (
+                result.report.scenario_exercised_case_count
+            ),
+            "unexpected_ready_case_count": (
+                result.report.unexpected_ready_case_count
+            ),
+            "fault_detection_gate_ready": (
+                result.report.fault_detection_gate_ready
+            ),
+            "network_impairment_tolerance_proven": (
+                result.report.network_impairment_tolerance_proven
+            ),
+            "cases": [
+                {
+                    "scenario": case.scenario,
+                    "status": case.actual_status,
+                    "failure_code": case.failure_code,
+                    "elapsed_ms": case.elapsed_ms,
+                    "expectation_met": case.expectation_met,
+                }
+                for case in result.report.cases
+            ],
+        },
+    )
+    if args.require_ready and not result.report.fault_detection_gate_ready:
         return 2
     return 0
 
@@ -2092,6 +2273,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _capture_stream_command(args)
     if args.command == "qualify-stream":
         return _qualify_stream_command(args)
+    if args.command == "exercise-stream-faults":
+        return _exercise_stream_faults_command(args)
     if args.command == "probe-media":
         return _probe_media_command(args)
     if args.command == "assess-m2c-capture":
