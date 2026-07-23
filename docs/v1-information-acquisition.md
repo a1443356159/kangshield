@@ -1,6 +1,6 @@
 # V1 信息采集与多模态模型探索
 
-状态：Active v0.6
+状态：Active v0.7
 
 更新时间：2026-07-23
 
@@ -309,7 +309,7 @@ V1 不在没有参考设备的情况下声称心率、呼吸或睡眠分期准�
 
 采集开始前复制 manifest 1.1 和三模型策略到受控目录，采集后先运行 `assess-m2c-capture`。只有 `camera_ready_for_model_retest=true` 才启动第 5 项；E1 fixture 的 10/10 结构覆盖不构成真机授权。设计与 E1 证据见[采集包就绪门](v1-m2c-capture-readiness-gate.md)和[初测报告](reports/v1-m2c-capture-readiness-smoke.md)。
 
-设备无关基线已在 Slurm L40 上通过 E1 smoke，见 [V1-M2a 初测报告](reports/v1-m2a-multimodal-smoke.md)。有界 HTTP 流采集已由 job `1782` 完成真实姿态/语言消费；重复开流 E1 又验证三次独立 artifact 和完整轨道签名，见[采集设计](v1-m1-bounded-stream-capture.md)、[资格门](v1-m1-stream-qualification.md)及各自正式报告。所有 E1 结果都不改变前四项真实设备任务的证据状态。
+设备无关基线已在 Slurm L40 上通过 E1 smoke，见 [V1-M2a 初测报告](reports/v1-m2a-multimodal-smoke.md)。有界 HTTP 流采集已由 job `1782` 完成真实姿态/语言消费；重复开流 E1 验证三次独立 artifact 和完整轨道签名；受控故障 E1 又实际执行完整/分块延迟/503/stall/截断/reset 七场景且 0 unexpected ready。见[采集设计](v1-m1-bounded-stream-capture.md)、[资格门](v1-m1-stream-qualification.md)、[故障矩阵](v1-m1-stream-fault-matrix.md)及各自正式报告。所有 E1 结果都不改变前四项真实设备任务的证据状态。
 
 V1-M3 姿态同集对比已经冻结模型、摘要、阈值和报告契约，见[姿态模型对比设计](v1-m3-pose-model-comparison.md)和[历史双模型报告](reports/v1-m3-pose-model-comparison.md)。HumanArt + RTMPose 保持准确率条件参考；REV-013 的 [Keypoint R-CNN 独立候选](reports/v1-m3-torchvision-keypointrcnn-candidate.md)虽达到 lying 21/21，但横卧关键点门仅 4/21，因此只保留 fallback。两条路线最终是否进入 V2 都取决于 C6c、负样本和分发 Review。
 

@@ -1,6 +1,6 @@
 # 康盾里程碑与验收门
 
-状态：Active v1.6
+状态：Active v1.7
 
 基准日期：2026-07-23
 
@@ -19,7 +19,7 @@
 | 里程碑 | 日期 | 状态 | 主要产物 | 验收门 |
 |---|---|---|---|---|
 | D0 文档基线 | 07-22～07-24 | Done | 架构、模块、里程碑、Review、采集探索文档 | 三份原始资料与硬件边界没有冲突口径 |
-| V1-M1 设备能力探测 | 07-25～07-28 | In progress | 摄像头/睡眠仪能力矩阵、有界流采集/重复开流资格、API 样例、原始样本 | 采集与重复开流接缝 E1 已关闭；每项目标设备能力仍须有真实调用或明确“不开放/待确认”证据 |
+| V1-M1 设备能力探测 | 07-25～07-28 | In progress | 摄像头/睡眠仪能力矩阵、有界流采集/重复开流/故障识别、API 样例、原始样本 | 三个接收工具门 E1 已关闭；每项目标设备能力仍须有真实调用或明确“不开放/待确认”证据 |
 | V1-M2a 设备无关多模态链路 | 07-22～07-23 | Done | 视频/语言回放、姿态、VAD/ASR、窗口、Slurm 报告 | 干净提交在 L40 上完成 E1 smoke，warm/cold 口径分离 |
 | V1-M2b 公开真实场景固定集与对齐评测 | 07-22～07-23 | Done | URFD/FLEURS 固定集、批量 Pipeline、标签/CER/覆盖率与 Slurm 报告 | 六 case 在干净提交和 L40 上可重复完成，公开数据边界固定为 E1 |
 | V1-M2c 目标设备样本与时间基 | 07-22～08-01 | In progress | 容器时间戳探针、采集包/标注/held-out gate、C6c 音视频样本、睡眠样例 | 两个 E1 工具切片已验收；目标设备视频、音频、睡眠样例仍须形成 E2/E3 证据 |
@@ -64,7 +64,7 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 | V1-M1 有界网络音视频流采集接缝 | `8cbd91f` / `5ce260e` | `origin/main` | 2026-07-23 已验证 | 环境端点、有界关键帧 codec-copy、owner-only Matroska、输出 timing gate、故障清理、HTTP E1 与 L40 job `1782`、REV-025；不代表 C6c RTSP、平台、重连或 drift 已验收 |
 | V1-M1 重复开流与格式稳定资格门 | `fea40f7` / `c8bda16` / `b192880` | `origin/main` | 2026-07-23 已验证 | 2～20 次独立 open、父/子 ledger、固定失败码、完整轨道签名、HTTP 3/3 ready 与 L40 job `1785`、REV-026；只关闭 scheduled reopen 工具门，不代表非自愿重连、弱网、长稳或 C6c 接入 |
 
-这里的“推送验证”只证明代码已到达远端。V1-M1 的有界 HTTP 采集与重复开流资格接缝已在 E1 关闭，但里程碑仍为 In progress；三次短 fixture 不能替代 C6c/SDNL1 E2/E3、断线恢复或长稳。V1-M2a 和 V1-M2b 的 Done 只关闭设备无关 E1 链路及公开固定集评测，不会提升真实设备证据等级。V1-M3 的姿态、语言和睡眠字段三个 E1 切片均已验收，因此仅在 E1 探索范围标记 Done；M2c 已有采集规程、容器时间戳工具、采集包 readiness gate 和可复用的流采集/资格工具，但仍没有真实 C6c 媒体或 SDNL1 字段证据。V1-R1 G4 的离线特征、首版候选状态机、公开压力与双标注/裁决/事件 scorer 也都只属于 E1，不能替代 C6c 正负视频、冻结策略的真实候选/事件指标、床上躺卧、多人 tracking 或跌倒风险/告警验收。
+这里的“推送验证”只证明代码已到达远端。V1-M1 的有界 HTTP 采集、重复开流资格和受控故障识别已在 E1 关闭，但里程碑仍为 In progress；fixture 不能替代 C6c/SDNL1 E2/E3、RTSP/packet loss、断线恢复或长稳。V1-M2a 和 V1-M2b 的 Done 只关闭设备无关 E1 链路及公开固定集评测，不会提升真实设备证据等级。V1-M3 的姿态、语音和睡眠字段三个 E1 切片均已验收，因此仅在 E1 探索范围标记 Done；M2c 已有采集规程、容器时间戳工具、采集包 readiness gate 和可复用的流接收工具，但仍没有真实 C6c 媒体或 SDNL1 字段证据。V1-R1 G4 的离线特征、首版候选状态机、公开压力与双标注/裁决/事件 scorer 也都只属于 E1，不能替代 C6c 正负视频、冻结策略的真实候选/事件指标、床上躺卧、多人 tracking 或跌倒风险/告警验收。
 
 ## 4. 当前阶段任务
 
@@ -107,10 +107,11 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 - [x] Synthetic Fixture 与自动化测试。
 - [x] 有界 RTSP/HTTP 采集 adapter、环境端点边界、首关键帧/timeout/packet gate、owner-only Matroska 与输出 timing probe；HTTP E1 → L40 Pipeline job `1782` 已通过。
 - [x] 重复开流 qualification：多个独立 raw/child report、固定失败码、完整音视频格式签名和 fail-closed 父 gate；三次 HTTP E1 与 L40 child 复核已通过。
+- [x] 受控流故障矩阵：完整/分块延迟/503/双 stall/截断/reset 七场景、实际注入遥测、有界状态和 partial 清理；HTTP E1 7/7 通过，恢复/容忍声明仍为 false。
 - [ ] C6c 真实 E2/E3 证据。
 - [ ] CS-EP-SDNL1 真实 E2/E3 证据。
 
-当前实现验证见 [V1-M1 初步开发报告](reports/v1-m1-initial-development.md)、[有界流采集设计](v1-m1-bounded-stream-capture.md)、[重复开流资格门](v1-m1-stream-qualification.md)与各自正式 E1 报告。
+当前实现验证见 [V1-M1 初步开发报告](reports/v1-m1-initial-development.md)、[有界流采集设计](v1-m1-bounded-stream-capture.md)、[重复开流资格门](v1-m1-stream-qualification.md)、[受控流故障矩阵](v1-m1-stream-fault-matrix.md)与各自正式 E1 报告。
 
 ### V1-M2a：设备无关多模态链路
 
@@ -149,6 +150,7 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 - [x] 在干净提交 `6f1c02a` 上完成 10 场景 E1 正式运行：结构 10/10，最终决定 `tooling_only`，四个真机门均为 false。
 - [x] 在干净提交 `8cbd91f` 上完成有界 HTTP A/V 采集，并以相同 artifact SHA-256 进入 L40 job `1782`；只关闭网络输入到同容器 Pipeline 的 E1 接缝。
 - [x] 在干净提交 `c8bda16` 上完成三次独立 HTTP A/V qualification：3/3 ready、唯一完整轨道签名，并选取 child artifact 进入 L40；断线/长稳/网络损伤声明仍为 false。
+- [x] 在干净提交 `4e637a1` 上完成七场景 loopback HTTP 故障矩阵：7/7 实际执行、有界且符合预期，0 unexpected ready；只关闭安全识别工具门。
 - [ ] 录制有明确同意的 C6c 正常行走、起坐、模拟跌倒、遮挡/夜视样本。
 - [ ] 证明 C6c 视频与音频是否同容器，并保存 PTS/时钟偏差。
 - [ ] 获取 CS-EP-SDNL1 真实 API/SDK/导出样例和字段时间语义。
@@ -223,6 +225,7 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 - [x] 实现 `runtime-closure-v0.1.0`：冻结 RTMPose + FunASR 候选 profile、脱敏 `pip inspect`、extras/marker 传递闭包与八个 fail-closed gate；clean run `20260722T222305Z-2b36b79b` 验证工具通过且共享环境正确保持 3/8 ready（REV-024）。
 - [x] 实现 `stream-capture-v0.1.0`：环境端点、有界 codec-copy、首关键帧、owner-only raw、输出 timing probe 与 fail-cleanup；HTTP E1 run `20260722T225832Z-cfed1858` 和 L40 job `1782` 关闭采集 adapter seam（REV-025），不提升 C6c 证据。
 - [x] 实现 `stream-qualification-v0.1.0`：2～20 次独立 open、固定失败码、父/子 ledger、完整轨道签名和严格 gate；HTTP E1 run `20260722T234430Z-1f2b14c9` 与 L40 child 复核关闭重复开流工具门（REV-026），不证明真实重连或长稳。
+- [x] 实现 `stream-fault-matrix-v0.1.0`：七场景 loopback HTTP 行为、实际注入遥测、有界状态、固定失败码、partial 清理和严格父 gate；clean run `20260723T003417Z-2f683f0f` 关闭 E1 安全故障识别工具门（REV-027），不证明 RTSP、packet loss、恢复、容忍或长稳。
 - [ ] 使用 C6c 正负视频继续补空场持续、床上躺卧、宠物移动和真实多人 tracking，按已冻结 policy 生成真实候选并复用事件评估口径。
 - [ ] 用 E2/E3 证据把 C6c 与 SDNL1 从 Unknown 归类为 available、limited 或 blocked。
 - [ ] 由项目/模型 owner 关闭分发门：决定 V2 最终姿态权重、模型 artifact 打包方式和项目许可证，按决定建立隔离候选环境并将 runtime closure 从 3/8 关闭到 8/8，再生成 competition dependency lock 与第三方 NOTICE，并在最终分发 profile 上通过 `--require-ready`；当前 HumanArt、Keypoint R-CNN、FunASR 与项目依赖均未关闭。

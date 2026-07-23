@@ -22,6 +22,8 @@
 - [V1-M1 有界音视频流采集 E1 初测报告](docs/reports/v1-m1-bounded-stream-capture-smoke.md)
 - [V1-M1 重复开流资格门](docs/v1-m1-stream-qualification.md)
 - [V1-M1 重复开流资格门 E1 报告](docs/reports/v1-m1-stream-qualification-smoke.md)
+- [V1-M1 受控流故障矩阵](docs/v1-m1-stream-fault-matrix.md)
+- [V1-M1 受控流故障矩阵 E1 报告](docs/reports/v1-m1-stream-fault-matrix-smoke.md)
 - [V1 视频与语言多模态 Pipeline](docs/v1-multimodal-pipeline.md)
 - [V1-M2a 多模态 Pipeline 初测报告](docs/reports/v1-m2a-multimodal-smoke.md)
 - [V1-M2a 同容器音轨 PTS 对齐初测报告](docs/reports/v1-m2a-same-container-audio-smoke.md)
@@ -122,6 +124,15 @@ kangshield-info qualify-stream \
 ```
 
 该命令复用同一环境 endpoint，但为每次连接生成独立 raw/report，并检查视频宽高/帧率和音频采样率/声道等轨道签名。通过只表示计划性重复开流稳定，不代表非自愿断线恢复、丢包抖动或长稳。见[资格门设计](docs/v1-m1-stream-qualification.md)。
+
+在不接触真实设备或凭据的 E1 环境复核故障识别边界：
+
+```bash
+kangshield-info exercise-stream-faults <local-av-fixture.mkv> \
+  --require-ready
+```
+
+该命令实际执行完整响应、分块延迟、503、首包/部分 body stall、截断和 TCP reset，并要求实际注入遥测、预期状态与时限全部通过。它只验证安全故障识别，不证明 RTSP、packet loss、自动重连、网络容忍或长稳。见[故障矩阵设计](docs/v1-m1-stream-fault-matrix.md)。
 
 生成并验证确定性同容器音视频时间戳夹具：
 

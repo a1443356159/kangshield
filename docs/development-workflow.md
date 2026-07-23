@@ -1,6 +1,6 @@
 # 开发与证据晋级流程
 
-状态：Active v1.3
+状态：Active v1.4
 
 ## 1. 开发顺序
 
@@ -118,6 +118,15 @@ kangshield-info qualify-stream \
 ```
 
 逐项查看 attempt status、固定 failure code、`unique_track_signature_count` 和 `repeated_capture_gate_ready`，不能只看进程退出。三次计划性 reopen 成功不等于断线恢复或长稳；后两者必须另做网络故障和 30～60 分钟运行。每次尝试都会保存 raw，采集同意与删除规则按 artifact 数量执行。完整契约见[重复开流资格门](v1-m1-stream-qualification.md)。
+
+真机故障实验前先用本地 A/V fixture 验证 adapter 的 E1 fail-closed 行为：
+
+```bash
+kangshield-info exercise-stream-faults <local-av-fixture.mkv> \
+  --require-ready
+```
+
+必须逐 case 检查实际 body/delay/stall/reject/reset/early-close 遥测、elapsed、状态和固定 failure code，不能只看父 gate。该命令禁止使用真实 endpoint，只关闭 loopback HTTP 故障识别工具门；RTSP、鉴权、packet loss、恢复和长稳仍需独立 E2/E3 实验。成功 case 会新增 raw，继续受同意、留存和删除规则约束。完整契约见[受控流故障矩阵](v1-m1-stream-fault-matrix.md)。
 
 完整采集包在任何模型复测前运行：
 
@@ -373,6 +382,7 @@ kangshield-info assess-runtime-closure --require-ready
 28. 候选 runtime 是否从非 editable、无 `PYTHONPATH` 的已安装入口审计，根 extras/目标 marker 是否进入实际闭包，八个 closure gate 是否全部通过；是否在此之前误生成 final lock/NOTICE 或把共享开发环境冒充比赛环境。
 29. Stream capture 是否只从环境读取端点、从视频关键帧起录、在 timeout/时长/packet 上限内 clean termination，并经输出 timing probe；raw/report 权限、最短跨度、唯一音视频轨和凭据扫描是否通过；是否把 E1 HTTP 或单次 E2 clip 误写成 C6c 平台、重连或 drift 证据。
 30. Stream qualification 是否为每次独立 open 保留 raw/child report，所有尝试均满足请求 readiness，轨道 codec/time-base/视频尺寸帧率/音频采样率声道是否一致；是否把 scheduled reopen 误写成非自愿断线恢复、长稳或网络损伤容忍。
+31. Stream fault matrix 是否严格执行七个固定场景并记录实际注入遥测、7/7 有界/符合预期、0 unexpected ready、失败无 partial；是否把 chunk delay 写成 packet jitter，或把 E1 安全识别写成 RTSP、packet loss、自动恢复、网络容忍或长稳。
 
 快速检查：
 

@@ -1381,7 +1381,7 @@
 | 实现重复开流契约、CLI、失败码、完整格式签名、测试和正式 E1 | Codex | 2026-07-23 | Closed；`fea40f7` / `c8bda16` / REV-026 |
 | 用 C6c endpoint 执行三次 TCP E2 qualification 并确认格式签名 | 设备负责人 / 工程负责人 | 2026-07-29 | Blocked on endpoint/device access |
 | 记录有效、无权限、过期凭据和无音轨的固定失败码 | 工程负责人 | 2026-07-29 | Blocked on test credentials |
-| 以受控代理/网络仿真执行 stall、断流、丢包、抖动与恢复矩阵 | 工程负责人 | 2026-07-31 | Blocked on E2 stream |
+| 以受控代理/网络仿真执行 stall、断流、丢包、抖动与恢复矩阵 | 工程负责人 | 2026-07-31 | E1 loopback safety gate Closed by REV-027；RTSP/packet loss/recovery Blocked on E2 stream |
 | 执行 30～60 分钟长稳并决定外部 supervisor 的新 run 策略 | 工程负责人 | 2026-07-31 | Blocked on E2 stream |
 
 ### 未决问题
@@ -1390,3 +1390,57 @@
 2. 清晰度、夜视或直播/回放切换时，轨道签名的哪些变化属于预期 profile，哪些必须阻断？
 3. 非自愿断流后由外部 supervisor 新建 run，还是未来协议允许同一 session 下多个独立 artifact；演示 UI 如何表达间断？
 4. 网络故障矩阵使用哪种可审计代理/仿真工具，目标延迟、丢包、抖动和恢复阈值由谁冻结？
+
+---
+
+## REV-027 V1-M1 受控流故障识别矩阵 Review
+
+- 日期：2026-07-23
+- 状态：Accepted for E1 adapter fault-detection tooling；RTSP / packet loss / recovery / long-run remains Open
+- 参与人：项目组、Codex
+- 评审范围：固定故障 taxonomy、真实 loopback socket 行为、服务端实际注入遥测、有界返回、状态/错误码、partial 清理、父子 ledger、防篡改、owner-only 和与恢复/容忍/长稳的边界
+- 输入材料：[受控流故障矩阵](v1-m1-stream-fault-matrix.md)、[正式 E1 报告](reports/v1-m1-stream-fault-matrix-smoke.md)、实现提交 `4e637a1`、run `20260723T003417Z-2f683f0f`
+
+### 发现
+
+1. REV-025/026 已证明一次有界接收和计划性 reopen，但没有真实执行 stall、截断或 reset；因此不能证明异常输入不会被误报 ready。
+2. 只在配置里写“注入故障”证据不足。最终实现记录 server 实际 request/body chunk、delay、stall、503、reset 和提前关闭事件，父 gate 要求 7/7 `scenario_exercised=true`。
+3. clean `4e637a1` 上健康/分块延迟两例均 ready；503、首包 stall、部分 body stall、截断和 TCP reset 五例均失败，固定 code 为 `open_failed` 或 `remux_failed`，0 unexpected ready。
+4. 分块延迟实际发送 44 chunks、执行 43 次 5/20 ms 交替 delay，仍 ready；这是应用层 delivery schedule，不是 packet-level jitter 或 packet loss。
+5. 两个 stall 分别在 open/read timeout 约 1000 ms 返回；截断/reset 在 5/6 ms 返回。全部低于 7000 ms case limit。
+6. 五个失败 case 没有 raw、child report 或 partial；两个正向 raw/child report、SourceAsset 和 Observation 一一对应并保持 owner-only。
+7. 父契约会重算场景顺序、注入参数、实际遥测、elapsed、预期状态、计数、精确 artifact 名和 gate；私有 failure code、路径跳转或伪造事件被拒绝。
+8. 本工具只运行 loopback HTTP/PyAV，不调用模型或 GPU。clean 本地 E1 比提交无关 Slurm 作业更符合验证范围。
+
+### 决定
+
+1. 接受 `stream-fault-matrix-v0.1.0` 作为真机故障实验前的 E1 adapter safety gate。
+2. 固定七场景顺序：healthy、chunk-delay、503、initial stall、midstream stall、truncate、reset；变更场景或状态语义需新版本。
+3. 父 gate 必须同时满足 7/7 实际执行、7/7 有界、7/7 符合预期和 0 unexpected ready；配置存在不能替代实际事件遥测。
+4. 失败继续清理 partial，不在单 raw 中自动 reconnect 或拼接；若未来支持恢复，由外部 supervisor 新建 run 或新协议显式表达 session。
+5. 真机升级使用外部受控代理或 OS 网络仿真层，另补 RTSP TCP/UDP、鉴权过期、packet loss、packet-level jitter 和恢复时间；不得把 fixture CLI 指向真实 endpoint。
+6. `packet_loss_injected`、RTSP、reconnect、恢复、网络容忍、长稳、平台、M2c、Risk 和 Alert 在本版本固定 false。
+
+### 验证
+
+- 自动化：164 passed；新增 4 项覆盖真实七场景 socket、实际注入遥测、配置拒绝、父子 ledger、owner-only、计数/gate/遥测/路径/私有失败码防篡改和 parser。
+- 静态检查：`compileall`、全部 shell/sbatch `bash -n`、`pip check`、`git diff --check` 通过。
+- 正式 E1：clean `4e637a1`、completed、0 issue；7/7 bounded/expected/exercised，2 ready、5 failed、0 unexpected ready；manifest/父报告 SHA-256 为 `9175c7236ec06f872a2949e9f4344201dcf8832f4a844ec3baf9e89221526116` / `0ccc2efb336e96e8821d2d6b2e14870f4a4bf2a73bce4de85ae7faa324a528f1`。
+- run/子目录和文件为 `0700/0600`；endpoint/端口、fixture 原文件名、本地 home/用户名、环境变量、secret 和 Risk/Alert true 扫描 0 命中。
+
+### 行动项
+
+| 行动 | 负责人 | 截止日期 | 状态 |
+|---|---|---|---|
+| 实现七场景、实际遥测、严格契约/CLI、测试和正式 E1 | Codex | 2026-07-23 | Closed；`4e637a1` / REV-027 |
+| 用 C6c 完成单次短 E2 与三次 qualification，确认音轨和格式 | 设备负责人 / 工程负责人 | 2026-07-29 | Blocked on endpoint/device access |
+| 冻结真机故障代理、RTSP TCP/UDP、鉴权过期与恢复 session 方案 | 工程负责人 | 2026-07-30 | Blocked on E2 stream and credentials |
+| 由产品/工程 owner 冻结 packet loss、delay、jitter、恢复时间阈值 | 产品负责人 / 工程负责人 | 2026-07-30 | Open owner decision |
+| 执行 E2 故障矩阵与 30～60 分钟长稳，独立记录恢复时间 | 工程负责人 | 2026-07-31 | Blocked on E2 stream |
+
+### 未决问题
+
+1. 真机实验采用 Toxiproxy、Linux netem 还是 RTSP-aware proxy；工具版本和命令如何进入不可变 provenance？
+2. C6c endpoint/token 是否允许代理转发和重复建连；鉴权过期场景由谁提供测试凭据？
+3. TCP/UDP 两种 RTSP transport 的 loss/delay/jitter 阈值和允许降级行为是什么？
+4. 非自愿断流后的 supervisor 是否总是新建 run；演示 UI 如何表达 gap、恢复尝试和失败？

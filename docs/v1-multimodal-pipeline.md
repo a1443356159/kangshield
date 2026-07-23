@@ -1,6 +1,6 @@
 # V1 视频与语言多模态采集 Pipeline
 
-状态：Implemented Baseline v0.7；有界流采集、重复开流资格、同容器 PTS/owner-only 路径已实现；V1-R1 决策已同步
+状态：Implemented Baseline v0.8；有界流采集、重复开流、故障识别、同容器 PTS/owner-only 路径已实现；V1-R1 决策已同步
 
 更新时间：2026-07-23
 
@@ -217,6 +217,8 @@ unset KANG_STREAM_ENDPOINT
 
 真机批量采集前，先把同一 endpoint 交给 `qualify-stream --attempt-count 3 --require-ready`。只有父 gate 和选中 child 的独立 timing gate 都通过，才将该 child artifact 交给本 Pipeline；仍不得由三次短开流推断长期实时推理容量。
 
+`exercise-stream-faults` 使用本地 fixture 复核输入层在 503、stall、截断和 reset 下不会产出意外 ready；它不直接调用本 Pipeline，也不使用真机 endpoint。该 gate 通过只授权后续受控 E2 故障实验，不证明实时推理在弱网下连续、自动恢复或保持延迟。
+
 提交 Slurm：
 
 ```bash
@@ -243,13 +245,14 @@ Slurm 脚本请求 1 张 L40、8 CPU、20 分钟，并强制从本地缓存加�
 - [x] 确定性同容器样例完成单音轨解码、16 kHz 重采样、正负 offset、事件平移、单来源登记和 fail-closed PTS 测试。
 - [x] 有界 HTTP 流 E1 已生成 owner-only 同容器 artifact，并由实际 L40 job `1782` 完成姿态、语言和窗口链路。
 - [x] 三次独立 HTTP 开流 E1 均 ready、完整轨道签名稳定，并选取一个 child artifact 进入 L40 下游复核。
+- [x] 七场景 loopback HTTP 故障矩阵实际注入并有界返回，0 unexpected ready；失败场景无 partial。
 - [ ] 真实 C6c 同容器音视频或可靠同步样本完成。
 - [ ] 固定居家场景集上的姿态漏检、跟踪稳定性、ASR 字错率和噪声测试完成。
 - [ ] V2 姿态许可证/替代模型决策完成。
 
-前九项关闭的是“设备无关采集/重复开流接缝、回放链路与同容器实现”，后三项属于 V1 真实数据和模型对比，不得由 synthetic/public smoke 替代。
+前十项关闭的是“设备无关采集/重复开流/故障识别接缝、回放链路与同容器实现”，后三项属于 V1 真实数据和模型对比，不得由 synthetic/public smoke 替代。
 
-历史独立 video/WAV 的 Slurm 结果见 [V1-M2a 初测报告](reports/v1-m2a-multimodal-smoke.md)；同容器 PTS、真实后端 CPU 与 owner-only L40 证据见[同容器音轨初测报告](reports/v1-m2a-same-container-audio-smoke.md)；网络式输入到该入口的 E1 证据见[有界流采集报告](reports/v1-m1-bounded-stream-capture-smoke.md)。
+历史独立 video/WAV 的 Slurm 结果见 [V1-M2a 初测报告](reports/v1-m2a-multimodal-smoke.md)；同容器 PTS、真实后端 CPU 与 owner-only L40 证据见[同容器音轨初测报告](reports/v1-m2a-same-container-audio-smoke.md)；网络式输入到该入口的 E1 证据见[有界流采集报告](reports/v1-m1-bounded-stream-capture-smoke.md)，安全故障识别边界见[受控流故障矩阵报告](reports/v1-m1-stream-fault-matrix-smoke.md)。
 
 ## 9. 官方依据
 

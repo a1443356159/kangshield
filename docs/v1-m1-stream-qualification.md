@@ -1,6 +1,6 @@
 # V1-M1 重复开流资格门
 
-状态：Implemented E1 v0.1.0；C6c / RTSP E2 与故障网络矩阵仍 Open
+状态：Implemented E1 v0.1.0；受控故障 E1 已补，C6c / RTSP E2 仍 Open
 
 基准日期：2026-07-23
 
@@ -134,6 +134,6 @@ clean `c8bda16` 的三次 loopback HTTP 资格运行全部 ready，完整结果�
 
 1. 用 C6c 的真实 endpoint 执行短 E2 TCP 资格门；
 2. 分别记录有效鉴权、无权限、过期凭据和无音轨结果；
-3. 用受控代理或网络仿真执行 stall、断流、丢包、抖动与恢复矩阵；
+3. 复用已通过的[受控故障 E1 taxonomy](v1-m1-stream-fault-matrix.md)，以外部代理/网络仿真补 RTSP、packet loss、packet-level jitter 与恢复 E2；
 4. 执行至少 30～60 分钟长稳，不用三段短 clip 外推；
 5. 通过后再按 C01～C12、双同步事件和同意/留存规程采集 M2c 包。

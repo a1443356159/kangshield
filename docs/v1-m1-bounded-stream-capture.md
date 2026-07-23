@@ -160,6 +160,6 @@ E1 已完成 HTTP loopback、真实 PyAV remux、同容器探针和 L40 多模�
 
 1. 取得 C6c 的脱敏 RTSP/平台取流方式和麦克风音轨结论。
 2. 运行一次短 E2 采集并核对原始 artifact、轨道与凭据扫描。
-3. 加入开流失败、鉴权失败、短流、无音频、丢包/抖动、timeout 与断线重连实验。
+3. E1 先复用已通过的[受控故障矩阵](v1-m1-stream-fault-matrix.md)；真机再补鉴权失败、RTSP TCP/UDP、packet loss/jitter、timeout 与断线恢复 E2。
 4. 按 M2c C01～C12 规程采集，保留开始/结束两次可见可听同步事件，计算真实 offset/drift。
 5. 只有平台调用可重复且能力快照通过后，才单独申请 C6c E3。
