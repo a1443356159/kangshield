@@ -64,7 +64,7 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 | V1-M1 有界网络音视频流采集接缝 | `8cbd91f` / `5ce260e` | `origin/main` | 2026-07-23 已验证 | 环境端点、有界关键帧 codec-copy、owner-only Matroska、输出 timing gate、故障清理、HTTP E1 与 L40 job `1782`、REV-025；不代表 C6c RTSP、平台、重连或 drift 已验收 |
 | V1-M1 重复开流与格式稳定资格门 | `fea40f7` / `c8bda16` / `b192880` | `origin/main` | 2026-07-23 已验证 | 2～20 次独立 open、父/子 ledger、固定失败码、完整轨道签名、HTTP 3/3 ready 与 L40 job `1785`、REV-026；只关闭 scheduled reopen 工具门，不代表非自愿重连、弱网、长稳或 C6c 接入 |
 | V1-M1 受控流故障识别矩阵 | `4e637a1` / `73c8ca5` | `origin/main` | 2026-07-23 已验证 | 七个 loopback HTTP 行为、实际注入遥测、有界状态、0 unexpected ready、partial 清理与 REV-027；只关闭 E1 adapter safety gate，不代表 RTSP、packet loss、恢复、容忍、长稳或 C6c 接入 |
-| V1-M1 流会话 Supervisor 与受控恢复 | `6a68371` / `d9e9daa` | `origin/main` | 待本轮推送验证 | 独立 segment/raw、start/finish/gap/interruption ledger、30 分钟硬门、全健康 3/3 session 与同 endpoint ready→503→ready、REV-028；只关闭 E1 外部重开接缝，不代表同连接/非自愿断流恢复、长稳、RTSP/packet loss 或 C6c |
+| V1-M1 流会话 Supervisor 与受控恢复 | `6a68371` / `d9e9daa` | `origin/main` | 2026-07-23 已验证 | 独立 segment/raw、start/finish/gap/interruption ledger、30 分钟硬门、全健康 3/3 session 与同 endpoint ready→503→ready、REV-028；只关闭 E1 外部重开接缝，不代表同连接/非自愿断流恢复、长稳、RTSP/packet loss 或 C6c |
 
 这里的“推送验证”只证明代码已到达远端。V1-M1 的有界 HTTP 采集、重复开流资格、受控故障识别和 session supervisor/受控恢复已在 E1 关闭，但里程碑仍为 In progress；fixture 不能替代 C6c/SDNL1 E2/E3、RTSP/packet loss、同连接或非自愿断流恢复、30～60 分钟长稳。V1-M2a 和 V1-M2b 的 Done 只关闭设备无关 E1 链路及公开固定集评测，不会提升真实设备证据等级。V1-M3 的姿态、语音和睡眠字段三个 E1 切片均已验收，因此仅在 E1 探索范围标记 Done；M2c 已有采集规程、容器时间戳工具、采集包 readiness gate 和可复用的流接收工具，但仍没有真实 C6c 媒体或 SDNL1 字段证据。V1-R1 G4 的离线特征、首版候选状态机、公开压力与双标注/裁决/事件 scorer 也都只属于 E1，不能替代 C6c 正负视频、冻结策略的真实候选/事件指标、床上躺卧、多人 tracking 或跌倒风险/告警验收。
 
