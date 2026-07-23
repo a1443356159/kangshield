@@ -282,7 +282,7 @@ kangshield-info exercise-stream-recovery <local-av-fixture.mkv> \
 
 通用命令为每段独立 open/raw/child report 记录 start、finish、gap、状态、固定 failure code 和完整轨道签名；非 ready 后只由外部 supervisor 新开下一段，不跨段拼接媒体。连续 interruption 后的新 ready artifact 形成 recovery event。全段采集、声明 wall time 和组合 session gate 分开；只有声明值与实际值均至少 1,800,000 ms 才能打开 segmented-session 长稳字段。
 
-fixture-only 命令在同一 loopback endpoint 上固定执行 ready→HTTP 503→ready，并同时检查 request/body/rejection 遥测和 2→3 恢复事件。专用恢复 gate 通过时，通用 session gate 因中间失败仍为 false。同连接 reconnect、非自愿断流、RTSP/packet loss、C6c 和长稳不能由该短测推出。设计见[流会话 Supervisor](v1-m1-stream-session-supervisor.md)；clean E1 正式结果待记录。
+fixture-only 命令在同一 loopback endpoint 上固定执行 ready→HTTP 503→ready，并同时检查 request/body/rejection 遥测和 2→3 恢复事件。专用恢复 gate 通过时，通用 session gate 因中间失败仍为 false。同连接 reconnect、非自愿断流、RTSP/packet loss、C6c 和长稳不能由该短测推出。clean `6a68371` 已完成全健康 3/3 ready session 与 2 ready + 1 `open_failed` 的受控恢复，两条 gate 均按各自口径通过。设计与证据见[流会话 Supervisor](v1-m1-stream-session-supervisor.md)和[正式报告](reports/v1-m1-stream-session-supervisor-smoke.md)。
 
 ### 7.6 目标设备采集包就绪门
 

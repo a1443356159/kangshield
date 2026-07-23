@@ -1,6 +1,6 @@
 # V1-M1 流会话 Supervisor 与恢复账本
 
-状态：Implemented v0.1.0；clean E1 正式运行待记录，C6c E2 与 30～60 分钟长稳仍 Open
+状态：Implemented E1 v0.1.0；C6c E2、非自愿断流与 30～60 分钟长稳仍 Open
 
 基准日期：2026-07-23
 
@@ -163,4 +163,8 @@ runs/<session-run>/
 5. 执行至少 30～60 分钟 segmented session 长稳，并单独保留单连接连续性结论；
 6. 通过后才进入 C01～C12 与双同步事件采集。
 
-当前 fixture 恢复只关闭工程接缝，不提升 C6c 的设备证据等级。
+## 8. E1 结论
+
+clean `6a68371` 已完成两次正式运行：全健康 fixture session 为 3/3 ready、唯一轨道签名 1、`session_gate_ready=true`；同一 loopback HTTP endpoint 的 ready→503→ready 为 2 ready + 1 `open_failed`、1 条 2→3 recovery event、`controlled_supervisor_recovery_gate_ready=true`。完整时间、注入遥测、摘要与隐私审计见[正式 E1 报告](reports/v1-m1-stream-session-supervisor-smoke.md)。
+
+两次短 run 的 segmented/single-connection 长稳、same-connection reconnect、非自愿断流恢复、RTSP、packet loss、网络容忍和设备平台声明都保持 false。fixture 恢复只关闭工程接缝，不提升 C6c 的设备证据等级。

@@ -1444,3 +1444,59 @@
 2. C6c endpoint/token 是否允许代理转发和重复建连；鉴权过期场景由谁提供测试凭据？
 3. TCP/UDP 两种 RTSP transport 的 loss/delay/jitter 阈值和允许降级行为是什么？
 4. 非自愿断流后的 supervisor 是否总是新建 run；演示 UI 如何表达 gap、恢复尝试和失败？
+
+---
+
+## REV-028 V1-M1 流会话 Supervisor 与恢复账本 Review
+
+- 日期：2026-07-23
+- 状态：Accepted for E1 segmented-session supervisor tooling；C6c / involuntary disconnect / network impairment / long-run remains Open
+- 参与人：项目组、Codex
+- 评审范围：独立 segment artifact、start/finish/gap ledger、失败继续与 backoff、interruption streak、恢复事件、轨道签名、通用/专用 gate、受控 HTTP 503 注入、owner-only、隐私和长稳证据边界
+- 输入材料：[流会话 Supervisor 设计](v1-m1-stream-session-supervisor.md)、[正式 E1 报告](reports/v1-m1-stream-session-supervisor-smoke.md)、实现提交 `6a68371`、healthy run `20260723T011139Z-558b1b7b`、recovery run `20260723T011205Z-46d42c9b`
+
+### 发现
+
+1. REV-025～027 已有单次 capture、计划性 qualification 和故障识别，但无法在同一审计对象中表达“第几段失败、间断多久、何时重新取得独立可用媒体”。
+2. V1 不应在同一个 raw 内静默重连或拼接时间轴。最终 supervisor 在同一 run 下为每次 open 生成精确索引的独立 artifact/child report，failed segment 不引用 raw，父报告保留 gap。
+3. `StreamSessionReport` 会重算 segment index、start/finish/elapsed/gap、requested readiness、计数、轨道签名、独立路径、最长 interruption streak、recovery event 和三层 gate；路径、时间或 gate 防篡改已覆盖。
+4. clean healthy run 为 3/3 ready、唯一轨道签名 1、session elapsed 2118 ms，`all_segment_capture_gate_ready` / duration / session gate 均为 true；没有 interruption 时 recovery 字段保持 false。
+5. clean recovery run 在同一 loopback endpoint 实际观察 full 11,504,831 B / HTTP 503 rejection / full 11,504,831 B。segment 状态为 ready / `open_failed` / ready，100 ms 后重新 open，690 ms 后形成新 ready artifact。
+6. 专用恢复 gate 为 true 时，通用 all-segment/session gate 按设计保持 false。这样“恢复成功”不会覆盖中间失败，也不会让运行者误以为全程可用。
+7. `supervisor_reopen_recovery_observed` 只说明外部重开后得到新 artifact。HTTP 503 是受控拒绝，不是非自愿断流；same-connection reconnect、RTSP/packet loss 容忍和 C6c 都未验证。
+8. segmented-session 长稳必须同时声明并实际达到至少 1,800,000 ms，且全部 segment ready、签名一致。两次短 run 的 segmented/single-connection 长稳字段均为 false。
+
+### 决定
+
+1. 接受 `stream-session-v0.1.0` 作为多个有界 capture 的 E1 supervisor ledger，接受 `stream-recovery-exercise-v0.1.0` 作为真机恢复实验前的 fixture-only 状态机 gate。
+2. V1 固定“同一 run、多份独立 artifact”语义；禁止在同一 raw 内隐藏 reconnect、删除 gap 或跨段拼接。V2 若需要连续播放，UI 也必须显式显示缺口和 segment 边界。
+3. 通用 `session_gate_ready` 只接受全段 ready + 独立 artifact + 唯一完整轨道签名 + 声明 wall time；专用 controlled recovery gate 独立发布，二者不得互相替代。
+4. 30 分钟是 segmented-session 长稳的最小硬阈值，不代表 60 分钟或 single-connection 稳定性。操作者必须根据 segment duration/count 显式声明并实际达到目标。
+5. 真机恢复证据必须把外部代理/网络仿真的版本、配置、实际注入 receipt 与 session report 绑定；未知根因的普通失败后 ready 仍不得晋级为非自愿断流恢复。
+6. 设备平台、M2c bundle、RiskAssessment 和 Alert 不由 supervisor 打开；每个 ready/not-ready raw 继续执行同意、访问、留存和删除控制。
+
+### 验证
+
+- 自动化：clean `6a68371` 全量 170 passed；新增 6 项覆盖配置上限、健康/恢复实际运行、两条 CLI、owner-only、duration/long-run、时间/gap、注入、路径和 gate 防篡改。
+- 静态检查：`compileall`、全部 shell/sbatch `bash -n`、`pip check`、Markdown 相对链接、`git diff --check` 通过。
+- Healthy：completed、clean、0 issue；3 ready、0 interruption、1 unique signature、2118 ms；manifest/父报告 SHA-256 为 `4896a09a02f097dc4050546eca8781ef844ecd7cd85a95a1131243c6f61dc87c` / `a67f6819235b200ae75ff8af2c1f2d1c31e0b5213af842f7a3e0900ad59c1368`。
+- Recovery：completed、clean、0 issue；2 ready + 1 `open_failed`、3/3 injection exercised、1 recovery event、100 ms reopen、690 ms ready artifact；manifest/父报告 SHA-256 为 `4a165eb43a106d4f7cd4e2d2e21a6ee5ee0010a0165465a3fc91d2797acc3b00` / `986bb71ffa928f8f646c270c6aba6b5981f9905f94a6b1a987246ed2d701e59b`。
+- 两个 run 的目录/文件均为 `0700/0600`；failed segment 无 raw/child/partial。endpoint/端口、fixture 原名/路径、本地 home/用户名、环境变量、secret 和 Risk/Alert true 扫描 0 命中。
+
+### 行动项
+
+| 行动 | 负责人 | 截止日期 | 状态 |
+|---|---|---|---|
+| 实现 session/recovery 契约、runner、CLI、测试和正式 E1 | Codex | 2026-07-23 | Closed；`6a68371` / REV-028 |
+| 用 C6c 执行短时 3-segment E2，确认真实 endpoint、音轨、签名和外部重开 | 设备负责人 / 工程负责人 | 2026-07-29 | Blocked on endpoint/device access |
+| 冻结 RTSP-aware proxy/netem 工具、版本、注入 receipt 和故障阈值 | 工程负责人 / 产品负责人 | 2026-07-30 | Blocked on E2 stream and owner decision |
+| 注入鉴权过期、非自愿断流、packet loss/delay/jitter，并记录真实恢复时间 | 工程负责人 | 2026-07-31 | Blocked on preceding actions |
+| 执行至少 30～60 分钟 segmented-session 长稳并单列 single-connection 结论 | 工程负责人 | 2026-07-31 | Blocked on E2 stream |
+| 在演示 UI 明示 segment、gap、恢复中和最终失败，不把断点渲染为连续 | V2 前端 / 工程负责人 | 2026-08-12 | Open for V2-D1 |
+
+### 未决问题
+
+1. C6c 的可代理 endpoint 和鉴权刷新是否允许连续多次 open；平台限流或 token 刷新应由哪个组件拥有？
+2. 真机 non-ready streak 到几次后应停止重试并升级为人工处置；backoff 是否需要指数策略和 jitter？
+3. packet loss、delay、jitter、恢复时间和 30/60 分钟通过阈值由产品、设备还是工程 owner 最终签字？
+4. V2 是否需要把跨 segment 的姿态 track、ASR 上下文和融合窗口重置规则升级为独立协议版本？
