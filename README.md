@@ -24,6 +24,7 @@
 - [V1-M1 重复开流资格门 E1 报告](docs/reports/v1-m1-stream-qualification-smoke.md)
 - [V1-M1 受控流故障矩阵](docs/v1-m1-stream-fault-matrix.md)
 - [V1-M1 受控流故障矩阵 E1 报告](docs/reports/v1-m1-stream-fault-matrix-smoke.md)
+- [V1-M1 流会话 Supervisor 与恢复账本](docs/v1-m1-stream-session-supervisor.md)
 - [V1 视频与语言多模态 Pipeline](docs/v1-multimodal-pipeline.md)
 - [V1-M2a 多模态 Pipeline 初测报告](docs/reports/v1-m2a-multimodal-smoke.md)
 - [V1-M2a 同容器音轨 PTS 对齐初测报告](docs/reports/v1-m2a-same-container-audio-smoke.md)
@@ -133,6 +134,22 @@ kangshield-info exercise-stream-faults <local-av-fixture.mkv> \
 ```
 
 该命令实际执行完整响应、分块延迟、503、首包/部分 body stall、截断和 TCP reset，并要求实际注入遥测、预期状态与时限全部通过。它只验证安全故障识别，不证明 RTSP、packet loss、自动重连、网络容忍或长稳。见[故障矩阵设计](docs/v1-m1-stream-fault-matrix.md)。
+
+用多个独立 raw 组成可审计 session，并记录 gap、失败 streak 和外部重开恢复：
+
+```bash
+kangshield-info run-stream-session \
+  --evidence-level E2 \
+  --source-type network_stream \
+  --device-ref c6c_demo_01 \
+  --segment-count 3 \
+  --duration-s 10 \
+  --minimum-duration-s 8 \
+  --failure-backoff-s 1 \
+  --require-ready
+```
+
+真机前可执行 `kangshield-info exercise-stream-recovery <local-av-fixture.mkv> --require-ready`，在同一 loopback endpoint 验证 `ready → HTTP 503 → ready`。它证明的是 supervisor 新开独立 artifact，不是同连接 reconnect、RTSP/packet loss、C6c 或长稳；30 分钟声明还必须显式设置并实际达到 `--minimum-session-wall-s 1800`。见[Supervisor 设计](docs/v1-m1-stream-session-supervisor.md)。
 
 生成并验证确定性同容器音视频时间戳夹具：
 

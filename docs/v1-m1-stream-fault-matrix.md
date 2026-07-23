@@ -1,6 +1,6 @@
 # V1-M1 受控流故障矩阵
 
-状态：Implemented E1 v0.1.0；RTSP、packet loss、恢复与长稳仍 Open
+状态：Implemented E1 v0.1.0；受控 supervisor 恢复工具已实现，RTSP、packet loss、非自愿恢复与长稳仍 Open
 
 基准日期：2026-07-23
 
@@ -99,6 +99,6 @@ clean `4e637a1` 的正式七场景 E1 全部在界内执行且符合预期，完
 
 1. 取得同意和脱敏 endpoint 后完成单次短 E2 与三次 qualification；
 2. 在外部受控代理或 OS 网络仿真层执行同一场景 taxonomy，另加 RTSP TCP/UDP、鉴权过期和真实 packet loss；
-3. 明确 supervisor 是新建 run 还是协议化 session，不在同一 raw 中静默拼接；
-4. 单独执行 30～60 分钟长稳和恢复时间测量；
+3. 复用已实现的[流会话 Supervisor](v1-m1-stream-session-supervisor.md)：同一 run 下使用多个独立 artifact、记录 gap/recovery，不在同一 raw 中静默拼接；
+4. 先完成受控 ready→503→ready E1，再在真机代理下单独执行 30～60 分钟长稳和非自愿断流恢复时间测量；
 5. 通过后才进入 C01～C12、双同步事件和 M2c 包。

@@ -128,6 +128,25 @@ kangshield-info exercise-stream-faults <local-av-fixture.mkv> \
 
 必须逐 case 检查实际 body/delay/stall/reject/reset/early-close 遥测、elapsed、状态和固定 failure code，不能只看父 gate。该命令禁止使用真实 endpoint，只关闭 loopback HTTP 故障识别工具门；RTSP、鉴权、packet loss、恢复和长稳仍需独立 E2/E3 实验。成功 case 会新增 raw，继续受同意、留存和删除规则约束。完整契约见[受控流故障矩阵](v1-m1-stream-fault-matrix.md)。
 
+故障识别通过后，用显式 session ledger 组织多个独立 segment：
+
+```bash
+kangshield-info run-stream-session \
+  --evidence-level E2 \
+  --source-type network_stream \
+  --device-ref c6c_demo_01 \
+  --segment-count 3 \
+  --duration-s 10 \
+  --minimum-duration-s 8 \
+  --failure-backoff-s 1 \
+  --require-ready
+
+kangshield-info exercise-stream-recovery <local-av-fixture.mkv> \
+  --require-ready
+```
+
+逐段核对 status、gap、完整轨道签名、独立 raw 和 recovery event。受控恢复的固定结果是 ready/503-failed/ready：此时 `controlled_supervisor_recovery_gate_ready=true`，但通用 `session_gate_ready=false`，因为中间失败不能被“恢复成功”抵消。真实长稳必须显式设置 `--minimum-session-wall-s 1800` 并实际运行至少 30 分钟；短 session、HTTP 503 fixture、同连接 reconnect 和非自愿断流恢复是四种不同证据。完整契约见[流会话 Supervisor](v1-m1-stream-session-supervisor.md)。
+
 完整采集包在任何模型复测前运行：
 
 ```bash
@@ -383,6 +402,7 @@ kangshield-info assess-runtime-closure --require-ready
 29. Stream capture 是否只从环境读取端点、从视频关键帧起录、在 timeout/时长/packet 上限内 clean termination，并经输出 timing probe；raw/report 权限、最短跨度、唯一音视频轨和凭据扫描是否通过；是否把 E1 HTTP 或单次 E2 clip 误写成 C6c 平台、重连或 drift 证据。
 30. Stream qualification 是否为每次独立 open 保留 raw/child report，所有尝试均满足请求 readiness，轨道 codec/time-base/视频尺寸帧率/音频采样率声道是否一致；是否把 scheduled reopen 误写成非自愿断线恢复、长稳或网络损伤容忍。
 31. Stream fault matrix 是否严格执行七个固定场景并记录实际注入遥测、7/7 有界/符合预期、0 unexpected ready、失败无 partial；是否把 chunk delay 写成 packet jitter，或把 E1 安全识别写成 RTSP、packet loss、自动恢复、网络容忍或长稳。
+32. Stream session 是否为每段保留独立 raw/child report 和可重算 start/finish/gap，非 ready streak 与 recovery event 是否一致；是否把受控 HTTP 503 后的新 artifact 写成同连接重连/非自愿断流恢复，或在声明与实际均未达到 30 分钟时发布长稳。
 
 快速检查：
 

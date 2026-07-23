@@ -124,6 +124,32 @@ def build_parser() -> argparse.ArgumentParser:
     )
     stream_qualification.add_argument("--attempt-count", type=int, default=3)
 
+    stream_session = subparsers.add_parser(
+        "run-stream-session",
+        help=(
+            "Supervise independent bounded stream segments and record gaps and "
+            "external reopen recovery"
+        ),
+    )
+    _add_stream_capture_arguments(
+        stream_session,
+        ready_help=(
+            "Exit 2 after writing all reports unless every segment and the "
+            "declared session duration gate are ready"
+        ),
+    )
+    stream_session.add_argument("--segment-count", type=int, default=3)
+    stream_session.add_argument("--failure-backoff-s", type=float, default=1.0)
+    stream_session.add_argument(
+        "--minimum-session-wall-s",
+        type=float,
+        default=0.0,
+        help=(
+            "Minimum observed wall time for the session gate; long-run proof "
+            "also requires at least 1800 seconds"
+        ),
+    )
+
     stream_fault_matrix = subparsers.add_parser(
         "exercise-stream-faults",
         help=(
@@ -170,6 +196,37 @@ def build_parser() -> argparse.ArgumentParser:
         "--require-ready",
         action="store_true",
         help="Exit 2 after writing reports unless the fixed fault gate passes",
+    )
+
+    stream_recovery = subparsers.add_parser(
+        "exercise-stream-recovery",
+        help=(
+            "Run a fixed ready-HTTP503-ready supervisor recovery exercise on "
+            "one loopback endpoint"
+        ),
+    )
+    stream_recovery.add_argument("fixture", type=Path)
+    stream_recovery.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    stream_recovery.add_argument("--duration-s", type=float, default=2.0)
+    stream_recovery.add_argument(
+        "--minimum-duration-s", type=float, default=1.5
+    )
+    stream_recovery.add_argument("--open-timeout-s", type=float, default=1.0)
+    stream_recovery.add_argument("--read-timeout-s", type=float, default=1.0)
+    stream_recovery.add_argument("--max-packets", type=int, default=200_000)
+    stream_recovery.add_argument(
+        "--max-packets-per-stream", type=int, default=200_000
+    )
+    stream_recovery.add_argument(
+        "--failure-backoff-s", type=float, default=0.1
+    )
+    stream_recovery.add_argument(
+        "--require-ready",
+        action="store_true",
+        help=(
+            "Exit 2 after writing reports unless the controlled supervisor "
+            "recovery gate passes"
+        ),
     )
 
     media = subparsers.add_parser(
@@ -912,6 +969,16 @@ def _stream_run_configuration(
     }
     if command == "qualify-stream":
         configuration["attempt_count"] = args.attempt_count
+    if command == "run-stream-session":
+        configuration.update(
+            {
+                "segment_count": args.segment_count,
+                "failure_backoff_s": args.failure_backoff_s,
+                "minimum_session_wall_s": args.minimum_session_wall_s,
+                "long_run_threshold_s": 1800,
+                "cross_segment_media_concatenated": False,
+            }
+        )
     return configuration
 
 
@@ -1065,6 +1132,91 @@ def _qualify_stream_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_stream_session_command(args: argparse.Namespace) -> int:
+    from .stream_capture import endpoint_from_environment
+    from .stream_session import StreamSessionConfig, run_stream_session
+
+    endpoint = endpoint_from_environment(args.endpoint_env)
+    capture_config = _stream_capture_config(args)
+    configuration = _stream_run_configuration(
+        args,
+        command="run-stream-session",
+    )
+    with RunArtifacts(
+        args.runs_dir,
+        stage="v1-stream-session",
+        evidence_level=args.evidence_level,
+        configuration=configuration,
+    ) as run:
+        with run.step("run-stream-session") as step:
+            result = run_stream_session(
+                endpoint=endpoint,
+                artifacts_dir=run.artifacts_dir,
+                endpoint_supplied_via_environment=True,
+                evidence_level=args.evidence_level,
+                source_type=args.source_type,
+                device_ref=args.device_ref,
+                elder_ref=args.elder_ref,
+                config=StreamSessionConfig(
+                    segment_count=args.segment_count,
+                    failure_backoff_s=args.failure_backoff_s,
+                    minimum_session_wall_s=args.minimum_session_wall_s,
+                    capture=capture_config,
+                ),
+            )
+            capture_iterator = iter(result.capture_reports)
+            for segment in result.report.segments:
+                if segment.status == "failed":
+                    continue
+                capture = next(capture_iterator)
+                run.record_asset(capture.media_probe.asset)
+                run.record_observation(capture.media_probe.observation)
+                if segment.output_artifact not in run.manifest.artifacts:
+                    run.manifest.artifacts.append(segment.output_artifact)
+                    run.save_manifest()
+                capture_report_path = run.write_report(
+                    Path(segment.capture_report_artifact).name,
+                    capture,
+                )
+                step.outputs.extend(
+                    [segment.output_artifact, run.relative(capture_report_path)]
+                )
+            parent_path = run.write_report("stream-session.json", result.report)
+            step.outputs.append(run.relative(parent_path))
+    report = result.report
+    _print_result(
+        run,
+        {
+            "endpoint_scheme": report.endpoint_scheme,
+            "segment_count": report.segment_count,
+            "session_elapsed_ms": report.session_elapsed_ms,
+            "ready_segment_count": report.ready_segment_count,
+            "not_ready_segment_count": report.not_ready_segment_count,
+            "failed_segment_count": report.failed_segment_count,
+            "longest_interruption_streak": report.longest_interruption_streak,
+            "recovery_event_count": len(report.recovery_events),
+            "supervisor_reopen_attempted": report.supervisor_reopen_attempted,
+            "supervisor_reopen_recovery_observed": (
+                report.supervisor_reopen_recovery_observed
+            ),
+            "all_segment_capture_gate_ready": (
+                report.all_segment_capture_gate_ready
+            ),
+            "session_duration_gate_ready": report.session_duration_gate_ready,
+            "session_gate_ready": report.session_gate_ready,
+            "segmented_session_long_running_stability_proven": (
+                report.segmented_session_long_running_stability_proven
+            ),
+            "device_platform_integration_proven": (
+                report.device_platform_integration_proven
+            ),
+        },
+    )
+    if args.require_ready and not report.session_gate_ready:
+        return 2
+    return 0
+
+
 def _exercise_stream_faults_command(args: argparse.Namespace) -> int:
     from .contracts import STREAM_FAULT_SCENARIO_ORDER
     from .privacy import sha256_file
@@ -1194,6 +1346,127 @@ def _exercise_stream_faults_command(args: argparse.Namespace) -> int:
         },
     )
     if args.require_ready and not result.report.fault_detection_gate_ready:
+        return 2
+    return 0
+
+
+def _exercise_stream_recovery_command(args: argparse.Namespace) -> int:
+    from .privacy import sha256_file
+    from .stream_capture import StreamCaptureConfig
+    from .stream_session import (
+        StreamRecoveryExerciseConfig,
+        StreamSessionConfig,
+        exercise_stream_recovery,
+    )
+
+    if not args.fixture.is_file():
+        raise FileNotFoundError(args.fixture)
+    fixture_sha256 = sha256_file(args.fixture)
+    fixture_byte_size = args.fixture.stat().st_size
+    capture_config = StreamCaptureConfig(
+        duration_s=args.duration_s,
+        minimum_duration_s=args.minimum_duration_s,
+        open_timeout_s=args.open_timeout_s,
+        read_timeout_s=args.read_timeout_s,
+        max_packets=args.max_packets,
+        packet_scan_limit_per_stream=args.max_packets_per_stream,
+        transport="auto",
+        require_audio=True,
+    )
+    exercise_config = StreamRecoveryExerciseConfig(
+        session=StreamSessionConfig(
+            segment_count=3,
+            failure_backoff_s=args.failure_backoff_s,
+            minimum_session_wall_s=0.0,
+            capture=capture_config,
+        )
+    )
+    configuration = {
+        "command": "exercise-stream-recovery",
+        "source_type": SourceType.FIXTURE.value,
+        "evidence_level": EvidenceLevel.E1.value,
+        "fixture_path_persisted": False,
+        "fixture_sha256": fixture_sha256,
+        "fixture_byte_size": fixture_byte_size,
+        "profile": "ready_http_503_ready",
+        "endpoint_loopback_only": True,
+        "endpoint_value_persisted": False,
+        "endpoint_port_persisted": False,
+        "endpoint_log_messages_persisted": False,
+        "duration_s": args.duration_s,
+        "minimum_duration_s": args.minimum_duration_s,
+        "open_timeout_s": args.open_timeout_s,
+        "read_timeout_s": args.read_timeout_s,
+        "max_packets": args.max_packets,
+        "max_packets_per_stream": args.max_packets_per_stream,
+        "failure_backoff_s": args.failure_backoff_s,
+        "cross_segment_media_concatenated": False,
+        "packet_loss_injected": False,
+        "rtsp_transport_tested": False,
+    }
+    with RunArtifacts(
+        args.runs_dir,
+        stage="v1-stream-recovery-exercise",
+        evidence_level=EvidenceLevel.E1,
+        configuration=configuration,
+    ) as run:
+        with run.step("exercise-stream-recovery") as step:
+            result = exercise_stream_recovery(
+                fixture_path=args.fixture,
+                artifacts_dir=run.artifacts_dir,
+                config=exercise_config,
+            )
+            capture_iterator = iter(result.capture_reports)
+            for segment in result.report.session.segments:
+                if segment.status == "failed":
+                    continue
+                capture = next(capture_iterator)
+                run.record_asset(capture.media_probe.asset)
+                run.record_observation(capture.media_probe.observation)
+                if segment.output_artifact not in run.manifest.artifacts:
+                    run.manifest.artifacts.append(segment.output_artifact)
+                    run.save_manifest()
+                capture_report_path = run.write_report(
+                    Path(segment.capture_report_artifact).name,
+                    capture,
+                )
+                step.outputs.extend(
+                    [segment.output_artifact, run.relative(capture_report_path)]
+                )
+            parent_path = run.write_report(
+                "stream-recovery-exercise.json",
+                result.report,
+            )
+            step.outputs.append(run.relative(parent_path))
+    report = result.report
+    session = report.session
+    _print_result(
+        run,
+        {
+            "profile": report.profile,
+            "all_injections_exercised": report.all_injections_exercised,
+            "ready_segment_count": session.ready_segment_count,
+            "failed_segment_count": session.failed_segment_count,
+            "recovery_event_count": len(session.recovery_events),
+            "supervisor_reopen_attempted": session.supervisor_reopen_attempted,
+            "supervisor_reopen_recovery_observed": (
+                session.supervisor_reopen_recovery_observed
+            ),
+            "controlled_supervisor_recovery_gate_ready": (
+                report.controlled_supervisor_recovery_gate_ready
+            ),
+            "same_connection_reconnect_proven": (
+                report.same_connection_reconnect_proven
+            ),
+            "involuntary_disconnect_recovery_proven": (
+                report.involuntary_disconnect_recovery_proven
+            ),
+            "long_running_stability_proven": (
+                report.long_running_stability_proven
+            ),
+        },
+    )
+    if args.require_ready and not report.controlled_supervisor_recovery_gate_ready:
         return 2
     return 0
 
@@ -2273,8 +2546,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _capture_stream_command(args)
     if args.command == "qualify-stream":
         return _qualify_stream_command(args)
+    if args.command == "run-stream-session":
+        return _run_stream_session_command(args)
     if args.command == "exercise-stream-faults":
         return _exercise_stream_faults_command(args)
+    if args.command == "exercise-stream-recovery":
+        return _exercise_stream_recovery_command(args)
     if args.command == "probe-media":
         return _probe_media_command(args)
     if args.command == "assess-m2c-capture":

@@ -32,7 +32,7 @@ from .stream_capture import (
 
 
 STREAM_FAULT_MATRIX_VERSION = "stream-fault-matrix-v0.1.0"
-_Behavior = Literal[
+ControlledHTTPBehavior = Literal[
     "full",
     "jitter",
     "reject",
@@ -123,7 +123,7 @@ class _FaultTelemetry:
 @dataclass(frozen=True)
 class _ScenarioSpec:
     name: StreamFaultScenarioName
-    behavior: _Behavior
+    behavior: ControlledHTTPBehavior
     expected_status: StreamFaultExpectedStatus
 
 
@@ -155,7 +155,7 @@ class _FaultHTTPServer(ThreadingHTTPServer):
     def __init__(
         self,
         source_path: Path,
-        behavior: _Behavior,
+        behavior: ControlledHTTPBehavior,
         *,
         body_byte_limit: int | None,
         stall_duration_s: float,
@@ -192,6 +192,10 @@ class _FaultHTTPServer(ThreadingHTTPServer):
     def telemetry(self) -> _FaultTelemetry:
         with self._telemetry_lock:
             return _FaultTelemetry(**self._telemetry)
+
+    def set_behavior(self, behavior: ControlledHTTPBehavior) -> None:
+        # Session exercises call this only between completed capture attempts.
+        self.behavior = behavior
 
 
 class _FaultRequestHandler(BaseHTTPRequestHandler):
@@ -301,22 +305,25 @@ class _FaultRequestHandler(BaseHTTPRequestHandler):
 
 
 @dataclass(frozen=True)
-class _FaultEndpoint:
+class ControlledHTTPStreamEndpoint:
     url: str
     server: _FaultHTTPServer
 
     def telemetry(self) -> _FaultTelemetry:
         return self.server.telemetry()
 
+    def set_behavior(self, behavior: ControlledHTTPBehavior) -> None:
+        self.server.set_behavior(behavior)
+
 
 @contextmanager
-def _fault_http_endpoint(
+def controlled_http_stream_endpoint(
     source_path: Path,
-    behavior: _Behavior,
+    behavior: ControlledHTTPBehavior,
     *,
     body_byte_limit: int | None,
     config: StreamFaultMatrixConfig,
-) -> Iterator[_FaultEndpoint]:
+) -> Iterator[ControlledHTTPStreamEndpoint]:
     server = _FaultHTTPServer(
         source_path,
         behavior,
@@ -335,7 +342,7 @@ def _fault_http_endpoint(
     )
     thread.start()
     try:
-        yield _FaultEndpoint(
+        yield ControlledHTTPStreamEndpoint(
             url=f"http://127.0.0.1:{server.server_port}/fixture.mkv",
             server=server,
         )
@@ -443,7 +450,7 @@ def exercise_stream_fault_matrix(
             source_size=fixture_size,
             prefix_byte_limit=config.prefix_byte_limit,
         )
-        with _fault_http_endpoint(
+        with controlled_http_stream_endpoint(
             fixture_path,
             spec.behavior,
             body_byte_limit=body_byte_limit,

@@ -2029,6 +2029,430 @@ class StreamQualificationReport(ContractModel):
         return self
 
 
+StreamSessionFailureCode = Literal[
+    "open_failed",
+    "remux_failed",
+    "video_track_layout_invalid",
+    "audio_track_layout_invalid",
+    "required_audio_track_missing",
+    "packet_timestamp_missing",
+    "video_keyframe_missing",
+    "video_packets_missing",
+    "audio_packets_missing",
+    "media_artifact_missing",
+    "output_verification_failed",
+    "stream_capture_failed",
+]
+
+
+class StreamSessionSegment(ContractModel):
+    """One independently opened and independently persisted session segment."""
+
+    segment_index: int = Field(ge=1)
+    status: Literal["captured_ready", "captured_not_ready", "failed"]
+    started_offset_ms: int = Field(ge=0)
+    finished_offset_ms: int = Field(ge=0)
+    elapsed_ms: int = Field(ge=0)
+    gap_before_ms: int = Field(ge=0)
+    failure_code: StreamSessionFailureCode | None = None
+    output_artifact: str | None = None
+    capture_report_artifact: str | None = None
+    captured_media_span_ms: int | None = Field(default=None, ge=0)
+    termination_reason: Literal[
+        "duration_limit",
+        "end_of_stream",
+        "packet_limit",
+        "wall_time_limit",
+    ] | None = None
+    capture_artifact_ready: bool = False
+    same_container_multimodal_ready: bool = False
+    track_signature: list[StreamQualificationTrackSignature] = Field(
+        default_factory=list
+    )
+    audio_minus_video_start_ms: float | None = None
+
+    @model_validator(mode="after")
+    def validate_segment_state(self):
+        if self.finished_offset_ms < self.started_offset_ms:
+            raise ValueError("session segment finishes before it starts")
+        if self.elapsed_ms != self.finished_offset_ms - self.started_offset_ms:
+            raise ValueError("session segment elapsed time is inconsistent")
+        artifact_fields = (
+            self.output_artifact,
+            self.capture_report_artifact,
+            self.captured_media_span_ms,
+            self.termination_reason,
+        )
+        if self.status == "failed":
+            if not self.failure_code:
+                raise ValueError("failed session segment requires failure_code")
+            if any(value is not None for value in artifact_fields):
+                raise ValueError("failed session segment cannot reference artifacts")
+            if (
+                self.capture_artifact_ready
+                or self.same_container_multimodal_ready
+                or self.track_signature
+                or self.audio_minus_video_start_ms is not None
+            ):
+                raise ValueError("failed session segment cannot publish capture facts")
+            return self
+
+        if self.failure_code is not None:
+            raise ValueError("captured session segment cannot include failure_code")
+        if any(value is None for value in artifact_fields):
+            raise ValueError("captured session segment requires artifact facts")
+        output_path = PurePosixPath(self.output_artifact)
+        report_path = PurePosixPath(self.capture_report_artifact)
+        if (
+            output_path.is_absolute()
+            or len(output_path.parts) != 2
+            or output_path.parts[0] != "artifacts"
+            or output_path.suffix != ".mkv"
+            or any(part in {"", ".", ".."} for part in output_path.parts)
+            or "\\" in self.output_artifact
+        ):
+            raise ValueError("session output artifact must be artifacts/*.mkv")
+        if (
+            report_path.is_absolute()
+            or len(report_path.parts) != 2
+            or report_path.parts[0] != "reports"
+            or report_path.suffix != ".json"
+            or any(part in {"", ".", ".."} for part in report_path.parts)
+            or "\\" in self.capture_report_artifact
+        ):
+            raise ValueError("session capture report must be reports/*.json")
+        if self.capture_artifact_ready and not self.track_signature:
+            raise ValueError("ready session artifact requires track signature")
+        return self
+
+
+class StreamSessionRecoveryEvent(ContractModel):
+    """A contiguous unready streak followed by a new ready artifact."""
+
+    interruption_start_segment_index: int = Field(ge=1)
+    interruption_end_segment_index: int = Field(ge=1)
+    recovered_segment_index: int = Field(ge=2)
+    interrupted_segment_count: int = Field(ge=1)
+    reopen_delay_ms: int = Field(ge=0)
+    interruption_to_ready_artifact_ms: int = Field(ge=0)
+
+
+class StreamSessionReport(ContractModel):
+    """Auditable ledger for a sequence of independent bounded stream opens."""
+
+    schema_version: str = "1.0"
+    session_version: str
+    evidence_level: EvidenceLevel
+    source_type: SourceType
+    endpoint_scheme: Literal["rtsp", "rtsps", "http", "https", "file", "local"]
+    endpoint_supplied_via_environment: bool = False
+    endpoint_value_persisted: Literal[False] = False
+    endpoint_digest_persisted: Literal[False] = False
+    endpoint_variable_persisted: Literal[False] = False
+    endpoint_log_messages_persisted: Literal[False] = False
+    transport: Literal["auto", "tcp", "udp"]
+    segment_count: int = Field(ge=2, le=1000)
+    requested_duration_ms_per_segment: int = Field(gt=0)
+    minimum_duration_ms_per_segment: int = Field(gt=0)
+    open_timeout_ms: int = Field(gt=0)
+    read_timeout_ms: int = Field(gt=0)
+    audio_required: bool
+    failure_backoff_ms: int = Field(ge=0)
+    minimum_session_wall_ms: int = Field(ge=0)
+    long_run_threshold_ms: Literal[1800000] = 1_800_000
+    session_elapsed_ms: int = Field(ge=0)
+    segments: list[StreamSessionSegment] = Field(default_factory=list)
+    recovery_events: list[StreamSessionRecoveryEvent] = Field(default_factory=list)
+    captured_segment_count: int = Field(ge=0)
+    ready_segment_count: int = Field(ge=0)
+    not_ready_segment_count: int = Field(ge=0)
+    failed_segment_count: int = Field(ge=0)
+    longest_interruption_streak: int = Field(ge=0)
+    unique_track_signature_count: int = Field(ge=0)
+    track_signatures_consistent: bool
+    independent_segment_artifacts_proven: bool
+    supervisor_reopen_attempted: bool
+    supervisor_reopen_recovery_observed: bool
+    all_segment_capture_gate_ready: bool
+    session_duration_gate_ready: bool
+    session_gate_ready: bool
+    segmented_session_long_running_stability_proven: bool
+    same_raw_reconnect_attempted: Literal[False] = False
+    cross_segment_media_concatenated: Literal[False] = False
+    involuntary_disconnect_recovery_proven: Literal[False] = False
+    single_connection_long_running_stability_proven: Literal[False] = False
+    network_impairment_tolerance_proven: Literal[False] = False
+    device_platform_integration_proven: Literal[False] = False
+    m2c_capture_bundle_ready: Literal[False] = False
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_session_ledger(self):
+        if len(self.segments) != self.segment_count:
+            raise ValueError("session segment list must match segment_count")
+        if [item.segment_index for item in self.segments] != list(
+            range(1, self.segment_count + 1)
+        ):
+            raise ValueError("session segment indexes must be contiguous")
+        if self.minimum_duration_ms_per_segment > self.requested_duration_ms_per_segment:
+            raise ValueError("session minimum duration exceeds request")
+        previous_finished = 0
+        for item in self.segments:
+            expected_gap = item.started_offset_ms - previous_finished
+            if expected_gap < 0 or item.gap_before_ms != expected_gap:
+                raise ValueError("session segment gap ledger is inconsistent")
+            if item.status != "failed" and (
+                item.output_artifact
+                != f"artifacts/stream-session-{item.segment_index:03d}.mkv"
+                or item.capture_report_artifact
+                != f"reports/stream-session-{item.segment_index:03d}.json"
+            ):
+                raise ValueError("session segment artifact names are inconsistent")
+            if item.status != "failed":
+                requested_ready = (
+                    item.same_container_multimodal_ready
+                    if self.audio_required
+                    else item.capture_artifact_ready
+                )
+                if (item.status == "captured_ready") is not requested_ready:
+                    raise ValueError("session segment status must match requested readiness")
+            previous_finished = item.finished_offset_ms
+        if self.session_elapsed_ms != self.segments[-1].finished_offset_ms:
+            raise ValueError("session elapsed time must close at the final segment")
+
+        captured = sum(item.status != "failed" for item in self.segments)
+        ready = sum(item.status == "captured_ready" for item in self.segments)
+        not_ready = sum(
+            item.status == "captured_not_ready" for item in self.segments
+        )
+        failed = sum(item.status == "failed" for item in self.segments)
+        if (
+            self.captured_segment_count != captured
+            or self.ready_segment_count != ready
+            or self.not_ready_segment_count != not_ready
+            or self.failed_segment_count != failed
+            or captured != ready + not_ready
+        ):
+            raise ValueError("session segment counts are inconsistent")
+
+        signature_keys = {
+            tuple(
+                tuple(sorted(track.model_dump(mode="json").items()))
+                for track in item.track_signature
+            )
+            for item in self.segments
+            if item.track_signature
+        }
+        if self.unique_track_signature_count != len(signature_keys):
+            raise ValueError("session unique track signature count is inconsistent")
+        expected_consistency = bool(
+            captured > 0
+            and sum(bool(item.track_signature) for item in self.segments)
+            == captured
+            and len(signature_keys) == 1
+        )
+        if self.track_signatures_consistent is not expected_consistency:
+            raise ValueError("session track signature consistency is inconsistent")
+
+        captured_paths = [
+            item.output_artifact for item in self.segments if item.output_artifact
+        ]
+        independent = bool(
+            captured > 0 and len(captured_paths) == len(set(captured_paths))
+        )
+        if self.independent_segment_artifacts_proven is not independent:
+            raise ValueError("independent session artifact result is inconsistent")
+
+        expected_events: list[dict[str, int]] = []
+        streak_start: int | None = None
+        streak_end: int | None = None
+        longest_streak = 0
+        for item in self.segments:
+            if item.status != "captured_ready":
+                if streak_start is None:
+                    streak_start = item.segment_index
+                streak_end = item.segment_index
+                longest_streak = max(
+                    longest_streak,
+                    streak_end - streak_start + 1,
+                )
+                continue
+            if streak_start is None or streak_end is None:
+                continue
+            first_interrupted = self.segments[streak_start - 1]
+            last_interrupted = self.segments[streak_end - 1]
+            expected_events.append(
+                {
+                    "interruption_start_segment_index": streak_start,
+                    "interruption_end_segment_index": streak_end,
+                    "recovered_segment_index": item.segment_index,
+                    "interrupted_segment_count": streak_end - streak_start + 1,
+                    "reopen_delay_ms": (
+                        item.started_offset_ms - last_interrupted.finished_offset_ms
+                    ),
+                    "interruption_to_ready_artifact_ms": (
+                        item.finished_offset_ms - first_interrupted.finished_offset_ms
+                    ),
+                }
+            )
+            streak_start = None
+            streak_end = None
+        if self.longest_interruption_streak != longest_streak:
+            raise ValueError("session interruption streak is inconsistent")
+        actual_events = [
+            item.model_dump(mode="json") for item in self.recovery_events
+        ]
+        if actual_events != expected_events:
+            raise ValueError("session recovery event ledger is inconsistent")
+        reopen_attempted = any(
+            item.status != "captured_ready" and item.segment_index < self.segment_count
+            for item in self.segments
+        )
+        recovery_observed = bool(expected_events)
+        if self.supervisor_reopen_attempted is not reopen_attempted:
+            raise ValueError("supervisor reopen attempt result is inconsistent")
+        if self.supervisor_reopen_recovery_observed is not recovery_observed:
+            raise ValueError("supervisor recovery observation is inconsistent")
+
+        all_capture_ready = bool(
+            ready == self.segment_count
+            and not_ready == 0
+            and failed == 0
+            and independent
+            and expected_consistency
+            and len(signature_keys) == 1
+        )
+        duration_ready = self.session_elapsed_ms >= self.minimum_session_wall_ms
+        session_ready = all_capture_ready and duration_ready
+        long_running = bool(
+            session_ready
+            and self.minimum_session_wall_ms >= self.long_run_threshold_ms
+            and self.session_elapsed_ms >= self.long_run_threshold_ms
+        )
+        if self.all_segment_capture_gate_ready is not all_capture_ready:
+            raise ValueError("all-segment capture gate is inconsistent")
+        if self.session_duration_gate_ready is not duration_ready:
+            raise ValueError("session duration gate is inconsistent")
+        if self.session_gate_ready is not session_ready:
+            raise ValueError("session gate is inconsistent")
+        if self.segmented_session_long_running_stability_proven is not long_running:
+            raise ValueError("segmented long-running stability result is inconsistent")
+        return self
+
+
+StreamRecoveryBehavior = Literal["full", "reject"]
+
+
+class StreamRecoveryInjectionResult(ContractModel):
+    segment_index: int = Field(ge=1)
+    behavior: StreamRecoveryBehavior
+    request_count: int = Field(ge=0)
+    body_bytes_sent: int = Field(ge=0)
+    body_chunk_count: int = Field(ge=0)
+    rejection_event_count: int = Field(ge=0)
+    scenario_exercised: bool
+
+    @model_validator(mode="after")
+    def validate_recovery_injection(self):
+        if (self.body_bytes_sent > 0) is not (self.body_chunk_count > 0):
+            raise ValueError("recovery injection body telemetry is inconsistent")
+        exercised = bool(
+            self.request_count > 0
+            and (
+                (
+                    self.behavior == "full"
+                    and self.body_bytes_sent > 0
+                    and self.rejection_event_count == 0
+                )
+                or (
+                    self.behavior == "reject"
+                    and self.body_bytes_sent == 0
+                    and self.rejection_event_count > 0
+                )
+            )
+        )
+        if self.scenario_exercised is not exercised:
+            raise ValueError("recovery injection execution telemetry is inconsistent")
+        return self
+
+
+class StreamRecoveryExerciseReport(ContractModel):
+    """Fixture-only proof that the external supervisor reopens after rejection."""
+
+    schema_version: str = "1.0"
+    exercise_version: str
+    evidence_level: Literal[EvidenceLevel.E1] = EvidenceLevel.E1
+    source_type: Literal[SourceType.FIXTURE] = SourceType.FIXTURE
+    fixture_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    fixture_byte_size: int = Field(gt=0)
+    fixture_path_persisted: Literal[False] = False
+    endpoint_scheme: Literal["http"] = "http"
+    endpoint_loopback_only: Literal[True] = True
+    endpoint_value_persisted: Literal[False] = False
+    endpoint_port_persisted: Literal[False] = False
+    endpoint_log_messages_persisted: Literal[False] = False
+    profile: Literal["ready_http_503_ready"] = "ready_http_503_ready"
+    injections: list[StreamRecoveryInjectionResult] = Field(default_factory=list)
+    all_injections_exercised: bool
+    session: StreamSessionReport
+    controlled_supervisor_recovery_gate_ready: bool
+    packet_loss_injected: Literal[False] = False
+    rtsp_transport_tested: Literal[False] = False
+    same_connection_reconnect_proven: Literal[False] = False
+    involuntary_disconnect_recovery_proven: Literal[False] = False
+    network_impairment_tolerance_proven: Literal[False] = False
+    long_running_stability_proven: Literal[False] = False
+    device_platform_integration_proven: Literal[False] = False
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_recovery_exercise(self):
+        expected_behaviors = ("full", "reject", "full")
+        if len(self.injections) != 3:
+            raise ValueError("recovery exercise requires three injections")
+        if [item.segment_index for item in self.injections] != [1, 2, 3]:
+            raise ValueError("recovery injection indexes must be contiguous")
+        if tuple(item.behavior for item in self.injections) != expected_behaviors:
+            raise ValueError("recovery exercise behavior order is inconsistent")
+        all_exercised = all(item.scenario_exercised for item in self.injections)
+        if self.all_injections_exercised is not all_exercised:
+            raise ValueError("recovery injection aggregate is inconsistent")
+        session = self.session
+        expected_session = bool(
+            session.evidence_level == EvidenceLevel.E1
+            and session.source_type == SourceType.FIXTURE
+            and session.endpoint_scheme == "http"
+            and not session.endpoint_supplied_via_environment
+            and session.transport == "auto"
+            and session.segment_count == 3
+            and [item.status for item in session.segments]
+            == ["captured_ready", "failed", "captured_ready"]
+            and session.segments[1].failure_code == "open_failed"
+            and session.ready_segment_count == 2
+            and session.failed_segment_count == 1
+            and session.not_ready_segment_count == 0
+            and session.unique_track_signature_count == 1
+            and session.track_signatures_consistent
+            and session.independent_segment_artifacts_proven
+            and session.supervisor_reopen_attempted
+            and session.supervisor_reopen_recovery_observed
+            and len(session.recovery_events) == 1
+            and session.recovery_events[0].interruption_start_segment_index == 2
+            and session.recovery_events[0].interruption_end_segment_index == 2
+            and session.recovery_events[0].recovered_segment_index == 3
+            and not session.all_segment_capture_gate_ready
+            and not session.session_gate_ready
+        )
+        gate = all_exercised and expected_session
+        if self.controlled_supervisor_recovery_gate_ready is not gate:
+            raise ValueError("controlled supervisor recovery gate is inconsistent")
+        return self
+
+
 StreamFaultScenarioName = Literal[
     "healthy_control",
     "chunk_delay_jitter",

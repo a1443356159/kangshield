@@ -267,7 +267,24 @@ kangshield-info exercise-stream-faults <local-av-fixture.mkv> \
 
 只有 7/7 场景实际执行、7/7 有界、7/7 符合预期且 0 unexpected ready 时，`fault_detection_gate_ready=true`。失败不留 partial；成功或 not-ready case 才可引用 owner-only raw/child report。clean `4e637a1` 的正式 E1 已通过，但 packet loss、RTSP、reconnect、网络容忍、长稳、平台和 M2c 声明保持 false。设计与证据见[受控流故障矩阵](v1-m1-stream-fault-matrix.md)和[正式报告](reports/v1-m1-stream-fault-matrix-smoke.md)。
 
-### 7.5 目标设备采集包就绪门
+### 7.5 流会话 Supervisor
+
+```text
+kangshield-info run-stream-session \
+  --endpoint-env KANG_STREAM_ENDPOINT \
+  --segment-count 3 \
+  --failure-backoff-s 1 \
+  --require-ready
+
+kangshield-info exercise-stream-recovery <local-av-fixture.mkv> \
+  --require-ready
+```
+
+通用命令为每段独立 open/raw/child report 记录 start、finish、gap、状态、固定 failure code 和完整轨道签名；非 ready 后只由外部 supervisor 新开下一段，不跨段拼接媒体。连续 interruption 后的新 ready artifact 形成 recovery event。全段采集、声明 wall time 和组合 session gate 分开；只有声明值与实际值均至少 1,800,000 ms 才能打开 segmented-session 长稳字段。
+
+fixture-only 命令在同一 loopback endpoint 上固定执行 ready→HTTP 503→ready，并同时检查 request/body/rejection 遥测和 2→3 恢复事件。专用恢复 gate 通过时，通用 session gate 因中间失败仍为 false。同连接 reconnect、非自愿断流、RTSP/packet loss、C6c 和长稳不能由该短测推出。设计见[流会话 Supervisor](v1-m1-stream-session-supervisor.md)；clean E1 正式结果待记录。
+
+### 7.6 目标设备采集包就绪门
 
 ```text
 kangshield-info assess-m2c-capture <capture-manifest.json> \
@@ -278,7 +295,7 @@ kangshield-info assess-m2c-capture <capture-manifest.json> \
 
 E1 fixture、template、synthetic 或顶层 fixture marker 永远不能打开真机门。真实集至少需要 8 个核心结构可用 clip 和一个双事件音频 clip；完整 Review 还要求 C01～C10 与一份真实 SDNL1 导出。设计与 E1 结果见[采集包就绪门](v1-m2c-capture-readiness-gate.md)和[初测报告](reports/v1-m2c-capture-readiness-smoke.md)。
 
-### 7.6 睡眠导出字段发现
+### 7.7 睡眠导出字段发现
 
 命令目标：
 
@@ -303,7 +320,7 @@ kangshield-info assess-sleep-route <json-or-csv> \
 
 它用绑定《监测方案》摘要的 policy 将字段分成 direct-if-exposed、multi-night derived 和 not-assumed，并逐项检查 evidence、source path、单位、时间、值域及缺失语义。route report 不包含值；`ready_for_adapter` 也只授权后续单字段 adapter，不能解释为设备已验收或指标准确。
 
-### 7.7 萤石 SDK/API 快照分析
+### 7.8 萤石 SDK/API 快照分析
 
 命令目标：
 
@@ -328,7 +345,7 @@ kangshield-info inspect-ezviz <sanitized-json> --evidence-level E1|E2|E3
 
 后续获得确认过的接口文档后，再实现 LiveTransport；不让不确定接口固化到核心契约。
 
-### 7.8 视频 + 语言多模态回放
+### 7.9 视频 + 语言多模态回放
 
 ```text
 kangshield-info run-multimodal <video> <pcm-wav>
@@ -341,7 +358,7 @@ kangshield-info run-multimodal <av-container> --audio-from-video
 
 实现、命令、模型决策和限制见 [V1 视频与语言多模态 Pipeline](v1-multimodal-pipeline.md)，正偏移真实后端证据见[同容器音轨初测报告](reports/v1-m2a-same-container-audio-smoke.md)。
 
-### 7.9 公开数据固定集评测
+### 7.10 公开数据固定集评测
 
 ```text
 kangshield-info benchmark-dataset <benchmark-cases.json>
@@ -349,7 +366,7 @@ kangshield-info benchmark-dataset <benchmark-cases.json>
 
 V1-M2b 使用固定 SHA-256 的 URFD/FLEURS 子集验证多样本处理。每个 case 独立运行姿态、跟踪、VAD/ASR 和窗口 Pipeline，再按 URFD 帧阶段标签统计视频覆盖率、按 FLEURS 参考转写统计 corpus CER。两路数据不是自然同步录制，融合窗口只有工程验证含义，结果固定为 E1。数据来源、许可证、准备过程和完整指标口径见 [V1-M2b 数据集评测设计](v1-m2b-public-dataset-benchmark.md)。
 
-### 7.10 跌倒运动特征离线评测
+### 7.11 跌倒运动特征离线评测
 
 ```text
 kangshield-info benchmark-fall-features \
@@ -406,7 +423,7 @@ kangshield-info assemble-event-evaluation-bundle \
 
 组装器不修改标签/候选，不复制原媒体，也不覆盖目录；它在 `0700` staging 中以 `0600` 复制敏感 JSON，生成相对路径/大小/摘要引用，调用同一 evaluator preflight 后才原子 rename。正式可评审状态仍由 evaluator gates 决定。设计见 [G4 Event Bundle 组装](v1-g4-event-bundle-assembly.md)。
 
-### 7.11 比赛提交分发就绪门
+### 7.12 比赛提交分发就绪门
 
 ```text
 kangshield-info assess-distribution-readiness \
@@ -419,7 +436,7 @@ kangshield-info assess-distribution-readiness \
 
 普通审计在正确产出 blocked 报告时返回成功；Release Candidate 使用 `--require-ready`，报告落盘后仍未就绪则返回 `2`。policy 和 repository root 的本地路径不写入 manifest，owner-only `0700/0600` 规则不变。该门禁固定 `legal_advice_provided=false`，项目许可证、最终权重和打包方式必须由具名 owner 决定。设计与基线分别见[分发就绪门设计](v1-r1-distribution-readiness.md)和[正式 E1 报告](reports/v1-r1-distribution-readiness.md)。
 
-### 7.12 候选 Runtime 依赖闭包门
+### 7.13 候选 Runtime 依赖闭包门
 
 ```text
 kangshield-info assess-runtime-closure \
@@ -520,6 +537,7 @@ V1-R1 已完成 E1 决策收敛和可执行分发门禁：YOLO26n 为 V1 对照�
 - capture-stream 可从有界 HTTP/RTSP 输入生成 owner-only Matroska，经关键帧、最短时长、termination 与 timing gate 后再交给同容器 Pipeline；E1 HTTP 接缝已通过。
 - qualify-stream 可执行多次独立 open、保存每次受控 raw/report，并对请求 readiness 和完整音视频轨道签名 fail closed；E1 HTTP 重复开流已通过，但断线/长稳/损伤声明保持 false。
 - exercise-stream-faults 可实际注入七个 loopback HTTP 行为并用 server 遥测证明执行，父 gate 检查有界返回、预期状态和 0 unexpected ready；E1 通过不提升 RTSP、packet loss、恢复或长稳证据。
+- run-stream-session 可为独立 segment 生成 gap/interruption/recovery ledger，并把全段采集、wall time 和 30 分钟 segmented-session 长稳分门；exercise-stream-recovery 可验证受控 503 后外部重开，但不证明同连接或非自愿断流恢复。
 - profile-sleep 可发现任意 JSON/CSV 字段且不泄露敏感值。
 - inspect-ezviz 可分析脱敏 Fixture/导出并保留证据等级。
 - 自动化测试覆盖契约、运行产物、三条命令和脱敏。

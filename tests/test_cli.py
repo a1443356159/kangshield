@@ -108,6 +108,20 @@ def test_stream_qualification_parser_freezes_independent_reopen_defaults():
     assert args.require_ready is False
 
 
+def test_stream_session_parser_freezes_supervisor_and_long_run_defaults():
+    args = build_parser().parse_args(["run-stream-session"])
+    assert args.command == "run-stream-session"
+    assert args.endpoint_env == "KANG_STREAM_ENDPOINT"
+    assert args.source_type.value == "network_stream"
+    assert args.evidence_level.value == "E1"
+    assert args.segment_count == 3
+    assert args.failure_backoff_s == 1.0
+    assert args.minimum_session_wall_s == 0.0
+    assert args.duration_s == 10.0
+    assert args.allow_video_only is False
+    assert args.require_ready is False
+
+
 def test_stream_fault_matrix_parser_freezes_controlled_http_defaults():
     args = build_parser().parse_args(
         ["exercise-stream-faults", "fixture.mkv"]
@@ -123,6 +137,20 @@ def test_stream_fault_matrix_parser_freezes_controlled_http_defaults():
     assert args.jitter_chunk_bytes == 256 * 1024
     assert args.jitter_delay_min_ms == 5.0
     assert args.jitter_delay_max_ms == 20.0
+    assert args.require_ready is False
+
+
+def test_stream_recovery_parser_freezes_ready_reject_ready_defaults():
+    args = build_parser().parse_args(
+        ["exercise-stream-recovery", "fixture.mkv"]
+    )
+    assert args.command == "exercise-stream-recovery"
+    assert args.fixture.name == "fixture.mkv"
+    assert args.duration_s == 2.0
+    assert args.minimum_duration_s == 1.5
+    assert args.open_timeout_s == 1.0
+    assert args.read_timeout_s == 1.0
+    assert args.failure_backoff_s == 0.1
     assert args.require_ready is False
 
 

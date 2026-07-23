@@ -20,6 +20,8 @@ from kangshield.information.contracts import (
     SourceType,
     StreamFaultMatrixReport,
     StreamQualificationReport,
+    StreamRecoveryExerciseReport,
+    StreamSessionReport,
 )
 from kangshield.information.multimodal_pipeline import (
     MultimodalPipelineConfig,
@@ -37,6 +39,12 @@ from kangshield.information.stream_fault_matrix import (
 from kangshield.information.stream_qualification import (
     StreamQualificationConfig,
     qualify_stream,
+)
+from kangshield.information.stream_session import (
+    StreamRecoveryExerciseConfig,
+    StreamSessionConfig,
+    exercise_stream_recovery,
+    run_stream_session,
 )
 
 
@@ -724,6 +732,336 @@ def test_qualify_stream_cli_writes_parent_child_reports_and_ledgers(
     for path in run_dir.rglob("*"):
         expected = 0o700 if path.is_dir() else 0o600
         assert stat.S_IMODE(path.stat().st_mode) == expected
+
+
+def _fast_stream_session_config(
+    *,
+    minimum_session_wall_s: float = 0.0,
+) -> StreamSessionConfig:
+    return StreamSessionConfig(
+        segment_count=3,
+        failure_backoff_s=0.01,
+        minimum_session_wall_s=minimum_session_wall_s,
+        capture=StreamCaptureConfig(
+            duration_s=0.8,
+            minimum_duration_s=0.5,
+            open_timeout_s=0.25,
+            read_timeout_s=0.25,
+        ),
+    )
+
+
+def test_stream_session_rejects_unbounded_or_non_recovery_configuration():
+    with pytest.raises(ValueError, match="segment_count"):
+        StreamSessionConfig(segment_count=1)
+    with pytest.raises(ValueError, match="failure_backoff_s"):
+        StreamSessionConfig(failure_backoff_s=float("inf"))
+    with pytest.raises(ValueError, match="seven days"):
+        StreamSessionConfig(minimum_session_wall_s=8 * 24 * 3600)
+    with pytest.raises(ValueError, match="exactly three segments"):
+        StreamRecoveryExerciseConfig(
+            session=StreamSessionConfig(segment_count=2)
+        )
+    with pytest.raises(ValueError, match="requires the audio track"):
+        StreamRecoveryExerciseConfig(
+            session=StreamSessionConfig(
+                segment_count=3,
+                capture=StreamCaptureConfig(require_audio=False),
+            )
+        )
+
+
+def test_stream_session_records_independent_segments_without_false_long_run(
+    tmp_path,
+):
+    source = tmp_path / "private-session-source.mkv"
+    artifacts = tmp_path / "artifacts"
+    artifacts.mkdir(mode=0o700)
+    secret_metadata = "session-private-metadata"
+    _write_av_container(source, seconds=2, metadata_value=secret_metadata)
+
+    with _http_endpoint(tmp_path, source.name) as endpoint:
+        result = run_stream_session(
+            endpoint=endpoint,
+            artifacts_dir=artifacts,
+            evidence_level=EvidenceLevel.E1,
+            source_type=SourceType.FIXTURE,
+            config=_fast_stream_session_config(),
+        )
+
+    report = result.report
+    serialized = report.model_dump_json()
+    assert report.segment_count == 3
+    assert report.ready_segment_count == 3
+    assert report.not_ready_segment_count == 0
+    assert report.failed_segment_count == 0
+    assert report.longest_interruption_streak == 0
+    assert report.unique_track_signature_count == 1
+    assert report.track_signatures_consistent is True
+    assert report.independent_segment_artifacts_proven is True
+    assert report.supervisor_reopen_attempted is False
+    assert report.supervisor_reopen_recovery_observed is False
+    assert report.recovery_events == []
+    assert report.all_segment_capture_gate_ready is True
+    assert report.session_duration_gate_ready is True
+    assert report.session_gate_ready is True
+    assert report.segmented_session_long_running_stability_proven is False
+    assert report.same_raw_reconnect_attempted is False
+    assert report.cross_segment_media_concatenated is False
+    assert report.involuntary_disconnect_recovery_proven is False
+    assert report.single_connection_long_running_stability_proven is False
+    assert report.network_impairment_tolerance_proven is False
+    assert report.device_platform_integration_proven is False
+    assert len(result.capture_reports) == 3
+    assert endpoint not in serialized
+    assert source.name not in serialized
+    assert secret_metadata not in serialized
+    for index, segment in enumerate(report.segments, start=1):
+        assert segment.segment_index == index
+        assert segment.status == "captured_ready"
+        assert segment.output_artifact == (
+            f"artifacts/stream-session-{index:03d}.mkv"
+        )
+        assert segment.capture_report_artifact == (
+            f"reports/stream-session-{index:03d}.json"
+        )
+        assert segment.elapsed_ms == (
+            segment.finished_offset_ms - segment.started_offset_ms
+        )
+        artifact = artifacts / f"stream-session-{index:03d}.mkv"
+        assert artifact.is_file()
+        assert stat.S_IMODE(artifact.stat().st_mode) == 0o600
+
+    false_gate = report.model_dump(mode="json")
+    false_gate["session_gate_ready"] = False
+    with pytest.raises(ValidationError, match="session gate is inconsistent"):
+        StreamSessionReport.model_validate(false_gate)
+
+    false_long_run = report.model_dump(mode="json")
+    false_long_run["segmented_session_long_running_stability_proven"] = True
+    with pytest.raises(ValidationError, match="long-running stability"):
+        StreamSessionReport.model_validate(false_long_run)
+
+    duration_blocked = report.model_dump(mode="json")
+    duration_blocked["minimum_session_wall_ms"] = report.session_elapsed_ms + 1
+    duration_blocked["session_duration_gate_ready"] = False
+    duration_blocked["session_gate_ready"] = False
+    blocked_report = StreamSessionReport.model_validate(duration_blocked)
+    assert blocked_report.all_segment_capture_gate_ready is True
+    assert blocked_report.session_duration_gate_ready is False
+    assert blocked_report.session_gate_ready is False
+    assert blocked_report.segmented_session_long_running_stability_proven is False
+
+    wrong_gap = report.model_dump(mode="json")
+    wrong_gap["segments"][1]["gap_before_ms"] += 1
+    with pytest.raises(ValidationError, match="gap ledger"):
+        StreamSessionReport.model_validate(wrong_gap)
+
+
+def test_stream_recovery_exercise_observes_external_reopen_after_http_503(
+    tmp_path,
+):
+    source = tmp_path / "private-recovery-source.mkv"
+    artifacts = tmp_path / "artifacts"
+    artifacts.mkdir(mode=0o700)
+    _write_av_container(source, seconds=2, metadata_value="recovery-secret")
+
+    result = exercise_stream_recovery(
+        fixture_path=source,
+        artifacts_dir=artifacts,
+        config=StreamRecoveryExerciseConfig(
+            session=_fast_stream_session_config()
+        ),
+    )
+
+    report = result.report
+    session = report.session
+    serialized = report.model_dump_json()
+    assert [item.behavior for item in report.injections] == [
+        "full",
+        "reject",
+        "full",
+    ]
+    assert all(item.scenario_exercised for item in report.injections)
+    assert report.injections[0].body_bytes_sent > 0
+    assert report.injections[1].rejection_event_count > 0
+    assert report.injections[1].body_bytes_sent == 0
+    assert report.injections[2].body_bytes_sent > 0
+    assert report.all_injections_exercised is True
+    assert [item.status for item in session.segments] == [
+        "captured_ready",
+        "failed",
+        "captured_ready",
+    ]
+    assert session.segments[1].failure_code == "open_failed"
+    assert session.ready_segment_count == 2
+    assert session.failed_segment_count == 1
+    assert session.longest_interruption_streak == 1
+    assert session.independent_segment_artifacts_proven is True
+    assert session.supervisor_reopen_attempted is True
+    assert session.supervisor_reopen_recovery_observed is True
+    assert len(session.recovery_events) == 1
+    recovery = session.recovery_events[0]
+    assert recovery.interruption_start_segment_index == 2
+    assert recovery.interruption_end_segment_index == 2
+    assert recovery.recovered_segment_index == 3
+    assert recovery.interrupted_segment_count == 1
+    assert recovery.reopen_delay_ms >= 0
+    assert recovery.interruption_to_ready_artifact_ms >= recovery.reopen_delay_ms
+    assert session.all_segment_capture_gate_ready is False
+    assert session.session_duration_gate_ready is True
+    assert session.session_gate_ready is False
+    assert report.controlled_supervisor_recovery_gate_ready is True
+    assert report.same_connection_reconnect_proven is False
+    assert report.involuntary_disconnect_recovery_proven is False
+    assert report.network_impairment_tolerance_proven is False
+    assert report.long_running_stability_proven is False
+    assert report.device_platform_integration_proven is False
+    assert len(result.capture_reports) == 2
+    assert source.name not in serialized
+    assert str(source) not in serialized
+    assert "127.0.0.1" not in serialized
+    assert (artifacts / "stream-session-001.mkv").is_file()
+    assert not (artifacts / "stream-session-002.mkv").exists()
+    assert (artifacts / "stream-session-003.mkv").is_file()
+
+    false_gate = report.model_dump(mode="json")
+    false_gate["controlled_supervisor_recovery_gate_ready"] = False
+    with pytest.raises(ValidationError, match="recovery gate is inconsistent"):
+        StreamRecoveryExerciseReport.model_validate(false_gate)
+
+    false_injection = report.model_dump(mode="json")
+    false_injection["injections"][1]["rejection_event_count"] = 0
+    with pytest.raises(ValidationError, match="execution telemetry"):
+        StreamRecoveryExerciseReport.model_validate(false_injection)
+
+
+def test_stream_session_and_recovery_cli_write_private_ledgers(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    source = tmp_path / "private-cli-session-source.mkv"
+    _write_av_container(source, seconds=2)
+    monkeypatch.setenv("PRIVATE_SESSION_ENDPOINT", str(source))
+
+    session_exit = main(
+        [
+            "run-stream-session",
+            "--endpoint-env",
+            "PRIVATE_SESSION_ENDPOINT",
+            "--source-type",
+            "fixture",
+            "--segment-count",
+            "2",
+            "--duration-s",
+            "0.8",
+            "--minimum-duration-s",
+            "0.5",
+            "--failure-backoff-s",
+            "0.01",
+            "--runs-dir",
+            str(tmp_path / "session-runs"),
+            "--require-ready",
+        ]
+    )
+    session_output = json.loads(capsys.readouterr().out)
+    session_run = Path(session_output["run_dir"])
+    session_manifest = json.loads(
+        (session_run / "manifest.json").read_text(encoding="utf-8")
+    )
+    session_parent = json.loads(
+        (session_run / "reports" / "stream-session.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert session_exit == 0
+    assert session_output["ready_segment_count"] == 2
+    assert session_output["session_gate_ready"] is True
+    assert session_output[
+        "segmented_session_long_running_stability_proven"
+    ] is False
+    assert session_manifest["status"] == "completed"
+    assert session_manifest["configuration"]["segment_count"] == 2
+    assert session_manifest["configuration"]["long_run_threshold_s"] == 1800
+    assert session_parent["independent_segment_artifacts_proven"] is True
+    assert session_parent["cross_segment_media_concatenated"] is False
+    assert "PRIVATE_SESSION_ENDPOINT" not in json.dumps(session_manifest)
+    assert str(source) not in json.dumps(session_manifest)
+    assert set(session_manifest["artifacts"]) == {
+        "artifacts/stream-session-001.mkv",
+        "artifacts/stream-session-002.mkv",
+        "reports/stream-session-001.json",
+        "reports/stream-session-002.json",
+        "reports/stream-session.json",
+    }
+
+    recovery_exit = main(
+        [
+            "exercise-stream-recovery",
+            str(source),
+            "--runs-dir",
+            str(tmp_path / "recovery-runs"),
+            "--duration-s",
+            "0.8",
+            "--minimum-duration-s",
+            "0.5",
+            "--open-timeout-s",
+            "0.25",
+            "--read-timeout-s",
+            "0.25",
+            "--failure-backoff-s",
+            "0.01",
+            "--require-ready",
+        ]
+    )
+    recovery_output = json.loads(capsys.readouterr().out)
+    recovery_run = Path(recovery_output["run_dir"])
+    recovery_manifest = json.loads(
+        (recovery_run / "manifest.json").read_text(encoding="utf-8")
+    )
+    recovery_parent = json.loads(
+        (
+            recovery_run / "reports" / "stream-recovery-exercise.json"
+        ).read_text(encoding="utf-8")
+    )
+
+    assert recovery_exit == 0
+    assert recovery_output["all_injections_exercised"] is True
+    assert recovery_output["ready_segment_count"] == 2
+    assert recovery_output["failed_segment_count"] == 1
+    assert recovery_output["supervisor_reopen_recovery_observed"] is True
+    assert recovery_output[
+        "controlled_supervisor_recovery_gate_ready"
+    ] is True
+    assert recovery_output["same_connection_reconnect_proven"] is False
+    assert recovery_output["long_running_stability_proven"] is False
+    assert recovery_manifest["status"] == "completed"
+    assert recovery_manifest["configuration"]["fixture_path_persisted"] is False
+    assert recovery_manifest["configuration"]["profile"] == (
+        "ready_http_503_ready"
+    )
+    assert recovery_parent["controlled_supervisor_recovery_gate_ready"] is True
+    assert str(source) not in json.dumps(recovery_manifest)
+    assert source.name not in json.dumps(recovery_manifest)
+    assert set(recovery_manifest["artifacts"]) == {
+        "artifacts/stream-session-001.mkv",
+        "artifacts/stream-session-003.mkv",
+        "reports/stream-session-001.json",
+        "reports/stream-session-003.json",
+        "reports/stream-recovery-exercise.json",
+    }
+    for run_dir in (session_run, recovery_run):
+        run_text = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in run_dir.rglob("*.json*")
+        )
+        assert str(source) not in run_text
+        assert "127.0.0.1" not in run_text
+        for path in run_dir.rglob("*"):
+            expected = 0o700 if path.is_dir() else 0o600
+            assert stat.S_IMODE(path.stat().st_mode) == expected
 
 
 def _fast_fault_matrix_config() -> StreamFaultMatrixConfig:

@@ -40,7 +40,7 @@ class StreamQualificationResult:
     capture_reports: tuple[StreamCaptureReport, ...]
 
 
-def _track_signature(
+def stream_track_signature(
     report: StreamCaptureReport,
 ) -> list[StreamQualificationTrackSignature]:
     timing = report.media_probe.container_timing
@@ -95,7 +95,7 @@ def _track_signature(
     ]
 
 
-def _signature_key(
+def stream_signature_key(
     signature: list[StreamQualificationTrackSignature],
 ) -> tuple[tuple[tuple[str, object], ...], ...]:
     return tuple(
@@ -161,9 +161,9 @@ def qualify_stream(
             )
             continue
 
-        signature = _track_signature(capture)
+        signature = stream_track_signature(capture)
         if signature:
-            signature_keys.add(_signature_key(signature))
+            signature_keys.add(stream_signature_key(signature))
         requested_ready = (
             capture.same_container_multimodal_ready
             if config.capture.require_audio

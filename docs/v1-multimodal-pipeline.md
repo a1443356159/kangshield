@@ -36,6 +36,7 @@ flowchart LR
 - 当前是离线回放，不把结果写成直播时延。
 - `capture-stream` 可把一个 RTSP/HTTP(S) 输入在 timeout/时长/packet 上限内，从首个视频关键帧开始 remux 为同容器 artifact；endpoint 不落盘。它仍是“先采集、后推理”的两阶段链路，不是连续实时推理服务。
 - `qualify-stream` 在正式样本采集前重复上述独立连接并检查完整轨道签名；每个合格 artifact 都可单独进入本 Pipeline，但 qualification 不执行模型，也不把多个 clip 合并成连续推理。
+- `run-stream-session` 再将多个独立有界 capture 组织为 segment/gap/recovery ledger；Pipeline 仍逐个消费选中的 ready artifact，不跨 gap 合并 FeatureEvent 时间轴。30 分钟 segmented-session gate 只验证采集 supervisor，不证明单连接实时推理连续性。
 - 单个起点偏移不能估计时钟漂移；真实 G2 仍需两次跨模态同步事件。
 
 ## 2. V1 基线模型
@@ -218,6 +219,8 @@ unset KANG_STREAM_ENDPOINT
 真机批量采集前，先把同一 endpoint 交给 `qualify-stream --attempt-count 3 --require-ready`。只有父 gate 和选中 child 的独立 timing gate 都通过，才将该 child artifact 交给本 Pipeline；仍不得由三次短开流推断长期实时推理容量。
 
 `exercise-stream-faults` 使用本地 fixture 复核输入层在 503、stall、截断和 reset 下不会产出意外 ready；它不直接调用本 Pipeline，也不使用真机 endpoint。该 gate 通过只授权后续受控 E2 故障实验，不证明实时推理在弱网下连续、自动恢复或保持延迟。
+
+`exercise-stream-recovery` 在同一 loopback endpoint 上以 ready→503→ready 检查外部 supervisor 会生成新的独立 artifact 和恢复事件。该 fixture 不自动把恢复后的 segment 送入本 Pipeline；即使专用恢复 gate 通过，也不能推断跨 gap 的姿态 track、ASR 上下文或融合窗口连续。
 
 提交 Slurm：
 
