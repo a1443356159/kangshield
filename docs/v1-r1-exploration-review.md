@@ -60,7 +60,7 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 | R1-D16 | 有界网络音视频流采集接缝 | Adopt as E1 adapter seam | `8cbd91f` 以环境端点、首视频关键帧、timeout/时长/packet 上限和 owner-only 原子 Matroska 完成 loopback HTTP E1；job `1782` 用同一 artifact SHA-256 完成真实姿态/语言 Pipeline | C6c 必须另做 RTSP/鉴权/音轨、长稳/重连、丢包抖动与双同步事件 E2/E3；单次 clip 不代表平台接入 |
 | R1-D17 | 重复开流资格门 | Adopt as E1 pre-capture gate | `fea40f7` / `c8bda16` 将多次独立 open、固定失败码、父/子 ledger 和 codec/time-base/视频尺寸帧率/音频采样率声道签名冻结；3/3 HTTP E1 ready | C6c 短 E2 可复用，但 scheduled reopen 不代表非自愿断线恢复、长稳或网络损伤容忍；每个 raw 仍受同意/留存约束 |
 | R1-D18 | 受控流故障识别矩阵 | Adopt as E1 adapter safety gate | `4e637a1` 固定完整/分块延迟/503/双 stall/截断/reset 七场景、实际 server 遥测、有界状态和严格父 gate；7/7 E1 执行且 0 unexpected ready | 只证明 loopback HTTP 安全识别；RTSP、packet loss、packet-level jitter、恢复、容忍、长稳和 C6c 都须另做 E2/E3 |
-| R1-D19 | 流会话 Supervisor 与受控恢复 | Adopt as E1 segmented-session seam | `6a68371` 冻结独立 segment/raw、start/finish/gap/interruption/recovery ledger、通用/专用 gate 和 30 分钟硬门；全健康 3/3 与同 endpoint ready→503→ready 均按各自口径通过 | 受控 HTTP 503 后的新 artifact 不是 same-connection reconnect 或非自愿断流恢复；RTSP/packet loss、网络容忍、C6c 和 30～60 分钟实际长稳仍须 E2 |
+| R1-D19 | 流会话 Supervisor 与受控恢复 | Adopt as E1 segmented-session seam | `6a68371` 冻结独立 segment/raw、start/finish/gap/interruption/recovery ledger；`ab1f366` 再将 30 分钟硬门升级为 wall / ready media 双声明、双观测，短健康/恢复 run 均按各自口径通过 | 受控 HTTP 503 后的新 artifact 不是 same-connection reconnect 或非自愿断流恢复；契约正反例也不是实际长稳；RTSP/packet loss、网络容忍、C6c 和 30～60 分钟实际运行仍须 E2 |
 
 ## 4. 模型与提取器决策账本
 
@@ -129,7 +129,7 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 | 有界流采集 adapter | 环境端点、首视频关键帧、open/read timeout、时长/packet 上限、owner-only 原子 Matroska、输出 timing probe 与失败清理 | R1-D16 / REV-025 |
 | 重复开流资格 gate | 多次独立 raw/child report、固定失败码、完整音视频轨道签名、严格计数/路径/readiness 父 gate；断线/长稳/损伤声明分离 | R1-D17 / REV-026 |
 | 受控流故障识别 gate | 七个固定 loopback HTTP 行为、实际 request/body/delay/stall/reject/reset/early-close 遥测、有界状态、0 unexpected ready 与失败 partial 清理 | R1-D18 / REV-027 |
-| 分段 session / 外部重开 gate | 独立 raw/child report、start/finish/gap/interruption/recovery ledger、全段/时长/组合 gate、30 分钟硬门，以及同 endpoint full/503/full 实际遥测 | R1-D19 / REV-028 |
+| 分段 session / 外部重开 gate | 独立 raw/child report、start/finish/gap/interruption/recovery ledger、全段/wall/ready-media/组合 gate、30 分钟双时长硬门，以及同 endpoint full/503/full 实际遥测 | R1-D19 / REV-028/029 |
 | 姿态候选配置 | 5 fps、RTMPose detector conf 0.05；Keypoint R-CNN conf 0.5 / resize 800～1333；COCO-17 与分数语义分开记录 | REV-006 / REV-013 |
 | 跌倒运动特征契约 | box-only、关键点质量门、同 track 历史、fallback reason、无风险/告警硬约束；单一横卧框或 gate-passed torso-horizontal 均不得直接告警；静态 person detection 结果不得冒充事件指标 | REV-011 / REV-012 / REV-013 / REV-015 |
 | 跌倒候选生成契约 | transition 600 ms + 近期下降、settled 1200 ms + low-motion、gap/track reset、release 600 ms、refractory 3000 ms；label-blind，精确窗口只进 derived-sensitive FeatureEvent | REV-017 |
@@ -153,7 +153,7 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 
 ## 9. 不等待真机的下一开发顺序
 
-1. `[E1 tools done，REV-010/014/021/025/026/027/028]` 使用 PyAV 实现有界 HTTP/RTSP 接收、重复独立开流/格式 gate、故障识别、分段 session/gap/recovery ledger、容器时间基和同容器音轨到 VAD/ASR 的 PTS adapter，并把采集包、双事件与 held-out 冻结成可执行门；下一步按“单次 C6c 短 E2 → 三次 qualification → 短 session → 外部注入故障/恢复 → 30～60 分钟长稳 → C01～C12”执行，不把 E1 HTTP、scheduled reopen 或受控 503 后的新 artifact 当平台/same-connection/非自愿断流恢复结论。
+1. `[E1 tools done，REV-010/014/021/025/026/027/028/029]` 使用 PyAV 实现有界 HTTP/RTSP 接收、重复独立开流/格式 gate、故障识别、分段 session/gap/recovery ledger、wall/ready-media 双时长长稳门、容器时间基和同容器音轨到 VAD/ASR 的 PTS adapter，并把采集包、双事件与 held-out 冻结成可执行门；下一步按“单次 C6c 短 E2 → 三次 qualification → 短 session → 外部注入故障/恢复 → 30～60 分钟长稳 → C01～C12”执行，不把 E1 HTTP、scheduled reopen、契约构造或受控 503 后的新 artifact 当平台/same-connection/非自愿断流/实际长稳结论。
 2. `[E1 tools done，REV-011/012/015/016/017]` 已实现仅离线输出的跌倒特征层、首版 label-blind candidate episode、CAUCAFall/Open Images 压力支路，以及双标注/裁决/事件 scorer；保持不输出 RiskAssessment 或 Alert。
 3. 当前下一步是按 REV-014 采集 C01～C12；空场、家具遮挡、床上躺卧和安全模拟跌倒已进入标签契约，宠物移动和真实多人 tracking 作为扩展视频负样本继续 Open。C6c 首轮必须原样使用 REV-017 policy，再复用 REV-016 口径生成事件指标。
 4. `[E1 comparison done，REV-013]` 已评测非 Human-Art 的 Keypoint R-CNN；因 lying gate 4/21 和权重分发仍 Open，只保留 fallback。下一步不再横向增加 checkpoint，而是进入 C6c held-out 与自有训练路线判断。

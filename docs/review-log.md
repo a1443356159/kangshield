@@ -1500,3 +1500,55 @@
 2. 真机 non-ready streak 到几次后应停止重试并升级为人工处置；backoff 是否需要指数策略和 jitter？
 3. packet loss、delay、jitter、恢复时间和 30/60 分钟通过阈值由产品、设备还是工程 owner 最终签字？
 4. V2 是否需要把跨 segment 的姿态 track、ASR 上下文和融合窗口重置规则升级为独立协议版本？
+
+---
+
+## REV-029 V1-M1 Stream Session 媒体时长门加固 Review
+
+- 日期：2026-07-30
+- 状态：Accepted for E1 long-run gate semantics；actual 30～60 minute run / C6c remains Open
+- 参与人：项目组、Codex
+- 评审范围：v0.1 长稳假阳性、累计 ready media 重算、wall/media 双 gate、组合 session gate、30 分钟契约正反例、恢复兼容性、owner-only、隐私和设备证据边界
+- 输入材料：[Supervisor 设计](v1-m1-stream-session-supervisor.md)、[媒体时长门加固 E1 报告](reports/v1-m1-stream-session-media-duration-gate-smoke.md)、实现提交 `ab1f366`、healthy run `20260730T072716Z-fb419398`、recovery run `20260730T072946Z-5d163ce2`
+
+### 发现
+
+1. v0.1 只要求声明/实际 wall time 达到 1,800,000 ms；open、stall、gap 或 backoff 理论上可能撑大 wall，而有效 ready 媒体不足，存在 long-run 假阳性。
+2. v0.2 增加独立 `minimum_ready_media_ms`、可重算 `ready_media_span_ms` 和 `session_media_duration_gate_ready`。failed / captured-not-ready segment 不贡献 ready 媒体。
+3. 父契约从 segment ledger 重算 ready media；手工放大父汇总会被拒绝。通用 session gate 现在要求 all-segment、wall duration 与 media duration 三门同时通过。
+4. long-run 只有在 wall / ready media 的声明值和实际值分别达到 1,800,000 ms 时成立。测试中 wall 达标但媒体不足必须为 false；四项都达标的相干构造才为 true。
+5. 上述 30 分钟正反例是契约测试，不是实际 30 分钟运行。`segmented_session_long_running_stability_proven` 在两个正式短 run 中均保持 false。
+6. clean healthy run 显式声明 ready media 下限 1,500 ms，三段各 850 ms，父级重算 2,550 ms；media/session gate 均为 true。
+7. clean recovery run 为 ready / `open_failed` / ready，父级重算 ready media 1,700 ms；专用恢复 gate true，通用 session gate 因中间失败保持 false。
+8. 第一次 loopback 预检被环境 socket 权限拒绝，形成 failed/0-artifact ledger；解除环境限制后的 completed clean run 才进入正式证据。
+
+### 决定
+
+1. 接受 `stream-session-v0.2.0` 和 `stream-recovery-exercise-v0.2.0` 作为后续 E2 的最低 session 契约，v0.1 不再用于新长稳结论。
+2. E2 长稳命令必须显式设置 `--minimum-session-wall-s` 与 `--minimum-ready-media-s`；30 分钟门要求两者声明值和两项实际值分别不少于 1,800 秒。
+3. `session_duration_gate_ready` 继续只表达 wall；`session_media_duration_gate_ready` 只表达 ready media；`session_gate_ready` 组合全段与两项时长，不得互相替代。
+4. 契约构造测试只能作为公式证据，不得写成运行稳定性。实际 30～60 分钟结论仍须 completed E2 run、真实媒体和留存/删除审计。
+5. C6c、RTSP、same-connection、非自愿断流、network impairment、设备平台、M2c、RiskAssessment 和 Alert 不因本次加固晋级。
+
+### 验证
+
+- 自动化：clean `ab1f366` 全量 170 passed；覆盖 wall/media 独立阻断、父媒体汇总防篡改、30 分钟正反例、CLI、健康 session 和恢复兼容。
+- 静态检查：核心/脚本 `py_compile`、全部 shell/sbatch `bash -n`、`pip check`、`git diff --check` 通过。
+- Healthy：completed、clean、0 issue；3/3 ready，declared/actual ready media 1,500/2,550 ms，media/session gate true，long-run false；manifest/父报告摘要为 `145aa6a2e28db0b288b23daf8c3bd73bf61cfbedccc073252680e8183b3c0b23` / `4e68af59cac4a7011cb25b3d2a9ef46158495e8d63c359a7c484cc005c58f952`。
+- Recovery：completed、clean、0 issue；2 ready + 1 `open_failed`，ready media 1,700 ms，专用 gate true、通用 session gate false、long-run false；manifest/父报告摘要为 `9f9eaf61d08ff5ae7652bf71c005854a8685a79d37afdaa2186f35c34bd77cf8` / `ce32af1f480cbbec16c5dab46d17e4909572451af55368b72d7bd5a21075f8c1`。
+- 两个正式 run 的目录/文件为 `0700/0600`；endpoint/host/port、fixture path/name、本地 home/用户名、环境变量、secret 和 Risk/Alert true 扫描 0 命中。
+
+### 行动项
+
+| 行动 | 负责人 | 截止日期 | 状态 |
+|---|---|---|---|
+| 实现 wall/media 双门、契约防篡改、CLI、测试和 clean E1 | Codex | 2026-07-30 | Closed；`ab1f366` / REV-029 |
+| 用 C6c 执行短时 E2、qualification 与 short session | 设备负责人 / 工程负责人 | 2026-07-31 | Blocked on endpoint/device access |
+| 冻结外部故障工具、阈值、receipt 和非 ready 重试策略 | 工程负责人 / 产品负责人 | 2026-07-31 | Blocked on E2 stream and owner decision |
+| 执行 wall/media 双声明的 30～60 分钟 E2，并单列 single-connection | 工程负责人 | 2026-08-01 | Blocked on E2 stream |
+
+### 未决问题
+
+1. 30/60 分钟 ready media 是否允许小于 wall 的容器/关键帧误差，若允许，阈值由谁签字并如何显式进入新协议？
+2. 非 ready streak 的停止次数、backoff 指数策略和 jitter 是否应在 E2 前冻结为 v0.3？
+3. V2 UI 如何同时展示 wall elapsed、ready media coverage、gap 和最终 gate，避免把 segmented run 渲染为单连接连续流？

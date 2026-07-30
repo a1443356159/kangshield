@@ -1,6 +1,6 @@
 # V1-M1 流会话 Supervisor 与恢复账本
 
-状态：Implemented E1 v0.2.0；媒体时长 fail-closed 加固待 clean evidence，C6c E2、非自愿断流与 30～60 分钟实际长稳仍 Open
+状态：Accepted E1 v0.2.0；C6c E2、非自愿断流与 30～60 分钟实际长稳仍 Open
 
 基准日期：2026-07-30
 
@@ -172,6 +172,6 @@ runs/<session-run>/
 
 v0.1.0 的 clean `6a68371` 已完成两次正式运行：全健康 fixture session 为 3/3 ready、唯一轨道签名 1、`session_gate_ready=true`；同一 loopback HTTP endpoint 的 ready→503→ready 为 2 ready + 1 `open_failed`、1 条 2→3 recovery event、`controlled_supervisor_recovery_gate_ready=true`。完整时间、注入遥测、摘要与隐私审计见[正式 E1 报告](reports/v1-m1-stream-session-supervisor-smoke.md)。
 
-v0.2.0 将另以 clean E1 重跑短 session 和恢复 fixture，并通过契约测试同时覆盖“wall 达 30 分钟但 ready media 不足时必须为 false”及“双声明、双观测均达 30 分钟时才可为 true”。在该证据进入正式报告前，本次加固保持待 Review。
+v0.2.0 已在 clean `ab1f366` 上重跑短 session 和恢复 fixture，并通过契约测试同时覆盖“wall 达 30 分钟但 ready media 不足时必须为 false”及“双声明、双观测均达 30 分钟时才可为 true”。健康 run 显式声明 1,500 ms ready media，下游重算得到 2,550 ms，媒体门和 session gate 均通过；恢复 run 保持通用 session gate false、专用恢复 gate true。完整结果见[媒体时长门加固 E1 报告](reports/v1-m1-stream-session-media-duration-gate-smoke.md)。
 
 两次短 run 的 segmented/single-connection 长稳、same-connection reconnect、非自愿断流恢复、RTSP、packet loss、网络容忍和设备平台声明都保持 false。fixture 恢复只关闭工程接缝，不提升 C6c 的设备证据等级。

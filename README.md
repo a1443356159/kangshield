@@ -26,6 +26,7 @@
 - [V1-M1 受控流故障矩阵 E1 报告](docs/reports/v1-m1-stream-fault-matrix-smoke.md)
 - [V1-M1 流会话 Supervisor 与恢复账本](docs/v1-m1-stream-session-supervisor.md)
 - [V1-M1 流会话 Supervisor 与恢复账本 E1 报告](docs/reports/v1-m1-stream-session-supervisor-smoke.md)
+- [V1-M1 Stream Session 媒体时长门加固 E1 报告](docs/reports/v1-m1-stream-session-media-duration-gate-smoke.md)
 - [V1 视频与语言多模态 Pipeline](docs/v1-multimodal-pipeline.md)
 - [V1-M2a 多模态 Pipeline 初测报告](docs/reports/v1-m2a-multimodal-smoke.md)
 - [V1-M2a 同容器音轨 PTS 对齐初测报告](docs/reports/v1-m2a-same-container-audio-smoke.md)
