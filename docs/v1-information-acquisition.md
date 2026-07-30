@@ -170,7 +170,7 @@ AppKey、AccessToken、设备验证码和设备序列号不得提交到仓库。
 
 在单次采集之上，`qualify-stream` 以多个独立连接检查每次 readiness 以及视频尺寸/帧率、音频采样率/声道等格式稳定性；连接失败被归一化为固定错误码，不把 endpoint 或底层 message 写入报告。它不跨连接拼接媒体，也不把计划性 reopen 解释成断线恢复或长稳。
 
-通过资格门后，`run-stream-session` 将多个独立有界 capture 组织为 segment/gap/interruption ledger：非 ready 后由外部 supervisor 等待 backoff 并新开一个 raw，不修改或拼接前一段。`exercise-stream-recovery` 在同一 loopback HTTP endpoint 上执行 ready→503→ready，并要求实际注入遥测和恢复事件同时成立；这只证明 supervisor 状态机。真实 segmented-session 长稳必须声明并实际达到至少 30 分钟，且仍与同连接连续性、非自愿断流、RTSP/packet loss 容忍和设备平台证据分开。
+通过资格门后，`run-stream-session` 将多个独立有界 capture 组织为 segment/gap/interruption ledger：非 ready 后由外部 supervisor 等待 backoff 并新开一个 raw，不修改或拼接前一段。`exercise-stream-recovery` 在同一 loopback HTTP endpoint 上执行 ready→503→ready，并要求实际注入遥测和恢复事件同时成立；这只证明 supervisor 状态机。真实 segmented-session 长稳必须让 wall time 与累计 ready media 的声明值和实际值分别达到至少 30 分钟，空闲 gap/backoff 不能冒充有效媒体；该结论仍与同连接连续性、非自愿断流、RTSP/packet loss 容忍和设备平台证据分开。
 
 ### 4.3 Normalizer
 

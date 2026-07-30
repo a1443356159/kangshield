@@ -117,6 +117,7 @@ def test_stream_session_parser_freezes_supervisor_and_long_run_defaults():
     assert args.segment_count == 3
     assert args.failure_backoff_s == 1.0
     assert args.minimum_session_wall_s == 0.0
+    assert args.minimum_ready_media_s == 0.0
     assert args.duration_s == 10.0
     assert args.allow_video_only is False
     assert args.require_ready is False

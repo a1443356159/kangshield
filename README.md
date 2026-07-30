@@ -150,7 +150,7 @@ kangshield-info run-stream-session \
   --require-ready
 ```
 
-真机前可执行 `kangshield-info exercise-stream-recovery <local-av-fixture.mkv> --require-ready`，在同一 loopback endpoint 验证 `ready → HTTP 503 → ready`。它证明的是 supervisor 新开独立 artifact，不是同连接 reconnect、RTSP/packet loss、C6c 或长稳；30 分钟声明还必须显式设置并实际达到 `--minimum-session-wall-s 1800`。见[Supervisor 设计](docs/v1-m1-stream-session-supervisor.md)。
+真机前可执行 `kangshield-info exercise-stream-recovery <local-av-fixture.mkv> --require-ready`，在同一 loopback endpoint 验证 `ready → HTTP 503 → ready`。它证明的是 supervisor 新开独立 artifact，不是同连接 reconnect、RTSP/packet loss、C6c 或长稳；30 分钟声明必须同时设置 `--minimum-session-wall-s 1800 --minimum-ready-media-s 1800`，且实际 wall / ready media 均达标。见[Supervisor 设计](docs/v1-m1-stream-session-supervisor.md)。
 
 生成并验证确定性同容器音视频时间戳夹具：
 

@@ -737,11 +737,13 @@ def test_qualify_stream_cli_writes_parent_child_reports_and_ledgers(
 def _fast_stream_session_config(
     *,
     minimum_session_wall_s: float = 0.0,
+    minimum_ready_media_s: float = 0.0,
 ) -> StreamSessionConfig:
     return StreamSessionConfig(
         segment_count=3,
         failure_backoff_s=0.01,
         minimum_session_wall_s=minimum_session_wall_s,
+        minimum_ready_media_s=minimum_ready_media_s,
         capture=StreamCaptureConfig(
             duration_s=0.8,
             minimum_duration_s=0.5,
@@ -758,6 +760,8 @@ def test_stream_session_rejects_unbounded_or_non_recovery_configuration():
         StreamSessionConfig(failure_backoff_s=float("inf"))
     with pytest.raises(ValueError, match="seven days"):
         StreamSessionConfig(minimum_session_wall_s=8 * 24 * 3600)
+    with pytest.raises(ValueError, match="minimum_ready_media_s"):
+        StreamSessionConfig(minimum_ready_media_s=float("nan"))
     with pytest.raises(ValueError, match="exactly three segments"):
         StreamRecoveryExerciseConfig(
             session=StreamSessionConfig(segment_count=2)
@@ -804,6 +808,10 @@ def test_stream_session_records_independent_segments_without_false_long_run(
     assert report.recovery_events == []
     assert report.all_segment_capture_gate_ready is True
     assert report.session_duration_gate_ready is True
+    assert report.ready_media_span_ms == sum(
+        item.captured_media_span_ms or 0 for item in report.segments
+    )
+    assert report.session_media_duration_gate_ready is True
     assert report.session_gate_ready is True
     assert report.segmented_session_long_running_stability_proven is False
     assert report.same_raw_reconnect_attempted is False
@@ -842,15 +850,69 @@ def test_stream_session_records_independent_segments_without_false_long_run(
     with pytest.raises(ValidationError, match="long-running stability"):
         StreamSessionReport.model_validate(false_long_run)
 
-    duration_blocked = report.model_dump(mode="json")
-    duration_blocked["minimum_session_wall_ms"] = report.session_elapsed_ms + 1
-    duration_blocked["session_duration_gate_ready"] = False
-    duration_blocked["session_gate_ready"] = False
-    blocked_report = StreamSessionReport.model_validate(duration_blocked)
+    wall_blocked = report.model_dump(mode="json")
+    wall_blocked["minimum_session_wall_ms"] = report.session_elapsed_ms + 1
+    wall_blocked["session_duration_gate_ready"] = False
+    wall_blocked["session_gate_ready"] = False
+    blocked_report = StreamSessionReport.model_validate(wall_blocked)
     assert blocked_report.all_segment_capture_gate_ready is True
     assert blocked_report.session_duration_gate_ready is False
+    assert blocked_report.session_media_duration_gate_ready is True
     assert blocked_report.session_gate_ready is False
     assert blocked_report.segmented_session_long_running_stability_proven is False
+
+    media_blocked = report.model_dump(mode="json")
+    media_blocked["minimum_ready_media_ms"] = report.ready_media_span_ms + 1
+    media_blocked["session_media_duration_gate_ready"] = False
+    media_blocked["session_gate_ready"] = False
+    blocked_report = StreamSessionReport.model_validate(media_blocked)
+    assert blocked_report.all_segment_capture_gate_ready is True
+    assert blocked_report.session_duration_gate_ready is True
+    assert blocked_report.session_media_duration_gate_ready is False
+    assert blocked_report.session_gate_ready is False
+    assert blocked_report.segmented_session_long_running_stability_proven is False
+
+    tampered_media_total = report.model_dump(mode="json")
+    tampered_media_total["ready_media_span_ms"] += 1
+    with pytest.raises(ValidationError, match="ready media span"):
+        StreamSessionReport.model_validate(tampered_media_total)
+
+    idle_inflated = report.model_dump(mode="json")
+    idle_inflated["minimum_session_wall_ms"] = 1_800_000
+    idle_inflated["minimum_ready_media_ms"] = 1_800_000
+    idle_inflated["segments"][-1]["finished_offset_ms"] = 1_800_000
+    idle_inflated["segments"][-1]["elapsed_ms"] = (
+        1_800_000 - idle_inflated["segments"][-1]["started_offset_ms"]
+    )
+    idle_inflated["session_elapsed_ms"] = 1_800_000
+    idle_inflated["session_duration_gate_ready"] = True
+    idle_inflated["session_media_duration_gate_ready"] = False
+    idle_inflated["session_gate_ready"] = False
+    idle_inflated["segmented_session_long_running_stability_proven"] = False
+    idle_report = StreamSessionReport.model_validate(idle_inflated)
+    assert idle_report.session_elapsed_ms == 1_800_000
+    assert idle_report.ready_media_span_ms < 1_800_000
+    assert idle_report.segmented_session_long_running_stability_proven is False
+
+    valid_long_run = report.model_dump(mode="json")
+    valid_long_run["requested_duration_ms_per_segment"] = 600_000
+    valid_long_run["minimum_duration_ms_per_segment"] = 600_000
+    valid_long_run["minimum_session_wall_ms"] = 1_800_000
+    valid_long_run["minimum_ready_media_ms"] = 1_800_000
+    for index, segment in enumerate(valid_long_run["segments"]):
+        segment["started_offset_ms"] = index * 600_000
+        segment["finished_offset_ms"] = (index + 1) * 600_000
+        segment["elapsed_ms"] = 600_000
+        segment["gap_before_ms"] = 0
+        segment["captured_media_span_ms"] = 600_000
+    valid_long_run["session_elapsed_ms"] = 1_800_000
+    valid_long_run["ready_media_span_ms"] = 1_800_000
+    valid_long_run["session_duration_gate_ready"] = True
+    valid_long_run["session_media_duration_gate_ready"] = True
+    valid_long_run["session_gate_ready"] = True
+    valid_long_run["segmented_session_long_running_stability_proven"] = True
+    long_run_report = StreamSessionReport.model_validate(valid_long_run)
+    assert long_run_report.segmented_session_long_running_stability_proven is True
 
     wrong_gap = report.model_dump(mode="json")
     wrong_gap["segments"][1]["gap_before_ms"] += 1
@@ -910,6 +972,7 @@ def test_stream_recovery_exercise_observes_external_reopen_after_http_503(
     assert recovery.interruption_to_ready_artifact_ms >= recovery.reopen_delay_ms
     assert session.all_segment_capture_gate_ready is False
     assert session.session_duration_gate_ready is True
+    assert session.session_media_duration_gate_ready is True
     assert session.session_gate_ready is False
     assert report.controlled_supervisor_recovery_gate_ready is True
     assert report.same_connection_reconnect_proven is False
@@ -978,6 +1041,8 @@ def test_stream_session_and_recovery_cli_write_private_ledgers(
 
     assert session_exit == 0
     assert session_output["ready_segment_count"] == 2
+    assert session_output["ready_media_span_ms"] > 0
+    assert session_output["session_media_duration_gate_ready"] is True
     assert session_output["session_gate_ready"] is True
     assert session_output[
         "segmented_session_long_running_stability_proven"

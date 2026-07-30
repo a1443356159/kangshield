@@ -2159,8 +2159,10 @@ class StreamSessionReport(ContractModel):
     audio_required: bool
     failure_backoff_ms: int = Field(ge=0)
     minimum_session_wall_ms: int = Field(ge=0)
+    minimum_ready_media_ms: int = Field(ge=0)
     long_run_threshold_ms: Literal[1800000] = 1_800_000
     session_elapsed_ms: int = Field(ge=0)
+    ready_media_span_ms: int = Field(ge=0)
     segments: list[StreamSessionSegment] = Field(default_factory=list)
     recovery_events: list[StreamSessionRecoveryEvent] = Field(default_factory=list)
     captured_segment_count: int = Field(ge=0)
@@ -2175,6 +2177,7 @@ class StreamSessionReport(ContractModel):
     supervisor_reopen_recovery_observed: bool
     all_segment_capture_gate_ready: bool
     session_duration_gate_ready: bool
+    session_media_duration_gate_ready: bool
     session_gate_ready: bool
     segmented_session_long_running_stability_proven: bool
     same_raw_reconnect_attempted: Literal[False] = False
@@ -2221,6 +2224,13 @@ class StreamSessionReport(ContractModel):
             previous_finished = item.finished_offset_ms
         if self.session_elapsed_ms != self.segments[-1].finished_offset_ms:
             raise ValueError("session elapsed time must close at the final segment")
+        ready_media_span_ms = sum(
+            item.captured_media_span_ms or 0
+            for item in self.segments
+            if item.status == "captured_ready"
+        )
+        if self.ready_media_span_ms != ready_media_span_ms:
+            raise ValueError("session ready media span is inconsistent")
 
         captured = sum(item.status != "failed" for item in self.segments)
         ready = sum(item.status == "captured_ready" for item in self.segments)
@@ -2325,16 +2335,25 @@ class StreamSessionReport(ContractModel):
             and len(signature_keys) == 1
         )
         duration_ready = self.session_elapsed_ms >= self.minimum_session_wall_ms
-        session_ready = all_capture_ready and duration_ready
+        media_duration_ready = (
+            self.ready_media_span_ms >= self.minimum_ready_media_ms
+        )
+        session_ready = (
+            all_capture_ready and duration_ready and media_duration_ready
+        )
         long_running = bool(
             session_ready
             and self.minimum_session_wall_ms >= self.long_run_threshold_ms
             and self.session_elapsed_ms >= self.long_run_threshold_ms
+            and self.minimum_ready_media_ms >= self.long_run_threshold_ms
+            and self.ready_media_span_ms >= self.long_run_threshold_ms
         )
         if self.all_segment_capture_gate_ready is not all_capture_ready:
             raise ValueError("all-segment capture gate is inconsistent")
         if self.session_duration_gate_ready is not duration_ready:
             raise ValueError("session duration gate is inconsistent")
+        if self.session_media_duration_gate_ready is not media_duration_ready:
+            raise ValueError("session media duration gate is inconsistent")
         if self.session_gate_ready is not session_ready:
             raise ValueError("session gate is inconsistent")
         if self.segmented_session_long_running_stability_proven is not long_running:

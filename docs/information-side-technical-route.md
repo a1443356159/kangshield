@@ -280,7 +280,7 @@ kangshield-info exercise-stream-recovery <local-av-fixture.mkv> \
   --require-ready
 ```
 
-通用命令为每段独立 open/raw/child report 记录 start、finish、gap、状态、固定 failure code 和完整轨道签名；非 ready 后只由外部 supervisor 新开下一段，不跨段拼接媒体。连续 interruption 后的新 ready artifact 形成 recovery event。全段采集、声明 wall time 和组合 session gate 分开；只有声明值与实际值均至少 1,800,000 ms 才能打开 segmented-session 长稳字段。
+通用命令为每段独立 open/raw/child report 记录 start、finish、gap、状态、固定 failure code、媒体跨度和完整轨道签名；非 ready 后只由外部 supervisor 新开下一段，不跨段拼接媒体。连续 interruption 后的新 ready artifact 形成 recovery event。全段采集、声明 wall time、累计 ready media duration 和组合 session gate 分开；只有 wall/media 两项的声明值与实际值分别至少为 1,800,000 ms 才能打开 segmented-session 长稳字段，空闲 gap/backoff 不计入有效媒体。
 
 fixture-only 命令在同一 loopback endpoint 上固定执行 ready→HTTP 503→ready，并同时检查 request/body/rejection 遥测和 2→3 恢复事件。专用恢复 gate 通过时，通用 session gate 因中间失败仍为 false。同连接 reconnect、非自愿断流、RTSP/packet loss、C6c 和长稳不能由该短测推出。clean `6a68371` 已完成全健康 3/3 ready session 与 2 ready + 1 `open_failed` 的受控恢复，两条 gate 均按各自口径通过。设计与证据见[流会话 Supervisor](v1-m1-stream-session-supervisor.md)和[正式报告](reports/v1-m1-stream-session-supervisor-smoke.md)。
 
@@ -537,7 +537,7 @@ V1-R1 已完成 E1 决策收敛和可执行分发门禁：YOLO26n 为 V1 对照�
 - capture-stream 可从有界 HTTP/RTSP 输入生成 owner-only Matroska，经关键帧、最短时长、termination 与 timing gate 后再交给同容器 Pipeline；E1 HTTP 接缝已通过。
 - qualify-stream 可执行多次独立 open、保存每次受控 raw/report，并对请求 readiness 和完整音视频轨道签名 fail closed；E1 HTTP 重复开流已通过，但断线/长稳/损伤声明保持 false。
 - exercise-stream-faults 可实际注入七个 loopback HTTP 行为并用 server 遥测证明执行，父 gate 检查有界返回、预期状态和 0 unexpected ready；E1 通过不提升 RTSP、packet loss、恢复或长稳证据。
-- run-stream-session 可为独立 segment 生成 gap/interruption/recovery ledger，并把全段采集、wall time 和 30 分钟 segmented-session 长稳分门；exercise-stream-recovery 可验证受控 503 后外部重开，但不证明同连接或非自愿断流恢复。
+- run-stream-session 可为独立 segment 生成 gap/interruption/recovery ledger，并把全段采集、wall time、累计 ready media 和 30 分钟 segmented-session 长稳分门；exercise-stream-recovery 可验证受控 503 后外部重开，但不证明同连接或非自愿断流恢复。
 - profile-sleep 可发现任意 JSON/CSV 字段且不泄露敏感值。
 - inspect-ezviz 可分析脱敏 Fixture/导出并保留证据等级。
 - 自动化测试覆盖契约、运行产物、三条命令和脱敏。

@@ -145,8 +145,17 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=0.0,
         help=(
-            "Minimum observed wall time for the session gate; long-run proof "
-            "also requires at least 1800 seconds"
+            "Minimum observed wall time for the session gate"
+        ),
+    )
+    stream_session.add_argument(
+        "--minimum-ready-media-s",
+        type=float,
+        default=0.0,
+        help=(
+            "Minimum cumulative ready media span for the session gate; long-run "
+            "proof requires both declared minima and both observations to reach "
+            "at least 1800 seconds"
         ),
     )
 
@@ -975,6 +984,7 @@ def _stream_run_configuration(
                 "segment_count": args.segment_count,
                 "failure_backoff_s": args.failure_backoff_s,
                 "minimum_session_wall_s": args.minimum_session_wall_s,
+                "minimum_ready_media_s": args.minimum_ready_media_s,
                 "long_run_threshold_s": 1800,
                 "cross_segment_media_concatenated": False,
             }
@@ -1161,6 +1171,7 @@ def _run_stream_session_command(args: argparse.Namespace) -> int:
                     segment_count=args.segment_count,
                     failure_backoff_s=args.failure_backoff_s,
                     minimum_session_wall_s=args.minimum_session_wall_s,
+                    minimum_ready_media_s=args.minimum_ready_media_s,
                     capture=capture_config,
                 ),
             )
@@ -1190,6 +1201,7 @@ def _run_stream_session_command(args: argparse.Namespace) -> int:
             "endpoint_scheme": report.endpoint_scheme,
             "segment_count": report.segment_count,
             "session_elapsed_ms": report.session_elapsed_ms,
+            "ready_media_span_ms": report.ready_media_span_ms,
             "ready_segment_count": report.ready_segment_count,
             "not_ready_segment_count": report.not_ready_segment_count,
             "failed_segment_count": report.failed_segment_count,
@@ -1203,6 +1215,9 @@ def _run_stream_session_command(args: argparse.Namespace) -> int:
                 report.all_segment_capture_gate_ready
             ),
             "session_duration_gate_ready": report.session_duration_gate_ready,
+            "session_media_duration_gate_ready": (
+                report.session_media_duration_gate_ready
+            ),
             "session_gate_ready": report.session_gate_ready,
             "segmented_session_long_running_stability_proven": (
                 report.segmented_session_long_running_stability_proven

@@ -87,7 +87,7 @@ V1-M1 在网络输入与上述 timing gate 之间增加有界采集接缝：“�
 
 其后增加 fixture-only 故障识别层：“七个独立 loopback HTTP 行为 → 真实 capture → 服务端注入遥测 + 固定状态预期 → StreamFaultMatrixReport”。健康和分块延迟必须 ready；503、首包/部分 body stall、截断和 TCP reset 不得意外 ready。父 gate 同时重算实际 delay/stall/reject/reset/early-close 事件、时限、状态、计数和安全路径。该层固定不证明 RTSP、packet loss、恢复、容忍或长稳。
 
-故障识别之后增加外部 session supervisor：“同一受控 endpoint → 多个独立有界 open/raw/child report → segment/gap/interruption ledger → StreamSessionReport”。非 ready 后只允许由 supervisor 等待 backoff 再新开 segment，不在同一 raw 内静默 reconnect 或拼接。恢复事件绑定非 ready streak 与后续新 ready artifact；fixture-only `ready → HTTP 503 → ready` 专用 gate 只证明该状态机接缝。通用 session gate 另把全段 readiness、轨道签名和声明 wall time 分开，只有声明与实际均达到 30 分钟才可发布 segmented-session 长稳，且仍不等于单连接连续性、RTSP/packet loss 容忍或 C6c 平台能力。
+故障识别之后增加外部 session supervisor：“同一受控 endpoint → 多个独立有界 open/raw/child report → segment/gap/interruption ledger → StreamSessionReport”。非 ready 后只允许由 supervisor 等待 backoff 再新开 segment，不在同一 raw 内静默 reconnect 或拼接。恢复事件绑定非 ready streak 与后续新 ready artifact；fixture-only `ready → HTTP 503 → ready` 专用 gate 只证明该状态机接缝。通用 session gate 另把全段 readiness、轨道签名、声明 wall time 和累计 ready media duration 分开；只有 wall/media 两项的声明与实际均达到 30 分钟才可发布 segmented-session 长稳，避免 open、stall、gap 或 backoff 把空闲时间冒充有效媒体。该字段仍不等于单连接连续性、RTSP/packet loss 容忍或 C6c 平台能力。
 
 M2a/M2c 之间再复用该报告形成同容器语言入口：“单音视频容器 → strict timing gate → PyAV 单声道 16 kHz → SpeechBackend → 按 audio-minus-video offset 平移 FeatureEvent”。解码器不自行选择轨道或推断零点；多轨、缺 PTS、扫描截断和音频 PTS 逆序均失败。相同容器只形成一个 SourceAsset/Observation，Pipeline report 显式区分 `same_container_pts` 与历史 `separate_files_synthetic_common_zero`。这关闭的是 adapter seam，不是 C6c 取流或 drift 证据。
 
@@ -192,7 +192,7 @@ StreamFaultCaseResult 固定七场景顺序和预期状态，并保存 loopback 
 
 ### StreamSessionReport 与 StreamRecoveryExerciseReport
 
-StreamSessionSegment 保存每次独立 open 的相对 start/finish、elapsed、前置 gap、状态、固定失败码或精确 artifact/report 引用，以及 path-free 轨道签名。父报告重算连续索引、时间/gap、计数、独立 artifact、签名、最长 interruption streak 和恢复事件；非 ready streak 后第一次取得的新 ready artifact 才形成 recovery event。`all_segment_capture_gate_ready`、`session_duration_gate_ready` 与组合 `session_gate_ready` 分开；segmented-session 长稳还硬性要求声明和实际 wall time 都不少于 1,800,000 ms。StreamRecoveryExerciseReport 再绑定同一 loopback endpoint 上 full/503/full 的实际 request/body/rejection 遥测和固定 ready/failed/ready session；专用恢复 gate 通过时，通用 all-segment/session gate 按设计保持 false。同 raw reconnect、跨段拼接、非自愿断流恢复、单连接长稳、网络容忍、设备平台、风险和告警均不得由这两份报告推导。
+StreamSessionSegment 保存每次独立 open 的相对 start/finish、elapsed、前置 gap、状态、固定失败码或精确 artifact/report 引用，以及 media span 与 path-free 轨道签名。父报告重算连续索引、时间/gap、计数、独立 artifact、签名、累计 ready media span、最长 interruption streak 和恢复事件；非 ready streak 后第一次取得的新 ready artifact 才形成 recovery event。`all_segment_capture_gate_ready`、wall `session_duration_gate_ready`、`session_media_duration_gate_ready` 与组合 `session_gate_ready` 分开；segmented-session 长稳还硬性要求 wall / ready media 的声明值和实际值分别不少于 1,800,000 ms。StreamRecoveryExerciseReport 再绑定同一 loopback endpoint 上 full/503/full 的实际 request/body/rejection 遥测和固定 ready/failed/ready session；专用恢复 gate 通过时，通用 all-segment/session gate 按设计保持 false。同 raw reconnect、跨段拼接、非自愿断流恢复、单连接长稳、网络容忍、设备平台、风险和告警均不得由这两份报告推导。
 
 ### ContainerTimingReport
 

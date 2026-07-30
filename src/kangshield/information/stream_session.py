@@ -32,8 +32,8 @@ from .stream_fault_matrix import (
 from .stream_qualification import stream_signature_key, stream_track_signature
 
 
-STREAM_SESSION_VERSION = "stream-session-v0.1.0"
-STREAM_RECOVERY_EXERCISE_VERSION = "stream-recovery-exercise-v0.1.0"
+STREAM_SESSION_VERSION = "stream-session-v0.2.0"
+STREAM_RECOVERY_EXERCISE_VERSION = "stream-recovery-exercise-v0.2.0"
 LONG_RUNNING_SESSION_THRESHOLD_S = 30 * 60
 _RECOVERY_BEHAVIORS = ("full", "reject", "full")
 
@@ -43,6 +43,7 @@ class StreamSessionConfig:
     segment_count: int = 3
     failure_backoff_s: float = 1.0
     minimum_session_wall_s: float = 0.0
+    minimum_ready_media_s: float = 0.0
     capture: StreamCaptureConfig = field(default_factory=StreamCaptureConfig)
 
     def __post_init__(self) -> None:
@@ -59,6 +60,12 @@ class StreamSessionConfig:
         ):
             raise ValueError(
                 "minimum_session_wall_s must be finite and at most seven days"
+            )
+        if not isfinite(self.minimum_ready_media_s) or not (
+            0 <= self.minimum_ready_media_s <= 7 * 24 * 3600
+        ):
+            raise ValueError(
+                "minimum_ready_media_s must be finite and at most seven days"
             )
 
 
@@ -349,13 +356,22 @@ def run_stream_session(
     )
     session_elapsed_ms = segments[-1].finished_offset_ms
     minimum_session_wall_ms = round(config.minimum_session_wall_s * 1000)
+    minimum_ready_media_ms = round(config.minimum_ready_media_s * 1000)
+    ready_media_span_ms = sum(
+        item.captured_media_span_ms or 0
+        for item in segments
+        if item.status == "captured_ready"
+    )
     duration_ready = session_elapsed_ms >= minimum_session_wall_ms
-    session_ready = all_capture_ready and duration_ready
+    media_duration_ready = ready_media_span_ms >= minimum_ready_media_ms
+    session_ready = all_capture_ready and duration_ready and media_duration_ready
     long_run_threshold_ms = LONG_RUNNING_SESSION_THRESHOLD_S * 1000
     long_running = bool(
         session_ready
         and minimum_session_wall_ms >= long_run_threshold_ms
         and session_elapsed_ms >= long_run_threshold_ms
+        and minimum_ready_media_ms >= long_run_threshold_ms
+        and ready_media_span_ms >= long_run_threshold_ms
     )
     report = StreamSessionReport(
         session_version=STREAM_SESSION_VERSION,
@@ -374,7 +390,9 @@ def run_stream_session(
         audio_required=config.capture.require_audio,
         failure_backoff_ms=round(config.failure_backoff_s * 1000),
         minimum_session_wall_ms=minimum_session_wall_ms,
+        minimum_ready_media_ms=minimum_ready_media_ms,
         session_elapsed_ms=session_elapsed_ms,
+        ready_media_span_ms=ready_media_span_ms,
         segments=segments,
         recovery_events=recovery_events,
         captured_segment_count=captured_count,
@@ -389,13 +407,14 @@ def run_stream_session(
         supervisor_reopen_recovery_observed=bool(recovery_events),
         all_segment_capture_gate_ready=all_capture_ready,
         session_duration_gate_ready=duration_ready,
+        session_media_duration_gate_ready=media_duration_ready,
         session_gate_ready=session_ready,
         segmented_session_long_running_stability_proven=long_running,
         limitations=[
             "segments_are_independent_artifacts_and_are_never_silently_concatenated",
             "supervisor_reopen_observation_is_not_same_connection_reconnect_proof",
             "unknown_failure_cause_cannot_prove_involuntary_disconnect_recovery",
-            "thirty_minute_declared_and_observed_wall_time_is_required_for_long_run_proof",
+            "thirty_minute_declared_and_observed_wall_time_and_ready_media_are_required_for_long_run_proof",
             "no_network_impairment_is_injected_or_measured_by_this_command",
             "container_pts_does_not_prove_capture_clock_accuracy_or_drift",
             "fixture_sessions_cannot_prove_target_device_or_platform_access",
