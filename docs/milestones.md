@@ -2,7 +2,7 @@
 
 状态：Active v1.9
 
-基准日期：2026-07-30
+基准日期：2026-08-02
 
 比赛提交目标：2026-09-05
 
@@ -74,7 +74,7 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 ### D0：文档基线
 
 - [x] 确认采用 V1 探索版、V2 比赛版两阶段。
-- [x] 确认当前设备型号。
+- [x] 确认当前设备型号（REV-031 升级为 2 × CS-C6c-V101-1J4WF + 1 × CS-EP-SDNL1 双视角基线）。
 - [x] 提取《监测方案》七维指标与四风险方向。
 - [x] 完成信息侧详细技术路线和设备能力矩阵。
 - [ ] 向萤石确认两个设备的开发账号、权限和接口文档。
@@ -233,6 +233,10 @@ V1 必须在 8 月 9 日结束探索。未完成的候选项默认不进入 V2�
 - [x] 实现 `stream-capture-v0.1.0`：环境端点、有界 codec-copy、首关键帧、owner-only raw、输出 timing probe 与 fail-cleanup；HTTP E1 run `20260722T225832Z-cfed1858` 和 L40 job `1782` 关闭采集 adapter seam（REV-025），不提升 C6c 证据。
 - [x] 实现 `stream-qualification-v0.1.0`：2～20 次独立 open、固定失败码、父/子 ledger、完整轨道签名和严格 gate；HTTP E1 run `20260722T234430Z-1f2b14c9` 与 L40 child 复核关闭重复开流工具门（REV-026），不证明真实重连或长稳。
 - [x] 实现 `stream-fault-matrix-v0.1.0`：七场景 loopback HTTP 行为、实际注入遥测、有界状态、固定失败码、partial 清理和严格父 gate；clean run `20260723T003417Z-2f683f0f` 关闭 E1 安全故障识别工具门（REV-027），不证明 RTSP、packet loss、恢复、容忍或长稳。
+- [x] REV-030：按外部指标可行性评审修正七维映射、Backlog、命名规范（肌力→坐站和功能活动表现等七条）与三层验证口径；设备矩阵覆盖结论同步。
+- [x] REV-031：设备边界升级为 2 × CS-C6c-V101-1J4WF + 1 × CS-EP-SDNL1 双视角基线；冻结安装/标定/事件级融合路线、硬件能力表述边界、无主动测试约束与验证降级口径。
+- [x] REV-032：归档萤石赛事平台材料（FAQ/资源边界/激活接口/睡眠组件仓文档形态），完成睡眠组件仓 E1 预开发（四 fixture + 候选 mapping + 回归测试）；确认 C6C 为赛事主推设备、雷达原始数据不开放、睡眠统计/属性接口有官方文档。
+- [x] REV-033：设备边界确定为 1 × CS-C6c-V101-1J4WF + 1 × CS-EP-SDHY1（双机位保留为扩展项）；睡眠 policy/配置/测试同步变更型号；首次真机 API 实测归档（激活码激活成功、9053 未决、睡眠 huayi 接口返回真实数据）。
 - [ ] 使用 C6c 正负视频继续补空场持续、床上躺卧、宠物移动和真实多人 tracking，按已冻结 policy 生成真实候选并复用事件评估口径。
 - [ ] 用 E2/E3 证据把 C6c 与 SDNL1 从 Unknown 归类为 available、limited 或 blocked。
 - [ ] 由项目/模型 owner 关闭分发门：决定 V2 最终姿态权重、模型 artifact 打包方式和项目许可证，按决定建立隔离候选环境并将 runtime closure 从 3/8 关闭到 8/8，再生成 competition dependency lock 与第三方 NOTICE，并在最终分发 profile 上通过 `--require-ready`；当前 HumanArt、Keypoint R-CNN、FunASR 与项目依赖均未关闭。

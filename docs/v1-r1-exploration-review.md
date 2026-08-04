@@ -88,7 +88,9 @@ V1-R1 不再继续无边界地增加模型。它把现有探索结果收敛为�
 | 睡眠趋势、早醒、WASO、IV/IS、RA/M10/L5 | Defer until coverage | 至少多夜/连续 24h 覆盖、时区、缺失和个人基线通过后再设计 |
 | RR interval、HRV、SpO2、AHI、体温、血压、原始雷达 | Exclude | 当前设备无证据，禁止在 V2 已实现清单中出现 |
 | 诈骗、认知、抑郁风险 | Defer / non-diagnostic | 比赛主线不做自动评分；最多保留人工查看的原始特征证据 |
-| 面部表情、社交时序、COP/真实肌力 | Defer / proxy only | 当前单摄像头只能做弱代理，不写成临床或物理测量 |
+| 面部表情、社交时序、COP/真实肌力 | Defer / proxy only | 当前摄像头组合只能做弱代理，不写成临床或物理测量 |
+
+2026-08-02 起本节范围判断按 REV-030/REV-031 修正执行：指标可行性、命名规范与三层验证口径以[信息采集探索](v1-information-acquisition.md)第 3 节为准；设备边界经 REV-033（2026-08-04）确定为 1 × CS-C6c-V101-1J4WF + 1 × CS-EP-SDHY1（REV-031 双机位设计保留为扩展项），家庭内不安排任何主动步行或睡眠测试，详见[设备能力矩阵](device-capability-matrix.md)。
 
 ## 6. 许可证与分发 Review
 

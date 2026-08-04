@@ -39,6 +39,7 @@
 |---|---|---|
 | [V1 信息采集与模型探索](v1-information-acquisition.md) | [V1-M1 初步开发报告](reports/v1-m1-initial-development.md) | 指标到采集 Backlog、设备边界和候选模型总览 |
 | [设备能力矩阵](device-capability-matrix.md) | [Review 记录](review-log.md) | C6c/SDNL1 每项能力的 E0～E4 状态 |
+| [萤石赛事平台使用与资源边界](v1-m1-ezviz-platform-competition-notes.md) | — | 赛事 FAQ/资源说明归档、套餐激活、录像下载与雷达开放边界 |
 | [有界音视频流采集适配器](v1-m1-bounded-stream-capture.md) | [有界流采集 E1 报告](reports/v1-m1-bounded-stream-capture-smoke.md) | RTSP/HTTP 有界接收、关键帧、原子 Matroska 和 timing gate |
 | [重复开流资格门](v1-m1-stream-qualification.md) | [重复开流 E1 报告](reports/v1-m1-stream-qualification-smoke.md) | 多次独立 open、完整轨道签名和格式稳定性 |
 | [受控流故障矩阵](v1-m1-stream-fault-matrix.md) | [故障矩阵 E1 报告](reports/v1-m1-stream-fault-matrix-smoke.md) | delay/503/stall/truncate/reset 的安全识别 |

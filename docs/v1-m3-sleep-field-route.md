@@ -137,3 +137,16 @@ kangshield-info assess-sleep-route sanitized-sdnl1-export.json \
 干净提交 `5635e95` 的正式运行 `20260722T072520Z-77a0f3b6` 为 completed，且 `code_dirty=false`。19 个 direct fields 中 4 个为 `candidate_unconfirmed`、15 个为 `not_observed`、0 个为 `ready_for_adapter`；5 个 derived 全部关闭。身份和完整原始值泄漏扫描均为 0。
 
 完整统计、摘要与决定见[睡眠字段路线评审报告](reports/v1-m3-sleep-field-route.md)。本切片通过 Review，只关闭 V1-M3 的 E1 路线决策；V1-M1/V1-M2c 真实设备证据门保持不变。
+
+## 9. 组件仓文档形态的 E1 预开发（REV-032，2026-08-02）
+
+萤石设备云组件仓文档（help/1836～1844、help/2097）确认了睡眠统计与属性级接口形态：每 10 分钟心率/呼吸率统计序列、分期时间线、name/value 指标集、属性历史记录，以及 EP/whst 族睡眠报告（含每 5 分钟心率/呼吸频率记录、离床事件、分期曲线和 resultCode 可信度）。
+
+据此完成设备无关预开发：
+
+- 按四个文档形态构造 synthetic fixture（`tests/fixtures/sleep/huayi-daily-sleep-stats.synthetic.json`、`huayi-daily-heart-rate.synthetic.json`、`huayi-properties-history.synthetic.json`、`whst-sleep-report.synthetic.json`）。
+- profiler 别名补充 `ts`、`breathRate` 叶字段识别；新增候选 mapping 示例 `configs/sleep/sdnl1-field-map.component-warehouse.example.json`。
+- 已知限制：profiler 只取最大记录列表，每日睡眠统计的 name/value 指标集与 EP 报告的 timeOutput 编码列表需要真实响应到达后人工判读；`name` 键按敏感键规则不产生候选。
+- `tests/test_sleep_component_schema.py` 六个回归通过；fixture 全部只能产出 `candidate_unconfirmed`，`direct_ready=0`、`values_persisted=false` 的 fail-closed 语义不变。
+
+型号兼容性（huayi 转发族 vs whst/EP 族）、字段单位语义和实际粒度仍须在赛事账号内实测，本切片不改变任何设备证据等级。
