@@ -3,10 +3,10 @@
   "fixture_only": true,
   "evidence_level": "E1",
   "device_model": "CS-EP-SDHY1",
-  "note": "Source paths are synthetic candidates and cannot enable standardized features. Replace this file only after inspecting a real E2/E3 export.",
+  "note": "Candidate source paths for the documented device-cloud component warehouse schemas (huayi statistics + properties history, whst/EP sleep report; see docs/v1-m1-ezviz-platform-competition-notes.md). All fixture candidates; replace only after inspecting real E2/E3 account responses.",
   "mappings": {
     "heart_rate_bpm": {
-      "source_path": "$.records[].heart_rate",
+      "source_path": "$.data[].heartRate",
       "confirmed_unit": null,
       "time_source_path": null,
       "time_semantics": null,
@@ -15,7 +15,7 @@
       "status": "candidate"
     },
     "respiratory_rate_bpm": {
-      "source_path": "$.records[].respiratory_rate",
+      "source_path": "$.data[].breathRate",
       "confirmed_unit": null,
       "time_source_path": null,
       "time_semantics": null,
@@ -23,8 +23,17 @@
       "missing_semantics": null,
       "status": "candidate"
     },
-    "bed_presence": {
-      "source_path": "$.records[].in_bed",
+    "measurement_at": {
+      "source_path": "$.data[].ts",
+      "confirmed_unit": null,
+      "time_source_path": null,
+      "time_semantics": null,
+      "value_semantics": null,
+      "missing_semantics": null,
+      "status": "candidate"
+    },
+    "sleep_stage": {
+      "source_path": "$.data.list[].stage",
       "confirmed_unit": null,
       "time_source_path": null,
       "time_semantics": null,

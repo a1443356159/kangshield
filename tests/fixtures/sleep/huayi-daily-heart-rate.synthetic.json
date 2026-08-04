@@ -1,0 +1,36 @@
+{
+  "fixture": true,
+  "schema_ref": "open.ys7.com/help/1839 daily heart-rate statistics, 10-minute series (huayi)",
+  "code": 200,
+  "message": "success",
+  "data": {
+    "deviceId": "SYNTHETIC-DEVICE-0001",
+    "avg": 62,
+    "max": 74,
+    "min": 54,
+    "count": 312,
+    "highCount": 0,
+    "lowCount": 0,
+    "lowHighCount": 0,
+    "minutesList": [
+      {
+        "avg": 62,
+        "max": 70,
+        "min": 55,
+        "ts": "2026-07-21 22:00:00"
+      },
+      {
+        "avg": 60,
+        "max": 68,
+        "min": 54,
+        "ts": "2026-07-21 22:10:00"
+      },
+      {
+        "avg": 64,
+        "max": 74,
+        "min": 58,
+        "ts": "2026-07-21 22:20:00"
+      }
+    ]
+  }
+}

@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "policy_version": "v1-sleep-route-2026-07-22",
-  "device_model": "CS-EP-SDNL1",
+  "policy_version": "v1-sleep-route-2026-08-04",
+  "device_model": "CS-EP-SDHY1",
   "source": "../../监测方案.docx",
   "source_sha256": "1f094fe453ce32de7dc3dcb0935b7dd3036e36495140639ec36a6279361fccb0",
   "direct_fields": [

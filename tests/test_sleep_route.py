@@ -23,7 +23,7 @@ def _confirmed_mapping(*, fixture_only: bool, evidence_level: str) -> dict:
         "schema_version": "1.0",
         "fixture_only": fixture_only,
         "evidence_level": evidence_level,
-        "device_model": "CS-EP-SDNL1",
+        "device_model": "CS-EP-SDHY1",
         "note": "test mapping",
         "mappings": {
             "heart_rate_bpm": {
