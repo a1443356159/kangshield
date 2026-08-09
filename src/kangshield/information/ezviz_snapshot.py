@@ -21,7 +21,7 @@ from .privacy import opaque_ref, redact_tree, safe_local_uri, sha256_file
 
 
 INSPECTOR_VERSION = "ezviz-snapshot-v0.1.0"
-TARGET_MODELS = {"CS-C6c-V101-1J4WF", "CS-EP-SDNL1"}
+TARGET_MODELS = {"CS-C6c-V101-1J4WF", "CS-EP-SDHY1"}
 MODEL_KEYS = {"devicetype", "device_type", "devicemodel", "device_model", "model"}
 SERIAL_KEYS = {"deviceserial", "device_serial", "serialnumber", "serial_number"}
 ONLINE_KEYS = {"status", "onlinestatus", "online_status", "isonline", "is_online"}

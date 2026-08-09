@@ -50,6 +50,21 @@ def atomic_write_json(path: Path, value: Any) -> None:
     temporary.replace(path)
 
 
+def atomic_write_text(path: Path, value: str) -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        "w",
+        encoding="utf-8",
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        delete=False,
+    ) as stream:
+        stream.write(value)
+        temporary = Path(stream.name)
+    temporary.replace(path)
+
+
 def append_jsonl(path: Path, value: Any) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -189,6 +204,17 @@ class RunArtifacts:
             raise ValueError("report filename must be a simple .json filename")
         path = self.reports_dir / filename
         atomic_write_json(path, report)
+        relative = self.relative(path)
+        if relative not in self.manifest.artifacts:
+            self.manifest.artifacts.append(relative)
+        self.save_manifest()
+        return path
+
+    def write_markdown(self, filename: str, content: str) -> Path:
+        if Path(filename).name != filename or not filename.endswith(".md"):
+            raise ValueError("markdown filename must be a simple .md filename")
+        path = self.reports_dir / filename
+        atomic_write_text(path, content)
         relative = self.relative(path)
         if relative not in self.manifest.artifacts:
             self.manifest.artifacts.append(relative)

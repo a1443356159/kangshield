@@ -67,7 +67,7 @@ def test_rule_bearing_export_is_directly_consumable_by_event_evaluator(
         evidence_level=EvidenceLevel.E1,
         source_type=SourceType.FIXTURE,
     )
-    assert assessment.report.clip_count == 12
+    assert assessment.report.clip_count == 16
     assert assessment.report.ground_truth_event_count == 2
     assert assessment.report.risk_assessment_emitted is False
     assert assessment.report.alert_emitted is False
@@ -124,7 +124,7 @@ def test_rule_bearing_export_is_directly_consumable_by_event_evaluator(
     output = json.loads(capsys.readouterr().out)
     assert exit_code == 0
     assert output["variant_id"] == variant_id
-    assert output["clip_count"] == 12
+    assert output["clip_count"] == 16
     assert output["candidate_episode_count"] == 2
     assert output["risk_assessment_emitted"] is False
     assert output["alert_emitted"] is False

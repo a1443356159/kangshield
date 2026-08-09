@@ -25,7 +25,7 @@ kang_slurm_init() {
   fi
   cd "${submit_dir}"
 
-  kang_slurm_output=${KANG_SLURM_OUTPUT_PATH:-${submit_dir}/slurm-${SLURM_JOB_NAME}-${SLURM_JOB_ID}.out}
+  kang_slurm_output=${KANG_SLURM_OUTPUT_PATH:-${submit_dir}/logs/slurm/slurm-${SLURM_JOB_NAME}-${SLURM_JOB_ID}.out}
   if [[ ! -f "${kang_slurm_output}" ]]; then
     echo "Slurm output file not found" >&2
     return 2

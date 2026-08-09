@@ -13,7 +13,7 @@ COMPONENT_MAPPING = (
     PROJECT_ROOT
     / "configs"
     / "sleep"
-    / "sdnl1-field-map.component-warehouse.example.json"
+    / "sdhy1-field-map.component-warehouse.example.json"
 )
 
 HUAYI_DAILY_SLEEP = FIXTURE_DIR / "huayi-daily-sleep-stats.synthetic.json"
@@ -109,5 +109,4 @@ def test_component_warehouse_route_marks_documented_candidates():
     assert by_field["heart_rate_bpm"].status == "candidate_unconfirmed"
     assert by_field["respiratory_rate_bpm"].status == "candidate_unconfirmed"
     assert by_field["measurement_at"].status == "candidate_unconfirmed"
-    assert by_field["sleep_stage"].status == "candidate_unconfirmed"
-    assert report.counts["direct_candidate_unconfirmed"] == 4
+    assert report.counts["direct_candidate_unconfirmed"] == 3

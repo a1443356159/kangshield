@@ -26,10 +26,10 @@
     },
     {
       "device_ref": "salted-pseudonymous-sleep-ref",
-      "model": "CS-EP-SDNL1",
+      "model": "CS-EP-SDHY1",
       "firmware_version": "record-observed-version",
       "capability_snapshot": {
-        "relative_path": "capabilities/sdnl1-sanitized.json",
+        "relative_path": "capabilities/sdhy1-sanitized.json",
         "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
         "byte_size": 1
       },

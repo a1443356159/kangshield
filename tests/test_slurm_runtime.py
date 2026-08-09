@@ -263,7 +263,7 @@ def test_all_sbatch_entries_use_shared_runtime_contract():
         ) == 1
         assert text.count("kang_slurm_init") == 1
         assert "${SLURM_SUBMIT_DIR:-/home/yyy/kangshield}" not in text
-        assert "#SBATCH --output=slurm-%x-%j.out" in text
+        assert "#SBATCH --output=logs/slurm/slurm-%x-%j.out" in text
         assert ("kang_slurm_bind_cudnn9" in text) == (
             entry.name in expected_cudnn
         )

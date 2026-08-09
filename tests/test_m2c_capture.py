@@ -62,8 +62,8 @@ def test_e1_capture_fixture_exercises_full_structure_without_device_claim(tmp_pa
     report = assessment.report
     assert report.decision == "tooling_only"
     assert report.quality_status is QualityStatus.PARTIAL
-    assert report.counts["declared_clip_count"] == 10
-    assert report.counts["structurally_usable_clip_count"] == 10
+    assert report.counts["declared_clip_count"] == 14
+    assert report.counts["structurally_usable_clip_count"] == 14
     assert report.counts["synchronized_usable_clip_count"] == 1
     assert report.counts["error_count"] == 0
     assert report.coverage["missing_core_tags"] == []
@@ -72,7 +72,7 @@ def test_e1_capture_fixture_exercises_full_structure_without_device_claim(tmp_pa
     assert report.camera_matrix_complete is False
     assert report.sleep_sample_ready_for_profiling is False
     assert report.capture_bundle_ready_for_review is False
-    assert len(assessment.media_reports) == 10
+    assert len(assessment.media_reports) == 14
     assert len(assessment.sleep_assets) == 1
 
     serialized = report.model_dump_json()
@@ -115,7 +115,7 @@ def test_capture_gate_blocks_digest_tampering(tmp_path):
     c05 = next(clip for clip in report.clips if clip.scenario_id == "C05")
     assert c05.manifest_digest_match is False
     assert c05.structurally_usable is False
-    assert report.counts["structurally_usable_clip_count"] == 9
+    assert report.counts["structurally_usable_clip_count"] == 13
     assert "media_sha256_mismatch" in {issue.code for issue in c05.issues}
 
 

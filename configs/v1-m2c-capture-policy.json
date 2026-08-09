@@ -2,7 +2,7 @@
   "schema_version": "1.0",
   "policy_version": "v1-m2c-capture-policy-v0.1.0",
   "target_camera_model": "CS-C6c-V101-1J4WF",
-  "target_sleep_model": "CS-EP-SDNL1",
+  "target_sleep_model": "CS-EP-SDHY1",
   "minimum_usable_clips_for_model_retest": 8,
   "minimum_model_variants": 3,
   "minimum_synchronized_audio_clips": 1,
@@ -42,7 +42,11 @@
     "C07",
     "C08",
     "C09",
-    "C10"
+    "C10",
+    "C13",
+    "C14",
+    "C15",
+    "C16"
   ],
   "scenarios": [
     {
@@ -176,6 +180,50 @@
       "expected_person_presence": "present",
       "required_annotation_labels": ["person_present", "simulated_fall"],
       "coverage_tags": ["night", "person", "night_person", "mid", "simulated_fall"]
+    },
+    {
+      "scenario_id": "C13",
+      "scenario": "turn_180",
+      "lighting": "day",
+      "night_vision": false,
+      "distance_band": "mid",
+      "occlusion": "none",
+      "expected_person_presence": "present",
+      "required_annotation_labels": ["person_present", "turn_180"],
+      "coverage_tags": ["day", "person", "day_person", "mid", "turning", "turn_180"]
+    },
+    {
+      "scenario_id": "C14",
+      "scenario": "turn_360",
+      "lighting": "day",
+      "night_vision": false,
+      "distance_band": "mid",
+      "occlusion": "none",
+      "expected_person_presence": "present",
+      "required_annotation_labels": ["person_present", "turn_360"],
+      "coverage_tags": ["day", "person", "day_person", "mid", "turning", "turn_360"]
+    },
+    {
+      "scenario_id": "C15",
+      "scenario": "kneel_rise",
+      "lighting": "day",
+      "night_vision": false,
+      "distance_band": "mid",
+      "occlusion": "none",
+      "expected_person_presence": "present",
+      "required_annotation_labels": ["person_present", "kneeling"],
+      "coverage_tags": ["day", "person", "day_person", "mid", "kneeling", "hard_negative"]
+    },
+    {
+      "scenario_id": "C16",
+      "scenario": "multiple_people_crossing",
+      "lighting": "day",
+      "night_vision": false,
+      "distance_band": "mid",
+      "occlusion": "person_partial",
+      "expected_person_presence": "present",
+      "required_annotation_labels": ["multiple_people", "track_crossing"],
+      "coverage_tags": ["day", "person", "day_person", "mid", "multiple_people", "partial_occlusion"]
     }
   ]
 }

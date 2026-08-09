@@ -11,10 +11,10 @@ from kangshield.information.sleep_route import assess_sleep_route
 
 
 PROJECT_ROOT = Path(__file__).parents[1]
-FIXTURE = PROJECT_ROOT / "tests/fixtures/sleep/sdnl1-export.synthetic.json"
+FIXTURE = PROJECT_ROOT / "tests/fixtures/sleep/sdhy1-export.synthetic.json"
 POLICY = PROJECT_ROOT / "configs/sleep/v1-sleep-route-policy.json"
 EXAMPLE_MAPPING = (
-    PROJECT_ROOT / "configs/sleep/sdnl1-field-map.example.json"
+    PROJECT_ROOT / "configs/sleep/sdhy1-field-map.example.json"
 )
 
 
@@ -50,11 +50,11 @@ def test_synthetic_route_is_fail_closed_and_covers_monitoring_policy():
 
     by_field = {field.canonical_field: field for field in report.direct_fields}
     assert report.decision == "interface_only_waiting_for_e2_e3_schema"
-    assert report.counts["direct_total"] == 19
+    assert report.counts["direct_total"] == 9
     assert report.counts["direct_ready"] == 0
     assert report.counts["direct_candidate_unconfirmed"] == 4
     assert report.counts["not_assumed_total"] == 11
-    assert report.counts["derived_total"] == 5
+    assert report.counts["derived_total"] == 0
     assert report.counts["derived_enabled"] == 0
     assert by_field["heart_rate_bpm"].status == "candidate_unconfirmed"
     assert by_field["measurement_at"].status == "candidate_unconfirmed"

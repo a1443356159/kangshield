@@ -15,7 +15,7 @@
     {
       "deviceSerial": "SYNTHETIC-SLEEP-0001",
       "deviceName": "Synthetic sleep device",
-      "deviceType": "CS-EP-SDNL1",
+      "deviceType": "CS-EP-SDHY1",
       "status": 1,
       "capability": "synthetic-unverified"
     }

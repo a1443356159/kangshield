@@ -1,9 +1,9 @@
 {
   "schema_version": "1.0",
-  "policy_version": "v1-sleep-route-2026-08-04",
+  "policy_version": "v1-sleep-route-2026-08-08",
   "device_model": "CS-EP-SDHY1",
-  "source": "../../监测方案.docx",
-  "source_sha256": "1f094fe453ce32de7dc3dcb0935b7dd3036e36495140639ec36a6279361fccb0",
+  "source": "../../docs/references/fall-risk-indicators.docx",
+  "source_sha256": "ccf5c23158be850fa2b64b7de999bc5e8c9cb927ce56079ba85119c38687ba06",
   "direct_fields": [
     {
       "canonical_field": "measurement_at",
@@ -76,125 +76,9 @@
       "route": "direct_if_exposed",
       "expected_units": ["iso8601", "unix_ms"],
       "required_confirmations": ["confirmed_unit", "time_semantics", "missing_semantics"]
-    },
-    {
-      "canonical_field": "awakening_count",
-      "monitoring_indicators": ["夜间觉醒次数"],
-      "priority": "P1",
-      "route": "direct_if_exposed",
-      "expected_units": ["count"],
-      "required_confirmations": ["confirmed_unit", "time_semantics", "value_semantics", "missing_semantics"]
-    },
-    {
-      "canonical_field": "waso_duration",
-      "monitoring_indicators": ["入睡后觉醒时间 WASO"],
-      "priority": "P1",
-      "route": "direct_if_exposed",
-      "expected_units": ["s", "min"],
-      "required_confirmations": ["confirmed_unit", "time_semantics", "value_semantics", "missing_semantics"]
-    },
-    {
-      "canonical_field": "long_wake_episode_count",
-      "monitoring_indicators": ["长清醒次数 LWEP"],
-      "priority": "P1",
-      "route": "direct_if_exposed",
-      "expected_units": ["count"],
-      "required_confirmations": ["confirmed_unit", "time_semantics", "value_semantics", "missing_semantics"]
-    },
-    {
-      "canonical_field": "sleep_efficiency_ratio",
-      "monitoring_indicators": ["睡眠效率"],
-      "priority": "P1",
-      "route": "direct_if_exposed",
-      "expected_units": ["ratio", "percent"],
-      "required_confirmations": ["confirmed_unit", "time_semantics", "value_semantics", "missing_semantics"]
-    },
-    {
-      "canonical_field": "sleep_stage",
-      "monitoring_indicators": ["深睡/浅睡", "REM 期"],
-      "priority": "P1",
-      "route": "direct_if_exposed",
-      "expected_units": ["categorical"],
-      "required_confirmations": ["confirmed_unit", "value_semantics", "time_source_path", "time_semantics", "missing_semantics"]
-    },
-    {
-      "canonical_field": "movement_duration_ratio",
-      "monitoring_indicators": ["睡眠期运动时间占比"],
-      "priority": "P1",
-      "route": "direct_if_exposed",
-      "expected_units": ["ratio", "percent"],
-      "required_confirmations": ["confirmed_unit", "time_semantics", "value_semantics", "missing_semantics"]
-    },
-    {
-      "canonical_field": "body_movement_index",
-      "monitoring_indicators": ["体动", "昼夜活动代理"],
-      "priority": "P1",
-      "route": "direct_if_exposed",
-      "expected_units": ["count", "score", "categorical"],
-      "required_confirmations": ["confirmed_unit", "value_semantics", "time_source_path", "time_semantics", "missing_semantics"]
-    },
-    {
-      "canonical_field": "turnover_count",
-      "monitoring_indicators": ["翻身次数"],
-      "priority": "P1",
-      "route": "direct_if_exposed",
-      "expected_units": ["count"],
-      "required_confirmations": ["confirmed_unit", "time_semantics", "value_semantics", "missing_semantics"]
-    },
-    {
-      "canonical_field": "rem_duration",
-      "monitoring_indicators": ["REM 期时长"],
-      "priority": "P1",
-      "route": "direct_if_exposed",
-      "expected_units": ["s", "min"],
-      "required_confirmations": ["confirmed_unit", "time_semantics", "value_semantics", "missing_semantics"]
-    },
-    {
-      "canonical_field": "nap_duration",
-      "monitoring_indicators": ["日间小睡时长"],
-      "priority": "P1",
-      "route": "direct_if_exposed",
-      "expected_units": ["s", "min"],
-      "required_confirmations": ["confirmed_unit", "time_semantics", "value_semantics", "missing_semantics"]
     }
   ],
-  "derived_indicators": [
-    {
-      "indicator_id": "sleep_duration_trend",
-      "monitoring_indicators": ["总睡眠时长趋势"],
-      "required_canonical_fields": ["total_sleep_duration", "report_generated_at"],
-      "minimum_nights": 7,
-      "limitations": ["engineering_minimum_not_a_clinical_validation_window"]
-    },
-    {
-      "indicator_id": "early_wake_deviation",
-      "monitoring_indicators": ["早醒", "起床时间偏移"],
-      "required_canonical_fields": ["sleep_end_at", "report_generated_at"],
-      "minimum_nights": 7,
-      "limitations": ["requires_personal_baseline_and_timezone_confirmation"]
-    },
-    {
-      "indicator_id": "awakening_trend",
-      "monitoring_indicators": ["夜间觉醒次数趋势", "WASO 趋势"],
-      "required_canonical_fields": ["awakening_count", "waso_duration", "report_generated_at"],
-      "minimum_nights": 7,
-      "limitations": ["device_stage_and_awake_semantics_must_be_confirmed"]
-    },
-    {
-      "indicator_id": "circadian_iv_is",
-      "monitoring_indicators": ["日内变异性 IV", "日间稳定性 IS"],
-      "required_canonical_fields": ["measurement_at", "body_movement_index"],
-      "minimum_nights": 7,
-      "limitations": ["requires_regular_24h_sampling_not_sleep_only_reports"]
-    },
-    {
-      "indicator_id": "circadian_ra_m10_l5",
-      "monitoring_indicators": ["相对振幅 RA", "M10", "L5", "M10 中点"],
-      "required_canonical_fields": ["measurement_at", "body_movement_index"],
-      "minimum_nights": 7,
-      "limitations": ["requires_regular_24h_activity_proxy_and_timezone_confirmation"]
-    }
-  ],
+  "derived_indicators": [],
   "not_assumed_fields": [
     {
       "canonical_field": "rr_intervals_ms",

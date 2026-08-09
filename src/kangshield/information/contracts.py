@@ -3265,6 +3265,107 @@ class SleepRouteAssessmentReport(ContractModel):
     limitations: list[str] = Field(default_factory=list)
 
 
+class IndicatorAssessability(StrEnum):
+    ASSESSABLE = "assessable"
+    NOT_ASSESSABLE = "not_assessable"
+    BLOCKED_SEMANTICS = "blocked_semantics"
+
+
+class IndicatorAssessmentStatus(StrEnum):
+    POLICY_NOT_FROZEN = "policy_not_frozen"
+    NOT_ASSESSABLE = "not_assessable"
+    BLOCKED_SEMANTICS = "blocked_semantics"
+    ASSESSED = "assessed"
+
+
+class IndicatorObservation(ContractModel):
+    """A normalized, provenance-bound indicator value before risk scoring."""
+
+    schema_version: str = "1.0"
+    observation_id: str
+    indicator_id: str
+    group: Literal["gait", "posture", "physiology", "sleep"]
+    source_modality: Literal["video", "sleep"]
+    source_ref: str
+    scenario_id: str | None = None
+    value: float | str | None = None
+    unit: str
+    time_range: TimeRange = Field(default_factory=TimeRange)
+    assessability: IndicatorAssessability
+    quality_status: QualityStatus
+    quality_metrics: dict[str, Any] = Field(default_factory=dict)
+    sample_count: int = Field(default=0, ge=0)
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _value_matches_assessability(self) -> "IndicatorObservation":
+        if self.assessability is IndicatorAssessability.ASSESSABLE:
+            if self.value is None:
+                raise ValueError("assessable indicator observation requires a value")
+            if self.quality_status is QualityStatus.FAIL:
+                raise ValueError("assessable indicator observation cannot fail quality")
+        elif self.value is not None:
+            raise ValueError("unassessable indicator observation must not contain a value")
+        return self
+
+
+class IndicatorAssessment(ContractModel):
+    """A policy result kept separate from raw indicator extraction."""
+
+    schema_version: str = "1.0"
+    assessment_id: str
+    observation_id: str
+    indicator_id: str
+    status: IndicatorAssessmentStatus
+    policy_revision: str | None = None
+    policy_digest: str | None = Field(default=None, min_length=64, max_length=64)
+    score: int | None = Field(default=None, ge=0, le=3)
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _score_requires_frozen_policy(self) -> "IndicatorAssessment":
+        frozen = self.status is IndicatorAssessmentStatus.ASSESSED
+        if frozen and (self.score is None or not self.policy_revision or not self.policy_digest):
+            raise ValueError("assessed indicator requires score and frozen policy binding")
+        if not frozen and self.score is not None:
+            raise ValueError("non-assessed indicator must not contain a score")
+        return self
+
+
+class IndicatorExtractionReport(ContractModel):
+    schema_version: str = "1.0"
+    extractor_version: str
+    source_modality: Literal["video", "sleep"]
+    source_type: SourceType
+    evidence_level: EvidenceLevel
+    source_ref: str
+    observations: list[IndicatorObservation]
+    limitations: list[str] = Field(default_factory=list)
+
+
+class IndicatorSummaryReport(ContractModel):
+    """Static indicator report. Global scoring is intentionally unavailable in v1."""
+
+    schema_version: str = "1.0"
+    report_version: str
+    visibility: Literal["owner_only", "public_evidence"]
+    generated_at: datetime = Field(default_factory=utc_now)
+    observations: list[IndicatorObservation] = Field(default_factory=list)
+    assessments: list[IndicatorAssessment] = Field(default_factory=list)
+    indicator_counts: dict[str, int] = Field(default_factory=dict)
+    quality_counts: dict[str, int] = Field(default_factory=dict)
+    status_counts: dict[str, int] = Field(default_factory=dict)
+    global_score: None = None
+    fall_candidate_summary: dict[str, int | str | bool | None] | None = None
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _public_report_is_value_free(self) -> "IndicatorSummaryReport":
+        if self.visibility == "public_evidence" and self.observations:
+            raise ValueError("public evidence report must not contain indicator values")
+        return self
+
+
 class DeviceSummary(ContractModel):
     device_ref: str
     model: str | None = None

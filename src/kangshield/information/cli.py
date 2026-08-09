@@ -9,7 +9,7 @@ from typing import Sequence
 from kangshield import __version__
 
 from .artifacts import RunArtifacts
-from .contracts import EvidenceLevel, SourceType
+from .contracts import EvidenceLevel, SourceType, ensure_source_evidence_compatible
 from .dataset_benchmark import run_dataset_benchmark
 from .ezviz_snapshot import inspect_ezviz_snapshot
 from .media_probe import probe_media
@@ -262,7 +262,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     capture = subparsers.add_parser(
         "assess-m2c-capture",
-        help="Validate a controlled C6c/SDNL1 capture bundle without copying raw data",
+        help="Validate a controlled C6c/SDHY1 capture bundle without copying raw data",
     )
     capture.add_argument("manifest", type=Path)
     capture.add_argument("--runs-dir", type=Path, default=Path("runs"))
@@ -485,7 +485,43 @@ def build_parser() -> argparse.ArgumentParser:
     sleep_route.add_argument(
         "--mapping-config",
         type=Path,
-        default=Path("configs/sleep/sdnl1-field-map.example.json"),
+        default=Path("configs/sleep/sdhy1-field-map.example.json"),
+    )
+
+    video_indicators = subparsers.add_parser(
+        "extract-video-indicators",
+        help="Normalize fixture video measurements through indicator quality gates",
+    )
+    video_indicators.add_argument("path", type=Path)
+    video_indicators.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    video_indicators.add_argument(
+        "--evidence-level", type=_evidence, default=EvidenceLevel.E1
+    )
+    video_indicators.add_argument(
+        "--source-type", type=_source_type, default=SourceType.FIXTURE
+    )
+
+    sleep_indicators = subparsers.add_parser(
+        "extract-sleep-indicators",
+        help="Extract trend-only SDHY1 indicators with fail-closed night semantics",
+    )
+    sleep_indicators.add_argument("path", type=Path)
+    sleep_indicators.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    sleep_indicators.add_argument(
+        "--evidence-level", type=_evidence, default=EvidenceLevel.E1
+    )
+    sleep_indicators.add_argument(
+        "--source-type", type=_source_type, default=SourceType.FIXTURE
+    )
+
+    indicator_report = subparsers.add_parser(
+        "build-indicator-report",
+        help="Build owner-only and redacted public static indicator reports",
+    )
+    indicator_report.add_argument("reports", type=Path, nargs="+")
+    indicator_report.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    indicator_report.add_argument(
+        "--evidence-level", type=_evidence, default=EvidenceLevel.E1
     )
 
     distribution = subparsers.add_parser(
@@ -1575,6 +1611,101 @@ def _profile_sleep_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def _extract_indicator_command(args: argparse.Namespace, *, modality: str) -> int:
+    from .indicators import extract_sleep_indicators, extract_video_indicators
+
+    ensure_source_evidence_compatible(args.source_type, args.evidence_level)
+    extractor = (
+        extract_video_indicators if modality == "video" else extract_sleep_indicators
+    )
+    with RunArtifacts(
+        args.runs_dir,
+        stage=f"v1-{modality}-indicator-extraction",
+        evidence_level=args.evidence_level,
+        configuration={
+            "command": f"extract-{modality}-indicators",
+            "source_type": args.source_type.value,
+            "input_path_persisted": False,
+            "risk_scoring_performed": False,
+        },
+    ) as run:
+        with run.step(f"extract-{modality}-indicators") as step:
+            report = extractor(
+                args.path,
+                evidence_level=args.evidence_level,
+                source_type=args.source_type,
+            )
+            report_path = run.write_report(
+                f"{modality}-indicator-observations.json", report
+            )
+            step.outputs.append(run.relative(report_path))
+    _print_result(
+        run,
+        {
+            "report": str(report_path),
+            "observation_count": len(report.observations),
+            "assessable_count": sum(
+                item.assessability.value == "assessable"
+                for item in report.observations
+            ),
+            "global_score": None,
+        },
+    )
+    return 0
+
+
+def _build_indicator_report_command(args: argparse.Namespace) -> int:
+    from .contracts import EVIDENCE_RANK
+    from .indicators import (
+        build_indicator_reports,
+        load_extraction_report,
+        render_indicator_markdown,
+    )
+
+    with RunArtifacts(
+        args.runs_dir,
+        stage="v1-indicator-static-report",
+        evidence_level=args.evidence_level,
+        configuration={
+            "command": "build-indicator-report",
+            "input_paths_persisted": False,
+            "global_scoring_enabled": False,
+        },
+    ) as run:
+        with run.step("build-indicator-report") as step:
+            inputs = [load_extraction_report(path) for path in args.reports]
+            if any(
+                EVIDENCE_RANK[item.evidence_level]
+                < EVIDENCE_RANK[args.evidence_level]
+                for item in inputs
+            ):
+                raise ValueError(
+                    "summary evidence level cannot exceed an extraction input"
+                )
+            owner, public = build_indicator_reports(inputs)
+            outputs = [
+                run.write_report("indicator-summary.owner.json", owner),
+                run.write_markdown(
+                    "indicator-summary.owner.md", render_indicator_markdown(owner)
+                ),
+                run.write_report("indicator-summary.public.json", public),
+                run.write_markdown(
+                    "indicator-summary.public.md", render_indicator_markdown(public)
+                ),
+            ]
+            step.outputs.extend(run.relative(path) for path in outputs)
+    _print_result(
+        run,
+        {
+            "owner_report": str(outputs[0]),
+            "public_report": str(outputs[2]),
+            "status_counts": owner.status_counts,
+            "global_score": None,
+        },
+    )
+    return 0
+
+
 def _assess_m2c_capture_command(args: argparse.Namespace) -> int:
     from .m2c_capture import assess_m2c_capture
     from .privacy import sha256_file
@@ -2583,6 +2714,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _profile_sleep_command(args)
     if args.command == "assess-sleep-route":
         return _assess_sleep_route_command(args)
+    if args.command == "extract-video-indicators":
+        return _extract_indicator_command(args, modality="video")
+    if args.command == "extract-sleep-indicators":
+        return _extract_indicator_command(args, modality="sleep")
+    if args.command == "build-indicator-report":
+        return _build_indicator_report_command(args)
     if args.command == "assess-distribution-readiness":
         return _assess_distribution_readiness_command(args)
     if args.command == "assess-runtime-closure":

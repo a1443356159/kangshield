@@ -1,274 +1,46 @@
-# 康盾 KangShield
+# KangShield
 
-社区独居老人多模态监测与风险预警项目。
+独居老人单机位跌倒风险指标与事件评估工程。
 
-当前采用两阶段交付：
+当前硬件：
 
-- V1：快速探索信息采集、模型可行性和端到端数据形态。
-- V2：基于 V1 结论设计并实现最终比赛提交版本。
+- 1 × `CS-C6c-V101-1J4WF` 摄像头，单机位。
+- 1 × `CS-EP-SDHY1` 睡眠仪。
 
-当前阶段只建设文档和 V1 信息采集探索，不提前固化完整业务系统。
+当前指标需求源为 [跌倒新指标](docs/references/fall-risk-indicators.docx)。工程范围包括步速、步频、5xSTS、转身、睡眠时间/时长、心率/呼吸趋势、跌倒候选，以及 C6c 语音的 VAD、普通话 ASR、求助/跌倒相关 candidate 与音视频人工复核。诈骗、情绪、认知、抑郁、表情和社交评分不在范围内。
 
-## 文档入口
+## 文档
 
-- [按功能分类的完整文档导航](docs/README.md)
+- [文档中心](docs/README.md)
+- [跌倒指标需求](docs/design/fall-risk-indicators.md)
+- [系统架构](docs/design/system-architecture.md)
+- [指标、模型与语音实现方案](docs/design/indicator-implementation.md)
+- [当前状态](docs/governance/current-status.md)
+- [里程碑](docs/governance/milestones.md)
 
-快速入口：
-
-- 总览与治理：[工程架构](docs/architecture.md)、[技术路线](docs/information-side-technical-route.md)、[里程碑](docs/milestones.md)、[Review](docs/review-log.md)
-- 设备与采集：[信息采集探索](docs/v1-information-acquisition.md)、[设备能力矩阵](docs/device-capability-matrix.md)、[流会话 Supervisor](docs/v1-m1-stream-session-supervisor.md)
-- 多模态与时间基：[视频/语言 Pipeline](docs/v1-multimodal-pipeline.md)、[目标设备采集规程](docs/v1-m2c-device-sample-protocol.md)
-- 模型与公开评测：[公开固定集](docs/v1-m2b-public-dataset-benchmark.md)、[姿态对比](docs/v1-m3-pose-model-comparison.md)、[语音对比](docs/v1-m3-speech-model-comparison.md)、[睡眠字段路线](docs/v1-m3-sleep-field-route.md)
-- 跌倒事件工程：[运动特征](docs/v1-g4-fall-motion-features.md)、[候选 Episode](docs/v1-g4-fall-event-candidates.md)、[事件评估](docs/v1-g4-event-evaluation-readiness.md)
-- 发布与 V2 输入：[V1-R1 收敛清单](docs/v1-r1-exploration-review.md)、[分发门](docs/v1-r1-distribution-readiness.md)、[Runtime Closure](docs/v1-r1-runtime-closure.md)
-
-## V1 初步开发
-
-V1 信息侧采用“运行目录 + JSON/JSONL 产物”的离线优先实现。开发入口、命令和产物结构见[信息侧详细技术路线](docs/information-side-technical-route.md)。
-
-### 本地运行
+## 开发
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e ".[dev,media]"
 make test
-make info-fixtures
 ```
 
-正式 Slurm 作业在 clean commit 上统一通过提交器运行；首次使用新 checkout、计算节点或 CUDA 环境时先执行 `make submit-runtime-preflight`。契约与 L40 证据见 [Slurm Runtime Preflight 报告](docs/reports/v1-slurm-runtime-preflight.md)。
-
-V1-R1 比赛包分发状态使用 `make PYTHON=.venv/bin/python assess-distribution-readiness` 审计；Release Candidate 必须使用 `kangshield-info assess-distribution-readiness --require-ready`。候选 Python 闭包另用 `make PYTHON=.venv/bin/python assess-runtime-closure` 盘点，正式候选环境必须从已安装入口运行 `kangshield-info assess-runtime-closure --require-ready`。当前分发工具已完成但 draft profile 仍为 0/5，现有共享环境的 runtime closure 也只通过 3/8；两者都不等于最终 lock、NOTICE 或分发许可。详见[分发设计](docs/v1-r1-distribution-readiness.md)、[分发报告](docs/reports/v1-r1-distribution-readiness.md)、[闭包设计](docs/v1-r1-runtime-closure.md)与[闭包报告](docs/reports/v1-r1-runtime-closure.md)。
-
-不安装 media extra 时，WAV 与 JSON/CSV 探测仍可运行；视频命令会明确报告 OpenCV 不可用。
-
-三条初始命令：
+主要 CLI：
 
 ```bash
-kangshield-info probe-media <video-or-wav>
-kangshield-info profile-sleep <json-or-csv>
-kangshield-info inspect-ezviz <sanitized-json> --evidence-level E1
+kangshield-info capture-stream ...
+kangshield-info qualify-stream ...
+kangshield-info run-stream-session ...
+kangshield-info profile-sleep ...
+kangshield-info assess-sleep-route ...
+kangshield-info extract-video-indicators ...
+kangshield-info extract-sleep-indicators ...
+kangshield-info build-indicator-report ...
+kangshield-info capture-fall-features ...
+kangshield-info export-fall-candidates ...
+kangshield-info assess-event-evaluation ...
 ```
 
-从 RTSP/HTTP(S) 音视频流生成有界、owner-only 的同容器采集物时，端点只能经环境变量传入：
-
-```bash
-read -rsp 'Stream endpoint: ' KANG_STREAM_ENDPOINT
-printf '\n'
-export KANG_STREAM_ENDPOINT
-kangshield-info capture-stream \
-  --evidence-level E2 \
-  --source-type network_stream \
-  --device-ref c6c_demo_01 \
-  --duration-s 30 \
-  --require-ready
-unset KANG_STREAM_ENDPOINT
-```
-
-不要把含账号、密码、token 或签名的 URL 写入命令历史。一次 E2 网络流采集只证明收到一段真实来源媒体，仍不证明萤石平台接入、长稳或断线重连；设计与当前 E1 证据见[有界流采集适配器](docs/v1-m1-bounded-stream-capture.md)和[初测报告](docs/reports/v1-m1-bounded-stream-capture-smoke.md)。
-
-真机短 E2 前先执行三次独立开流资格门：
-
-```bash
-kangshield-info qualify-stream \
-  --evidence-level E2 \
-  --source-type network_stream \
-  --device-ref c6c_demo_01 \
-  --attempt-count 3 \
-  --duration-s 10 \
-  --minimum-duration-s 8 \
-  --require-ready
-```
-
-该命令复用同一环境 endpoint，但为每次连接生成独立 raw/report，并检查视频宽高/帧率和音频采样率/声道等轨道签名。通过只表示计划性重复开流稳定，不代表非自愿断线恢复、丢包抖动或长稳。见[资格门设计](docs/v1-m1-stream-qualification.md)。
-
-在不接触真实设备或凭据的 E1 环境复核故障识别边界：
-
-```bash
-kangshield-info exercise-stream-faults <local-av-fixture.mkv> \
-  --require-ready
-```
-
-该命令实际执行完整响应、分块延迟、503、首包/部分 body stall、截断和 TCP reset，并要求实际注入遥测、预期状态与时限全部通过。它只验证安全故障识别，不证明 RTSP、packet loss、自动重连、网络容忍或长稳。见[故障矩阵设计](docs/v1-m1-stream-fault-matrix.md)。
-
-用多个独立 raw 组成可审计 session，并记录 gap、失败 streak 和外部重开恢复：
-
-```bash
-kangshield-info run-stream-session \
-  --evidence-level E2 \
-  --source-type network_stream \
-  --device-ref c6c_demo_01 \
-  --segment-count 3 \
-  --duration-s 10 \
-  --minimum-duration-s 8 \
-  --failure-backoff-s 1 \
-  --require-ready
-```
-
-真机前可执行 `kangshield-info exercise-stream-recovery <local-av-fixture.mkv> --require-ready`，在同一 loopback endpoint 验证 `ready → HTTP 503 → ready`。它证明的是 supervisor 新开独立 artifact，不是同连接 reconnect、RTSP/packet loss、C6c 或长稳；30 分钟声明必须同时设置 `--minimum-session-wall-s 1800 --minimum-ready-media-s 1800`，且实际 wall / ready media 均达标。见[Supervisor 设计](docs/v1-m1-stream-session-supervisor.md)。
-
-生成并验证确定性同容器音视频时间戳夹具：
-
-```bash
-make prepare-m2c-timing-fixture
-kangshield-info probe-media \
-  data/raw/public-smoke/v1-m2c-timing.synthetic.avi \
-  --source-type fixture \
-  --require-audio-track
-```
-
-该命令检查 video/audio track、逐轨 time base 和逐包 PTS/DTS；容器首尾偏移不等于实际声画同步或漂移，真实 C6c 仍需两次可见/可听同步事件。
-
-生成并评估完整的 M2c 采集包 E1 回归夹具：
-
-```bash
-make PYTHON=.venv/bin/python prepare-m2c-capture-fixture
-make PYTHON=.venv/bin/python assess-m2c-capture-fixture
-```
-
-`assess-m2c-capture` 会检查受控包路径、摘要、媒体轨道、C01～C10 场景/标注、双同步事件和三姿态策略摘要。Fixture 只能得到 `tooling_only`；真实 E2 核心集才可能打开 `camera_ready_for_model_retest`，C01～C10 与 SDNL1 样本都完成后才可能打开 `capture_bundle_ready_for_review`。该布尔量只验收采集包，V1-M2c 里程碑仍需下游模型/语言/睡眠字段报告。详细契约见[采集包就绪门](docs/v1-m2c-capture-readiness-gate.md)。
-
-生成并评估 G4 双标注/裁决/事件指标 E1 回归夹具：
-
-```bash
-make PYTHON=.venv/bin/python prepare-g4-event-evaluation-fixture
-make PYTHON=.venv/bin/python assess-g4-event-evaluation-fixture
-```
-
-该链路只对外部 candidate episode 做一致性、TP/FP/FN、误触发/小时和 delay 评分，不生成跌倒候选或告警。Fixture 固定为 `tooling_only`；真实 E2+ capture/clip、标注、裁决、最低数据和来源门全部通过后，才可能发布 `event_metrics_ready_for_review`。详细口径见[事件评估就绪门](docs/v1-g4-event-evaluation-readiness.md)。
-
-生成并评估真实状态机参与的 G4 export bridge E1 回归夹具：
-
-```bash
-make PYTHON=.venv/bin/python prepare-g4-candidate-export-fixture
-make PYTHON=.venv/bin/python assess-g4-candidate-export-fixture
-```
-
-该链路创建三路 capture-bound synthetic feature source，真实运行冻结 candidate 状态机并导出 evaluator 直接消费的 prediction/source run。它验证生产接口和 fail-closed provenance，不代表姿态模型或 C6c 事件性能。契约见 [G4 Candidate Export Bridge](docs/v1-g4-candidate-export-bridge.md)。
-
-设备无关的视频 + 语言回放链路：
-
-```bash
-python -m pip install -e ".[dev,multimodal]"
-kangshield-info run-multimodal <video> <pcm-wav> \
-  --pose-model models/yolo26n-pose.pt \
-  --offline-models
-
-# 或从单音视频容器读取麦克风轨，并按容器 PTS 对齐
-kangshield-info run-multimodal <av-container> \
-  --audio-from-video \
-  --pose-model models/yolo26n-pose.pt \
-  --offline-models
-```
-
-该命令输出姿态/跟踪、VAD、中文转写、词面标签和固定时间窗。同容器模式要求唯一音视频轨和完整 PTS，不会回退为猜测同步；它仍不代表 C6c 已接入。Slurm 环境与模型准备见 [Pipeline 文档](docs/v1-multimodal-pipeline.md)和[开发流程](docs/development-workflow.md)。
-
-准备并运行 V1-M2b 六 case 固定集：
-
-```bash
-python scripts/prepare_v1_m2b_data.py --accept-urfd-noncommercial-license
-kangshield-info benchmark-dataset data/processed/v1-m2b/benchmark-cases.json \
-  --pose-model models/yolo26n-pose.pt \
-  --offline-models
-```
-
-URFD 与 FLEURS 的固定版本、许可证和 SHA-256 见[数据集评测设计](docs/v1-m2b-public-dataset-benchmark.md)。公开视频与语音是跨数据集配对，只用于 E1 工程和分模态精度基线，不能替代萤石目标设备验证。
-
-运行 V1-M3 同集姿态对比：
-
-```bash
-python -m pip install -e ".[dev,multimodal,rtmpose-gpu]"
-python scripts/prepare_v1_m3_pose_models.py
-PYTHONPATH=src python scripts/prepare_v1_m3_torchvision_pose_model.py
-kangshield-info benchmark-pose-models \
-  data/processed/v1-m2b/benchmark-cases.json
-```
-
-该命令只重放六段视频，默认对比 YOLO26n-pose、YOLOX-m HumanArt + RTMPose-m HumanArt 和 TorchVision Keypoint R-CNN；不会重复运行语言模型。第三候选的权重血缘、未校准关键点分数和 fail-closed 分发边界见[独立候选设计](docs/v1-m3-torchvision-keypointrcnn-candidate.md)。
-
-从一份干净的姿态父报告离线派生 G4 运动特征：
-
-```bash
-kangshield-info benchmark-fall-features \
-  data/processed/v1-m2b/benchmark-cases.json \
-  runs/<clean-pose-parent>/reports/pose-model-comparison-report.json \
-  --variant rtmpose-m-humanart
-```
-
-该命令输出 box-only 横卧/下降/低运动代理、关键点质量门和 fallback reason，并强制保持 `risk_assessment_emitted=false`、`alert_emitted=false`。它只属于 E1 特征链路，不代表已实现跌倒判定或报警；设计与结果见 [G4 设计](docs/v1-g4-fall-motion-features.md)和[正式报告](docs/reports/v1-g4-fall-motion-features.md)。
-
-准备并运行独立 CAUCAFall ADL 压力集：
-
-```bash
-make prepare-g4-caucafall
-kangshield-info benchmark-fall-adl \
-  data/processed/v1-g4-caucafall/fall-adl-cases.json
-```
-
-该命令对 12 段 clip-level no-fall ADL 顺序运行三个姿态变体，并按动作/光照汇总代理激活。它不训练或评测跌倒分类器；正式 E1 结果见 [压力集设计](docs/v1-g4-caucafall-adl-stress.md)和[压力报告](docs/reports/v1-g4-caucafall-adl-stress.md)。
-
-从已有 clean G4 特征生成并压力测试去重 candidate episode：
-
-```bash
-kangshield-info benchmark-fall-candidates \
-  --urfd-run runs/<clean-yolo-fall-feature-run> \
-  --urfd-run runs/<clean-rtmpose-fall-feature-run> \
-  --urfd-run runs/<clean-keypointrcnn-fall-feature-run> \
-  --caucafall-run runs/<clean-three-variant-adl-parent>
-```
-
-该命令只在 label-blind 生成完成后读取公开标签做 E1 汇总；精确候选窗口留在被忽略的 derived-sensitive FeatureEvent。公开开发集结果不能作为 C6c 准确率或独立泛化证据，也不会产生风险或告警。冻结语义见[候选 episode 设计](docs/v1-g4-fall-event-candidates.md)，正式结果见[公开压力报告](docs/reports/v1-g4-fall-candidate-public-stress.md)。
-
-从一份 capture-bound G4 feature source 导出 event evaluator 输入：
-
-```bash
-kangshield-info export-fall-candidates \
-  <capture-manifest.json> \
-  <fall-feature-capture-set.json> \
-  <feature-source-run/manifest.json> \
-  --policy configs/v1-g4-event-candidate-policy.json
-```
-
-输出包含精确、derived-sensitive 的 `fall-candidate-predictions.json`、timestamp-free 汇总和严格绑定六项 scorer 摘要的 candidate source manifest。命令不读标签、不计算风险或告警；真实使用顺序见[导出桥接设计](docs/v1-g4-candidate-export-bridge.md)。
-
-准备并运行静态居家人物检测压力集：
-
-```bash
-make prepare-g4-static-home
-kangshield-info benchmark-static-home \
-  data/processed/v1-g4-openimages-static-home/static-home-cases.json
-```
-
-该命令对固定 4 张家具无人、4 张宠物无人和 4 张室内多人 Open Images validation 图片各推理一次，关闭 tracking，并以 IoU 0.5 汇总人物框匹配与 person-absent false activation。它不是视频、跌倒或事件评测；来源、逐图 CC BY 2.0 审计、Google LLC / CC BY 4.0 标注归因和非目标见[静态压力集设计](docs/v1-g4-openimages-static-home-stress.md)，L40 结果见[正式报告](docs/reports/v1-g4-openimages-static-home-stress.md)。
-
-运行 V1-M3 同集语音对比：
-
-```bash
-python -m pip install -e ".[dev,multimodal,speech-compare]"
-python scripts/prepare_v1_m3_speech_models.py
-kangshield-info benchmark-speech-models \
-  data/processed/v1-m2b/benchmark-cases.json \
-  --offline-models
-```
-
-该命令只重放六条 FLEURS 普通话，对比 FunASR 基线与 Whisper small，并运行不落原文的静音探针；不会重复运行视频模型。固定解码、权重、CER 和隐私口径见[语音模型对比设计](docs/v1-m3-speech-model-comparison.md)。
-
-评估睡眠字段路线（不持久化数值）：
-
-```bash
-kangshield-info assess-sleep-route \
-  tests/fixtures/sleep/sdnl1-export.synthetic.json \
-  --evidence-level E1 \
-  --source-type fixture
-```
-
-该命令只判断字段路径、证据和语义是否足以开始 adapter 实现，不输出睡眠或生命体征值。真实 SDNL1 字段必须使用 E2/E3 导出/API 和本地 confirmed mapping 解锁；详细边界见[睡眠字段路线](docs/v1-m3-sleep-field-route.md)。
-
-输出默认写入被 Git 忽略的 runs 目录。Fixture 只能作为 E1 开发证据，不能写成真实设备已接通。
-
-## 当前硬件边界
-
-- 萤石摄像头：1 × CS-C6c-V101-1J4WF，带麦克风（REV-033 起单机位；双机位设计保留为后续扩展）。
-- 萤石睡眠仪：1 × CS-EP-SDHY1（小贝壳）。
-
-手环、门锁、红外/人体存在传感器不属于当前已提供设备，相关指标只能保留接口或明确为暂不可得。
+原始数据、模型、运行产物和日志分别位于被 Git 忽略的 `data/`、`models/`、`runs/` 和 `logs/`。凭据、设备序列号、签名 URL、原始健康值和敏感媒体不得进入 Git。

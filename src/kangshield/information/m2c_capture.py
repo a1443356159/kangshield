@@ -125,6 +125,11 @@ class _AnnotationWindow(_StrictModel):
         "bed_rise",
         "furniture_occlusion",
         "simulated_fall",
+        "turn_180",
+        "turn_360",
+        "kneeling",
+        "multiple_people",
+        "track_crossing",
         "speech",
     ]
     start_ms: int = Field(ge=0)
@@ -163,7 +168,7 @@ class _Clip(_StrictModel):
     lighting: Literal["day", "night"]
     night_vision: bool
     distance_band: Literal["near", "mid", "far"]
-    occlusion: Literal["none", "furniture_partial"]
+    occlusion: Literal["none", "furniture_partial", "person_partial"]
     expected_person_presence: Literal["absent", "present"]
     expected_person_count: int = Field(ge=0)
     relative_path: str = Field(min_length=1)
@@ -307,7 +312,7 @@ class _ScenarioPolicy(_StrictModel):
     lighting: Literal["day", "night"]
     night_vision: bool
     distance_band: Literal["near", "mid", "far"]
-    occlusion: Literal["none", "furniture_partial"]
+    occlusion: Literal["none", "furniture_partial", "person_partial"]
     expected_person_presence: Literal["absent", "present"]
     required_annotation_labels: list[str] = Field(default_factory=list)
     coverage_tags: list[str] = Field(default_factory=list)

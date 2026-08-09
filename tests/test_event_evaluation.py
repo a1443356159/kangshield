@@ -60,8 +60,8 @@ def test_e1_event_fixture_scores_known_counts_without_risk_or_alert(tmp_path):
     report = assessment.report
     assert report.decision == "tooling_only"
     assert report.quality_status is QualityStatus.PARTIAL
-    assert report.clip_count == 12
-    assert report.exposure_ms == 36_000
+    assert report.clip_count == 16
+    assert report.exposure_ms == 48_000
     assert report.annotation_set_count == 2
     assert report.annotations_complete is True
     assert report.agreement_gate_passed is True
@@ -71,7 +71,7 @@ def test_e1_event_fixture_scores_known_counts_without_risk_or_alert(tmp_path):
     assert report.capture_camera_gate_passed is False
     assert report.event_metrics_ready_for_review is False
     assert report.ground_truth_event_count == 2
-    assert report.negative_clip_count == 10
+    assert report.negative_clip_count == 14
     assert report.risk_assessment_emitted is False
     assert report.alert_emitted is False
 
@@ -80,7 +80,7 @@ def test_e1_event_fixture_scores_known_counts_without_risk_or_alert(tmp_path):
     assert (rtmpose.true_positive_count, rtmpose.false_positive_count) == (2, 1)
     assert rtmpose.false_negative_count == 0
     assert rtmpose.recall == 1.0
-    assert rtmpose.false_activations_per_hour == 100.0
+    assert rtmpose.false_activations_per_hour == 75.0
     assert rtmpose.median_detection_delay_ms == 200.0
     assert rtmpose.p95_detection_delay_ms == 290.0
 
@@ -90,7 +90,7 @@ def test_e1_event_fixture_scores_known_counts_without_risk_or_alert(tmp_path):
         torchvision.false_positive_count,
         torchvision.false_negative_count,
     ) == (2, 2, 0)
-    assert torchvision.false_activations_per_hour == 200.0
+    assert torchvision.false_activations_per_hour == 150.0
     assert torchvision.median_detection_delay_ms == 100.0
 
     yolo = variants["yolo26n-pose"]

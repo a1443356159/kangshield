@@ -24,7 +24,7 @@ def test_ezviz_snapshot_finds_models_and_redacts_secrets(monkeypatch):
     assert len(report.devices) == 2
     assert report.target_models_found == [
         "CS-C6c-V101-1J4WF",
-        "CS-EP-SDNL1",
+        "CS-EP-SDHY1",
     ]
     assert report.checklist["live_preview"] == "requires_functional_test"
     assert report.sensitive_keys_redacted >= 5

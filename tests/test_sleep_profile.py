@@ -13,7 +13,7 @@ FIXTURE = (
     Path(__file__).parent
     / "fixtures"
     / "sleep"
-    / "sdnl1-export.synthetic.json"
+    / "sdhy1-export.synthetic.json"
 )
 
 

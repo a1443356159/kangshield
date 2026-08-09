@@ -348,7 +348,7 @@ def assess_sleep_route(
                 code="target_schema_unverified",
                 severity=Severity.WARNING,
                 message=(
-                    "E0/E1 input cannot confirm the CS-EP-SDNL1 developer schema"
+                    "E0/E1 input cannot confirm the CS-EP-SDHY1 developer schema"
                 ),
             )
         )

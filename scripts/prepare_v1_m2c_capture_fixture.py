@@ -138,6 +138,46 @@ SCENARIOS = (
         "expected_person_presence": "present",
         "labels": ("person_present", "simulated_fall"),
     },
+    {
+        "scenario_id": "C13",
+        "scenario": "turn_180",
+        "lighting": "day",
+        "night_vision": False,
+        "distance_band": "mid",
+        "occlusion": "none",
+        "expected_person_presence": "present",
+        "labels": ("person_present", "turn_180"),
+    },
+    {
+        "scenario_id": "C14",
+        "scenario": "turn_360",
+        "lighting": "day",
+        "night_vision": False,
+        "distance_band": "mid",
+        "occlusion": "none",
+        "expected_person_presence": "present",
+        "labels": ("person_present", "turn_360"),
+    },
+    {
+        "scenario_id": "C15",
+        "scenario": "kneel_rise",
+        "lighting": "day",
+        "night_vision": False,
+        "distance_band": "mid",
+        "occlusion": "none",
+        "expected_person_presence": "present",
+        "labels": ("person_present", "kneeling"),
+    },
+    {
+        "scenario_id": "C16",
+        "scenario": "multiple_people_crossing",
+        "lighting": "day",
+        "night_vision": False,
+        "distance_band": "mid",
+        "occlusion": "person_partial",
+        "expected_person_presence": "present",
+        "labels": ("person_present", "multiple_people", "track_crossing"),
+    },
 )
 
 
@@ -176,7 +216,7 @@ def build_capture_fixture(
         {"synthetic": True, "human_participant": False},
     )
     camera_capability = output_dir / "capabilities" / "c6c.synthetic.json"
-    sleep_capability = output_dir / "capabilities" / "sdnl1.synthetic.json"
+    sleep_capability = output_dir / "capabilities" / "sdhy1.synthetic.json"
     atomic_write_json(
         camera_capability,
         {
@@ -189,7 +229,7 @@ def build_capture_fixture(
         sleep_capability,
         {
             "synthetic": True,
-            "model": "CS-EP-SDNL1",
+            "model": "CS-EP-SDHY1",
             "capabilities": ["fixture_export"],
         },
     )
@@ -203,9 +243,9 @@ def build_capture_fixture(
         project_root / "configs" / "v1-m3-torchvision-pose-model.json",
         torchvision_policy,
     )
-    sleep_path = output_dir / "sleep" / "sdnl1-export.synthetic.json"
+    sleep_path = output_dir / "sleep" / "sdhy1-export.synthetic.json"
     _copy(
-        project_root / "tests" / "fixtures" / "sleep" / "sdnl1-export.synthetic.json",
+        project_root / "tests" / "fixtures" / "sleep" / "sdhy1-export.synthetic.json",
         sleep_path,
     )
 
@@ -269,6 +309,8 @@ def build_capture_fixture(
                 "expected_person_count": (
                     0
                     if scenario["expected_person_presence"] == "absent"
+                    else 2
+                    if scenario["scenario_id"] == "C16"
                     else 1
                 ),
                 **_file_reference(media_path, output_dir),
@@ -319,7 +361,7 @@ def build_capture_fixture(
             },
             {
                 "device_ref": "fixture-sleep",
-                "model": "CS-EP-SDNL1",
+                "model": "CS-EP-SDHY1",
                 "firmware_version": "synthetic",
                 "capability_snapshot": _file_reference(
                     sleep_capability, output_dir

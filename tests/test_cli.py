@@ -12,7 +12,13 @@ SLEEP_FIXTURE = (
     Path(__file__).parent
     / "fixtures"
     / "sleep"
-    / "sdnl1-export.synthetic.json"
+    / "sdhy1-export.synthetic.json"
+)
+VIDEO_INDICATOR_FIXTURE = (
+    Path(__file__).parent
+    / "fixtures"
+    / "indicators"
+    / "video-indicators.synthetic.json"
 )
 
 
@@ -71,7 +77,47 @@ def test_sleep_route_parser_defaults_to_fail_closed_fixture_inputs():
     assert args.evidence_level.value == "E1"
     assert args.source_type.value == "fixture"
     assert args.policy.name == "v1-sleep-route-policy.json"
-    assert args.mapping_config.name == "sdnl1-field-map.example.json"
+    assert args.mapping_config.name == "sdhy1-field-map.example.json"
+
+
+def test_indicator_cli_runs_fixture_chain_and_redacts_public_values(tmp_path, capsys):
+    runs = tmp_path / "runs"
+    assert main(
+        [
+            "extract-video-indicators",
+            str(VIDEO_INDICATOR_FIXTURE),
+            "--runs-dir",
+            str(runs),
+        ]
+    ) == 0
+    video = json.loads(capsys.readouterr().out)
+    assert main(
+        [
+            "extract-sleep-indicators",
+            str(SLEEP_FIXTURE),
+            "--runs-dir",
+            str(runs),
+        ]
+    ) == 0
+    sleep = json.loads(capsys.readouterr().out)
+    assert main(
+        [
+            "build-indicator-report",
+            video["report"],
+            sleep["report"],
+            "--runs-dir",
+            str(runs),
+        ]
+    ) == 0
+    summary = json.loads(capsys.readouterr().out)
+    owner = json.loads(Path(summary["owner_report"]).read_text(encoding="utf-8"))
+    public = json.loads(Path(summary["public_report"]).read_text(encoding="utf-8"))
+
+    assert owner["global_score"] is None
+    assert len(owner["observations"]) == 10
+    assert public["observations"] == []
+    assert public["global_score"] is None
+    assert (Path(summary["public_report"]).with_suffix(".md")).is_file()
 
 
 def test_media_probe_parser_freezes_packet_scan_and_audio_gate_defaults():

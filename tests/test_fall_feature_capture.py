@@ -145,10 +145,10 @@ def test_capture_feature_producer_feeds_candidate_export_without_labels(tmp_path
     )
 
     assert run.manifest.stage == "v1-g4-fall-feature-capture"
-    assert feature_set.clip_count == 12
-    assert report.clip_count == 12
-    assert report.input_frame_count == 180
-    assert backend.reset_count == 12
+    assert feature_set.clip_count == 16
+    assert report.clip_count == 16
+    assert report.input_frame_count == 240
+    assert backend.reset_count == 16
     assert all(clip.frame_count == 15 for clip in feature_set.clips)
     assert all(clip.frames_with_people == 15 for clip in report.clips)
     assert all(clip.tracked_frames == 15 for clip in report.clips)
@@ -184,8 +184,8 @@ def test_capture_feature_producer_feeds_candidate_export_without_labels(tmp_path
         allow_dirty_source=True,
     )
     assert candidate_run.manifest.status.value == "completed"
-    assert len(prediction.clips) == 12
-    assert summary.input_frame_count == 180
+    assert len(prediction.clips) == 16
+    assert summary.input_frame_count == 240
     assert summary.candidate_episode_count == 0
 
 
