@@ -2,22 +2,20 @@ from __future__ import annotations
 
 import math
 import os
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from .contracts import ModelBinding
+from .contracts import ModelBinding, SpeechSegment
 from .privacy import sha256_file
 from .streaming import AudioBuffer
 
 
-@dataclass(frozen=True)
-class SpeechSegment:
-    start_ms: int
-    end_ms: int
-    text: str
-    language: str
-    confidence: float | None = None
+__all__ = [
+    "SpeechSegment",
+    "SpeechBackend",
+    "FunASRSpeechBackend",
+    "WhisperSpeechBackend",
+]
 
 
 class SpeechBackend(Protocol):

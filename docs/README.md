@@ -24,6 +24,7 @@
 | [数据 Pipeline](design/data-pipeline.md) | 采集、姿态、跌倒候选、睡眠字段和评估链路 |
 | [指标公共契约](design/indicator-contracts.md) | Observation、Assessment、双版本静态报告与 fail-closed 规则 |
 | [指标、模型与语音实现方案](design/indicator-implementation.md) | 视频/睡眠指标算法、模型选择、语音 candidate、输出与 A/B 验收 |
+| [长程记忆库](design/longitudinal-memory.md) | 三链路指标分层存储、以人为中心的 SQLite 长程库、L0 持久化与 L1 个人基线偏离 |
 
 ## 开发治理
 

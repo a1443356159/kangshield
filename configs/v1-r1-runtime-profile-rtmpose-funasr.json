@@ -15,7 +15,7 @@
   "repository_sources": [
     {
       "relative_path": "pyproject.toml",
-      "sha256": "9b6015661dacc85a91f41a88ddf0414c5ff317f7a4f74aea6a6f2b04ee073902"
+      "sha256": "ae6df2b5a0df64fe2ca686f32c9b8188c00d243bee4e40382b953baa26b7302c"
     }
   ],
   "direct_requirements": [

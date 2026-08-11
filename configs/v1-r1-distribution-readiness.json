@@ -8,7 +8,7 @@
   "source_bindings": [
     {
       "relative_path": "pyproject.toml",
-      "sha256": "9b6015661dacc85a91f41a88ddf0414c5ff317f7a4f74aea6a6f2b04ee073902",
+      "sha256": "ae6df2b5a0df64fe2ca686f32c9b8188c00d243bee4e40382b953baa26b7302c",
       "covered_asset_ids": [
         "kangshield-project-code",
         "python-dependency-closure",
@@ -18,7 +18,7 @@
     },
     {
       "relative_path": "configs/v1-r1-runtime-profile-rtmpose-funasr.json",
-      "sha256": "a1ef8ef46caf5002cd9e5fdaf461c7aeb09e0ac4b55cb0fc36f5ec7f69d10823",
+      "sha256": "2a44e0631fea37f54eaefbf21ba33b046ce3476922a436cd170c2d194404fe1d",
       "covered_asset_ids": [
         "python-dependency-closure"
       ]

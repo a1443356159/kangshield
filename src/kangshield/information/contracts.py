@@ -501,6 +501,60 @@ class FallMotionFrameValue(ContractModel):
     alert_emitted: Literal[False] = False
 
 
+class PredictionFrameValue(ContractModel):
+    """Per-frame prediction indicators adapted from the synced fall-detection core.
+
+    Values are raw engineering measurements.  Candidate 0-3 scores produced by
+    the synced algorithms are owner-only candidates, not formal assessments.
+    """
+
+    schema_version: str = "1.0"
+    feature_version: str
+    frame_sequence: int = Field(ge=0)
+    timestamp_ms: int = Field(ge=0)
+    frame_width: int = Field(gt=0)
+    frame_height: int = Field(gt=0)
+    person_detected: bool
+    person_count: int = Field(ge=0)
+    selected_track_id: int | None = None
+    raw_posture: str | None = None
+    posture: str | None = None
+    bbox_aspect_ratio: float | None = None
+    torso_tilt_deg: float | None = None
+    knee_angle_deg: float | None = None
+    center_speed_px_s: float | None = None
+    horizontal_speed_frame_widths_s: float | None = None
+    vertical_speed_frame_heights_s: float | None = None
+    lying_duration_s: float | None = Field(default=None, ge=0.0)
+    gait: dict[str, Any] = Field(default_factory=dict)
+    sit_to_stand_state: str | None = None
+    last_sit_to_stand: dict[str, Any] | None = None
+    candidate_scores: dict[str, Any] = Field(default_factory=dict)
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
+    limitations: list[str] = Field(default_factory=list)
+
+
+class PredictionClipSummary(ContractModel):
+    """Clip-level aggregate of the synced prediction indicators."""
+
+    schema_version: str = "1.0"
+    feature_version: str
+    frames_processed: int = Field(ge=0)
+    frames_with_primary_person: int = Field(ge=0)
+    posture_frame_counts: dict[str, int] = Field(default_factory=dict)
+    step_event_count: int = Field(ge=0)
+    final_gait: dict[str, Any] = Field(default_factory=dict)
+    sit_to_stand_completed_count: int = Field(ge=0)
+    sit_to_stand_durations_s: list[float] = Field(default_factory=list)
+    assessability: Literal["assessable", "not_assessable"]
+    gate_failures: list[str] = Field(default_factory=list)
+    meters_per_pixel: float = Field(ge=0.0)
+    risk_assessment_emitted: Literal[False] = False
+    alert_emitted: Literal[False] = False
+    limitations: list[str] = Field(default_factory=list)
+
+
 class FallCandidateTransitionRule(ContractModel):
     minimum_horizontal_duration_ms: int = Field(gt=0)
     rapid_descent_lookback_ms: int = Field(gt=0)
@@ -1160,6 +1214,7 @@ class FallFeatureCaptureClipReport(ContractModel):
     tracked_frames: int = Field(ge=0)
     unique_track_count: int = Field(ge=0)
     fall_feature_metrics: FallFeatureMetrics
+    prediction_summary: PredictionClipSummary | None = None
     timing_ms: dict[str, float] = Field(default_factory=dict)
     realtime_factors: dict[str, float] = Field(default_factory=dict)
     risk_assessment_emitted: Literal[False] = False
@@ -1598,6 +1653,48 @@ class StaticHomeBenchmarkReport(ContractModel):
         if any(variant.case_count != self.case_count for variant in self.variants):
             raise ValueError("static variant case count disagrees with report")
         return self
+
+
+class SpeechSegment(ContractModel):
+    """Formal D1 speech segment contract (design doc section 3).
+
+    Transcript text stays owner-only; public evidence may only carry
+    category, timing, counts, quality and status.
+    """
+
+    schema_version: str = "1.0"
+    start_ms: int = Field(ge=0)
+    end_ms: int = Field(ge=0)
+    text: str
+    language: str
+    confidence: float | None = None
+    transcript_ref: str | None = None
+    finalized: bool = True
+
+    @model_validator(mode="after")
+    def validate_bounds(self) -> "SpeechSegment":
+        if self.end_ms < self.start_ms:
+            raise ValueError("speech segment end precedes start")
+        return self
+
+
+class VoiceCandidate(ContractModel):
+    """Help-request / fall-related voice candidate for human review.
+
+    A voice candidate never confirms a fall and never emits a risk
+    assessment by itself.
+    """
+
+    schema_version: str = "1.0"
+    candidate_id: str = Field(min_length=3)
+    category: Literal["help_request", "fall_related"]
+    time_range: TimeRange = Field(default_factory=TimeRange)
+    segment_ref: str | None = None
+    matcher_revision: str = Field(min_length=1)
+    review_status: Literal["pending_review", "confirmed", "rejected"] = (
+        "pending_review"
+    )
+    risk_assessment_emitted: Literal[False] = False
 
 
 class SpeechBenchmarkCaseEvaluation(ContractModel):
@@ -3385,3 +3482,141 @@ class EzvizSnapshotReport(ContractModel):
     sanitized_snapshot: Any
     checklist: dict[str, str]
     issues: list[QualityIssue] = Field(default_factory=list)
+
+
+class LongitudinalBucket(StrEnum):
+    DAY = "day"
+    NIGHT = "night"
+
+
+class LongitudinalIndicatorSpec(ContractModel):
+    indicator_id: str = Field(min_length=1)
+    risk_direction: Literal["above", "below", "both"]
+
+
+class LongitudinalBaselinePolicy(ContractModel):
+    """Versioned L1 personal-baseline deviation policy (candidate-only)."""
+
+    schema_version: str = "1.0"
+    policy_id: str = Field(min_length=1)
+    revision: str = Field(min_length=1)
+    day_start_hour: int = Field(default=6, ge=0, le=23)
+    day_end_hour: int = Field(default=18, ge=1, le=24)
+    window_days: int = Field(default=28, ge=7)
+    min_baseline_samples: int = Field(default=10, ge=1)
+    ewma_alpha: float = Field(default=0.3, gt=0.0, le=1.0)
+    score_z_thresholds: dict[int, float]
+    zero_mad_score: int = Field(default=1, ge=0, le=3)
+    indicators: list[LongitudinalIndicatorSpec] = Field(min_length=1)
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _policy_is_coherent(self) -> "LongitudinalBaselinePolicy":
+        if self.day_end_hour <= self.day_start_hour:
+            raise ValueError("longitudinal policy day window must be ordered")
+        if set(self.score_z_thresholds) != {1, 2, 3}:
+            raise ValueError("longitudinal policy requires z thresholds for scores 1..3")
+        ordered = [self.score_z_thresholds[score] for score in (1, 2, 3)]
+        if any(low >= high for low, high in zip(ordered, ordered[1:], strict=False)):
+            raise ValueError("longitudinal policy z thresholds must strictly increase")
+        ids = [spec.indicator_id for spec in self.indicators]
+        if len(ids) != len(set(ids)):
+            raise ValueError("longitudinal policy indicator ids must be unique")
+        return self
+
+
+class PersonalBaseline(ContractModel):
+    schema_version: str = "1.0"
+    elder_ref: str = Field(min_length=1)
+    indicator_id: str = Field(min_length=1)
+    bucket: LongitudinalBucket
+    computed_at: datetime
+    window_days: int = Field(ge=1)
+    sample_count: int = Field(ge=0)
+    status: Literal["ready", "insufficient_samples"]
+    median: float | None = None
+    mad: float | None = None
+    ewma: float | None = None
+    policy_revision: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _baseline_stats_match_status(self) -> "PersonalBaseline":
+        stats = (self.median, self.mad, self.ewma)
+        if self.status == "ready":
+            if any(value is None for value in stats) or self.sample_count < 1:
+                raise ValueError("ready baseline requires statistics and samples")
+        elif any(value is not None for value in stats):
+            raise ValueError("insufficient baseline must not contain statistics")
+        return self
+
+
+class BaselineDeviationCandidate(ContractModel):
+    """Owner-only L1 personal-baseline deviation candidate; not a risk score or alert."""
+
+    schema_version: str = "1.0"
+    candidate_id: str = Field(min_length=1)
+    elder_ref: str = Field(min_length=1)
+    indicator_id: str = Field(min_length=1)
+    bucket: LongitudinalBucket
+    detected_at: datetime
+    direction: Literal["above", "below"]
+    z_value: float
+    ewma_shift: float | None = None
+    score: int = Field(ge=0, le=3)
+    policy_revision: str = Field(min_length=1)
+    policy_digest: str = Field(min_length=64, max_length=64)
+    baseline_sample_count: int = Field(ge=1)
+    risk_assessment_emitted: Literal[False] = False
+    limitations: list[str] = Field(default_factory=list)
+
+
+class LongitudinalIngestEntry(ContractModel):
+    report_digest: str = Field(min_length=64, max_length=64)
+    report_kind: Literal["indicator_extraction", "fall_candidate_prediction_set"]
+    status: Literal["ingested", "skipped_duplicate"]
+    run_id: str | None = None
+    observation_count: int = Field(default=0, ge=0)
+    episode_count: int = Field(default=0, ge=0)
+    baseline_excluded_count: int = Field(default=0, ge=0)
+
+
+class LongitudinalIngestReport(ContractModel):
+    """Value-free ingest receipt; safe to share as public evidence."""
+
+    schema_version: str = "1.0"
+    ingestor_version: str
+    elder_ref: str = Field(min_length=1)
+    generated_at: datetime = Field(default_factory=utc_now)
+    entries: list[LongitudinalIngestEntry]
+    ingested_count: int = Field(ge=0)
+    skipped_duplicate_count: int = Field(ge=0)
+    limitations: list[str] = Field(default_factory=list)
+
+
+class LongitudinalAssessmentReport(ContractModel):
+    """L1 personal-baseline assessment. Global scoring is intentionally unavailable."""
+
+    schema_version: str = "1.0"
+    report_version: str
+    visibility: Literal["owner_only", "public_evidence"]
+    elder_ref: str = Field(min_length=1)
+    generated_at: datetime = Field(default_factory=utc_now)
+    policy_revision: str = Field(min_length=1)
+    policy_digest: str = Field(min_length=64, max_length=64)
+    baselines: list[PersonalBaseline] = Field(default_factory=list)
+    deviation_candidates: list[BaselineDeviationCandidate] = Field(default_factory=list)
+    observation_counts: dict[str, int] = Field(default_factory=dict)
+    status_counts: dict[str, int] = Field(default_factory=dict)
+    global_score: None = None
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _public_report_is_value_free(self) -> "LongitudinalAssessmentReport":
+        if self.visibility == "public_evidence" and (
+            self.baselines or self.deviation_candidates
+        ):
+            raise ValueError(
+                "public longitudinal report must not contain baseline values "
+                "or deviation candidates"
+            )
+        return self

@@ -1,0 +1,7 @@
+# V1-G4 PoseC3D isolated Python 3.10 environment (Slurm / L40).
+# Versions mirror the fall-detection verified combination.
+torch==2.1.2
+mmengine==0.10.7
+mmcv-lite==2.1.0
+mmaction2==1.2.0
+numpy>=1.26,<3

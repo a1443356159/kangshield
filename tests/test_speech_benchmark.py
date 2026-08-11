@@ -75,9 +75,9 @@ def test_speech_case_aggregate_uses_corpus_cer_and_omits_text_fields():
 
 def test_union_segment_duration_merges_overlap_and_clamps_to_audio():
     segments = [
-        SpeechSegment(0, 600, "甲", "zh"),
-        SpeechSegment(500, 900, "乙", "zh"),
-        SpeechSegment(950, 1200, "丙", "zh"),
+        SpeechSegment(start_ms=0, end_ms=600, text="甲", language="zh"),
+        SpeechSegment(start_ms=500, end_ms=900, text="乙", language="zh"),
+        SpeechSegment(start_ms=950, end_ms=1200, text="丙", language="zh"),
     ]
     assert _union_segment_duration_ms(segments, 1000) == 950
 

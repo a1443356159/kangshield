@@ -409,6 +409,27 @@ def build_parser() -> argparse.ArgumentParser:
     )
     feature_capture.add_argument("--sample-fps", type=float, default=5.0)
     feature_capture.add_argument(
+        "--prediction-policy",
+        type=Path,
+        default=None,
+        help=(
+            "Optional synced prediction-indicator policy; omit to keep the "
+            "legacy G4-only behaviour"
+        ),
+    )
+    feature_capture.add_argument(
+        "--posec3d",
+        choices=("off", "auto"),
+        default="off",
+        help="auto runs the synced PoseC3D sidecar when its environment exists",
+    )
+    feature_capture.add_argument(
+        "--face",
+        choices=("off", "auto"),
+        default="off",
+        help="auto runs synced whitelist identity when models and gallery exist",
+    )
+    feature_capture.add_argument(
         "--allow-dirty-readiness",
         action="store_true",
         help="Allow a dirty capture-readiness source for development only",
@@ -521,6 +542,49 @@ def build_parser() -> argparse.ArgumentParser:
     indicator_report.add_argument("reports", type=Path, nargs="+")
     indicator_report.add_argument("--runs-dir", type=Path, default=Path("runs"))
     indicator_report.add_argument(
+        "--evidence-level", type=_evidence, default=EvidenceLevel.E1
+    )
+
+    longi_ingest = subparsers.add_parser(
+        "ingest-longitudinal",
+        help="Ingest pipeline reports into the per-elder longitudinal store",
+    )
+    longi_ingest.add_argument("reports", type=Path, nargs="+")
+    longi_ingest.add_argument("--elder-ref", required=True)
+    longi_ingest.add_argument(
+        "--store-root", type=Path, default=Path("data/processed/longitudinal")
+    )
+    longi_ingest.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    longi_ingest.add_argument(
+        "--evidence-level", type=_evidence, default=EvidenceLevel.E1
+    )
+
+    longi_assess = subparsers.add_parser(
+        "assess-longitudinal",
+        help="Recompute personal baselines and emit L1 deviation candidates",
+    )
+    longi_assess.add_argument("--elder-ref", required=True)
+    longi_assess.add_argument(
+        "--store-root", type=Path, default=Path("data/processed/longitudinal")
+    )
+    longi_assess.add_argument(
+        "--policy", type=Path, default=Path("configs/v1-l1-longitudinal-policy.json")
+    )
+    longi_assess.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    longi_assess.add_argument(
+        "--evidence-level", type=_evidence, default=EvidenceLevel.E1
+    )
+
+    longi_inspect = subparsers.add_parser(
+        "inspect-longitudinal",
+        help="Print value-free counts and span for one elder's longitudinal store",
+    )
+    longi_inspect.add_argument("--elder-ref", required=True)
+    longi_inspect.add_argument(
+        "--store-root", type=Path, default=Path("data/processed/longitudinal")
+    )
+    longi_inspect.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    longi_inspect.add_argument(
         "--evidence-level", type=_evidence, default=EvidenceLevel.E1
     )
 
@@ -1654,6 +1718,125 @@ def _extract_indicator_command(args: argparse.Namespace, *, modality: str) -> in
     return 0
 
 
+def _ingest_longitudinal_command(args: argparse.Namespace) -> int:
+    from .longitudinal import LongitudinalStore, ingest_reports
+
+    with RunArtifacts(
+        args.runs_dir,
+        stage="v1-longitudinal-ingest",
+        evidence_level=args.evidence_level,
+        configuration={
+            "command": "ingest-longitudinal",
+            "input_paths_persisted": False,
+            "global_scoring_enabled": False,
+        },
+    ) as run:
+        with run.step("ingest-longitudinal") as step:
+            with LongitudinalStore(args.elder_ref, root=args.store_root) as store:
+                report = ingest_reports(
+                    args.reports,
+                    elder_ref=args.elder_ref,
+                    store=store,
+                    run_id=run.run_id,
+                )
+            output = run.write_report("longitudinal-ingest.json", report)
+            step.outputs.append(run.relative(output))
+    _print_result(
+        run,
+        {
+            "ingest_report": str(output),
+            "ingested_count": report.ingested_count,
+            "skipped_duplicate_count": report.skipped_duplicate_count,
+            "limitations": report.limitations,
+        },
+    )
+    return 0
+
+
+def _assess_longitudinal_command(args: argparse.Namespace) -> int:
+    from .contracts import LongitudinalBaselinePolicy, utc_now
+    from .longitudinal import (
+        LongitudinalStore,
+        build_assessment_reports,
+        detect_deviations,
+        recompute_baselines,
+        render_longitudinal_markdown,
+    )
+    from .privacy import sha256_file
+
+    policy = LongitudinalBaselinePolicy.model_validate(
+        json.loads(args.policy.read_text(encoding="utf-8"))
+    )
+    policy_digest = sha256_file(args.policy)
+    with RunArtifacts(
+        args.runs_dir,
+        stage="v1-longitudinal-assess",
+        evidence_level=args.evidence_level,
+        configuration={
+            "command": "assess-longitudinal",
+            "policy_revision": policy.revision,
+            "policy_digest": policy_digest,
+            "global_scoring_enabled": False,
+        },
+    ) as run:
+        with run.step("assess-longitudinal") as step:
+            with LongitudinalStore(args.elder_ref, root=args.store_root) as store:
+                _, baseline_counts = recompute_baselines(store, policy, now=utc_now())
+                _, detect_counts = detect_deviations(
+                    store, policy, policy_digest=policy_digest
+                )
+                owner, public = build_assessment_reports(
+                    store,
+                    policy,
+                    policy_digest=policy_digest,
+                    status_counts={**baseline_counts, **detect_counts},
+                )
+            outputs = [
+                run.write_report("longitudinal-assessment.owner.json", owner),
+                run.write_markdown(
+                    "longitudinal-assessment.owner.md",
+                    render_longitudinal_markdown(owner),
+                ),
+                run.write_report("longitudinal-assessment.public.json", public),
+                run.write_markdown(
+                    "longitudinal-assessment.public.md",
+                    render_longitudinal_markdown(public),
+                ),
+            ]
+            step.outputs.extend(run.relative(path) for path in outputs)
+    _print_result(
+        run,
+        {
+            "owner_report": str(outputs[0]),
+            "public_report": str(outputs[2]),
+            "baselines_ready": baseline_counts["ready_baseline"],
+            "baselines_insufficient": baseline_counts["insufficient_baseline"],
+            "deviation_candidate_count": len(owner.deviation_candidates),
+            "global_score": None,
+        },
+    )
+    return 0
+
+
+def _inspect_longitudinal_command(args: argparse.Namespace) -> int:
+    from .longitudinal import LongitudinalStore
+
+    with RunArtifacts(
+        args.runs_dir,
+        stage="v1-longitudinal-inspect",
+        evidence_level=args.evidence_level,
+        configuration={
+            "command": "inspect-longitudinal",
+            "value_free_counts_only": True,
+        },
+    ) as run:
+        with run.step("inspect-longitudinal"):
+            with LongitudinalStore(args.elder_ref, root=args.store_root) as store:
+                counts = store.counts()
+    _print_result(run, {"elder_ref": args.elder_ref, **counts})
+    return 0
+
+
 def _build_indicator_report_command(args: argparse.Namespace) -> int:
     from .contracts import EVIDENCE_RANK
     from .indicators import (
@@ -1974,6 +2157,9 @@ def _capture_fall_features_command(args: argparse.Namespace) -> int:
         source_type=args.source_type,
         sample_fps=args.sample_fps,
         allow_dirty_readiness=args.allow_dirty_readiness,
+        prediction_policy_path=args.prediction_policy,
+        posec3d_mode=args.posec3d,
+        face_mode=args.face,
     )
     _print_result(
         run,
@@ -2720,6 +2906,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _extract_indicator_command(args, modality="sleep")
     if args.command == "build-indicator-report":
         return _build_indicator_report_command(args)
+    if args.command == "ingest-longitudinal":
+        return _ingest_longitudinal_command(args)
+    if args.command == "assess-longitudinal":
+        return _assess_longitudinal_command(args)
+    if args.command == "inspect-longitudinal":
+        return _inspect_longitudinal_command(args)
     if args.command == "assess-distribution-readiness":
         return _assess_distribution_readiness_command(args)
     if args.command == "assess-runtime-closure":

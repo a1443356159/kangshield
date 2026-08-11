@@ -62,6 +62,10 @@ all observations
 | 回归基线 | YOLO pose + ByteTrack | 检查新链没有相对旧实现退化 |
 | fallback | Keypoint R-CNN | 独立对照，不按人物框覆盖自动接管 |
 | 可选诊断 | MediaPipe BlazePose Heavy | whole-body runtime 受阻时，仅用于单人步态 |
+| 短期失稳 challenger | PoseC3D SlowOnly-R50 NTU60-XSub keypoint | 48 帧骨架窗口的 staggering/falling 概率，独立 Python 3.10 环境 + 文件 IPC，随 fall-detection 同步 |
+| 身份关联（可选） | RetinaFace-R50 + ArcFace IR-SE50 | C16 多人交叉的 track 身份关联，本地白名单，无活体，默认关闭 |
+
+预测指标（姿态分类/稳定化、主目标选择、步事件、步频、步时变异、不对称、支撑宽度、站立摇摆、躯干波动、单次坐到站）的算法权威来源是 fall-detection 仓，经 `src/kangshield/information/prediction_sync/` 整体同步（`SYNC_MANIFEST.json` 记录 commit 与逐文件摘要，本地禁止改算法，只允许再同步）。kangshield 骨架只提供契约、policy 配置、capture 链接线和质量门；同步代码的 0–3 分与风险百分比只作 owner-only candidate，不进正式 Assessment。`capture-fall-features` 通过 `--prediction-policy` / `--posec3d off|auto` / `--face off|auto` 启用，缺省行为与既有 G4 链逐字段一致。同步算法按 15 fps 调参，5 fps 回放下步态指标必须挂 `step_event_thresholds_tuned_for_15fps` limitation。
 
 RTMW3D 和 ViTPose 不进入首轮 B：前者没有消除单目尺度/遮挡歧义，后者没有直接补足脚点和时序问题。A 集结束后最多让主候选、互补 fallback 和回归基线进入 B。
 
@@ -122,6 +126,8 @@ AAC 16 kHz mono
 
 FunASR 作为现有工程参考；SenseVoiceSmall + FSMN-VAD 作为 A 集远场、噪声和口音 challenger；Whisper small 只保留历史回归。任何 checkpoint 都需单独审查来源、摘要、许可证和携带方式。
 
+`SpeechSegment` 与 `VoiceCandidate` 已落地为 contracts.py 正式契约（owner-only transcript 引用、finalized 状态、`help_request|fall_related` 类目、matcher revision、`risk_assessment_emitted=false` 强制）；`speech_backend.py` 改为引用正式契约。确定性 matcher 的候选 policy 在 `configs/v1-g4-voice-candidate-policy.json`（版本化、不接 LLM、声明 hard negative 类目），词表与 candidate 生成待开发集 A 数据后冻结。
+
 首版 matcher 不接 LLM。否定、转述、电视/手机播放、ASR 错词、多人重叠和环境噪声必须作为 hard negative。完整逐字稿只存 owner-only artifact；public evidence 只保存类别、时间、计数、质量、状态和限制。
 
 音视频融合只生成复核候选：视频与语音 candidate 临近时提高人工复核优先级；只有语音时独立复核，不确认跌倒。音轨缺失、PTS 中断或模型失败时语音 `not_assessable`，视频与睡眠继续。
@@ -140,6 +146,8 @@ FunASR 作为现有工程参考；SenseVoiceSmall + FSMN-VAD 作为 A 集远场�
 | 语音 | VAD、CER、audio PTS、距离/噪声、回放/否定 | 降质量或不可评估 |
 
 public evidence 只含 assessability/质量计数、失败原因、模型/runtime/许可证状态、A/B 覆盖和聚合误差，不含个人指标值、关键点、录音、逐字稿或健康时序。
+
+跨时间的人口统计学存储与 L1 个人基线偏离（中位数/MAD/EWMA，candidate-only）见[长程记忆库](longitudinal-memory.md)；长程库以 `elder_ref` 为主键，owner-only，按人可删，L2 时序预测模型暂不考虑。
 
 ## 9. A/B 选择门
 

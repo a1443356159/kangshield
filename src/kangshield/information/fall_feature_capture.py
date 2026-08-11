@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from statistics import mean
 from time import perf_counter
-from typing import Callable
+from typing import Any, Callable
 
 from pydantic import BaseModel, ValidationError
 
@@ -44,6 +44,14 @@ from .fall_features import (
 )
 from .m2c_capture import M2cInferenceContext, load_m2c_inference_context
 from .pose_backend import PoseBackend, PoseDetection
+from .prediction_features import (
+    FaceIdentityRunner,
+    PoseC3DBatchRunner,
+    PredictionFeatureConfig,
+    PredictionFeatureExtractor,
+    load_prediction_feature_config,
+)
+from .contracts import PredictionFrameValue
 from .privacy import safe_local_uri, sha256_file
 from .streaming import OpenCVVideoReplay
 
@@ -327,6 +335,80 @@ def _fall_event(
     )
 
 
+def _prediction_event(
+    *,
+    run_id: str,
+    clip_index: int,
+    source: FeatureEvent,
+    value: PredictionFrameValue,
+) -> FeatureEvent:
+    return FeatureEvent(
+        feature_id=(
+            f"feature_{run_id}_prediction_{clip_index:03d}_{value.frame_sequence:06d}"
+        ),
+        observation_id=source.observation_id,
+        feature_type="video.prediction_frame",
+        time_range=source.time_range,
+        value=value.model_dump(mode="json"),
+        extractor_name="kangshield-prediction-features",
+        extractor_version=value.feature_version,
+        privacy_level=PrivacyLevel.DERIVED_SENSITIVE,
+        source_feature_refs=[source.feature_id],
+        limitations=[
+            "candidate_scores_are_not_formal_assessments",
+            "synced_algorithm_authority_fall_detection",
+            "capture_bound_held_out_replay",
+        ],
+    )
+
+
+def _identity_event(
+    *,
+    run_id: str,
+    clip_index: int,
+    sequence: int,
+    source: FeatureEvent,
+    identity: dict[str, Any],
+) -> FeatureEvent:
+    return FeatureEvent(
+        feature_id=f"feature_{run_id}_identity_{clip_index:03d}_{sequence:06d}",
+        observation_id=source.observation_id,
+        feature_type="video.identity_frame",
+        time_range=source.time_range,
+        value=identity,
+        extractor_name="kangshield-face-identity",
+        extractor_version="face-identity-sync-v0.1.0",
+        privacy_level=PrivacyLevel.DERIVED_SENSITIVE,
+        source_feature_refs=[source.feature_id],
+        limitations=[
+            "whitelist_identity_is_not_liveness_verified",
+            "identity_results_are_sensitive_personal_information",
+        ],
+    )
+
+
+def _posec3d_event(
+    *,
+    run_id: str,
+    clip_index: int,
+    observation_id: str,
+    result: dict[str, Any],
+) -> FeatureEvent:
+    return FeatureEvent(
+        feature_id=f"feature_{run_id}_posec3d_{clip_index:03d}",
+        observation_id=observation_id,
+        feature_type="video.posec3d_window",
+        value=result,
+        extractor_name="kangshield-posec3d-sidecar",
+        extractor_version="posec3d-slowonly-r50-ntu60-xsub-keypoint",
+        privacy_level=PrivacyLevel.DERIVED_SENSITIVE,
+        limitations=[
+            "ntu60_action_probabilities_are_not_calibrated_fall_probabilities",
+            "capture_bound_held_out_replay",
+        ],
+    )
+
+
 def _runtime_environment() -> dict[str, object]:
     result: dict[str, object] = {
         "python": platform.python_version(),
@@ -367,6 +449,9 @@ def _run_clip(
     config_path: Path,
     run: RunArtifacts,
     sample_fps: float,
+    prediction_config: PredictionFeatureConfig | None = None,
+    posec3d_runner: PoseC3DBatchRunner | None = None,
+    face_runner: FaceIdentityRunner | None = None,
 ) -> _ClipRuntime:
     clip = context.clips[clip_index]
     config = load_fall_feature_config(config_path)
@@ -377,12 +462,14 @@ def _run_clip(
     sample_period_ms = max(1, round(1000.0 / sample_fps))
     observation_id = f"observation_{run.run_id}_{clip_index:03d}"
     relative_path = f"artifacts/fall-motion-{clip_index:03d}.jsonl"
+    prediction_relative_path = f"artifacts/prediction-motion-{clip_index:03d}.jsonl"
     replay = OpenCVVideoReplay(
         clip.media_path,
         sample_fps=sample_fps,
         max_duration_s=clip.duration_ms / 1000.0,
     )
     extractor: FallMotionFeatureExtractor | None = None
+    prediction_extractor: PredictionFeatureExtractor | None = None
     values: list[FallMotionFrameValue] = []
     inference_latencies: list[float] = []
     feature_latencies: list[float] = []
@@ -407,6 +494,13 @@ def _run_clip(
                 int(height),
             ):
                 raise ValueError("capture frame dimensions changed within a clip")
+            if prediction_config is not None and prediction_extractor is None:
+                prediction_extractor = PredictionFeatureExtractor(
+                    prediction_config,
+                    frame_width=int(width),
+                    frame_height=int(height),
+                    sample_fps=sample_fps,
+                )
             inference_started = perf_counter()
             detections = backend.infer(packet.frame)
             inference_latencies.append((perf_counter() - inference_started) * 1000.0)
@@ -435,6 +529,39 @@ def _run_clip(
             run.record_feature(pose_event)
             run.record_feature(fall_event)
             stream_path = run.record_feature_artifact(relative_path, fall_event)
+            if prediction_extractor is not None:
+                prediction_value = prediction_extractor.process(
+                    detections,
+                    frame_sequence=sequence,
+                    timestamp_ms=packet.timestamp_ms,
+                )
+                prediction_event = _prediction_event(
+                    run_id=run.run_id,
+                    clip_index=clip_index,
+                    source=pose_event,
+                    value=prediction_value,
+                )
+                run.record_feature(prediction_event)
+                run.record_feature_artifact(
+                    prediction_relative_path, prediction_event
+                )
+                if face_runner is not None and face_runner.available:
+                    identity = face_runner.process_frame(
+                        packet.frame,
+                        detections,
+                        timestamp_ms=packet.timestamp_ms,
+                        frame_number=sequence,
+                        primary_track_id=prediction_value.selected_track_id,
+                    )
+                    run.record_feature(
+                        _identity_event(
+                            run_id=run.run_id,
+                            clip_index=clip_index,
+                            sequence=sequence,
+                            source=pose_event,
+                            identity=identity,
+                        )
+                    )
             values.append(value)
             if detections:
                 frames_with_people += 1
@@ -450,6 +577,19 @@ def _run_clip(
     replay_wall_ms = (perf_counter() - replay_started) * 1000.0
     if extractor is None or stream_path is None or not values:
         raise ValueError("capture clip produced no sampled frames")
+    if prediction_extractor is not None and posec3d_runner is not None:
+        posec3d_result = posec3d_runner.run_window(
+            prediction_extractor.state,
+            run.artifacts_dir / f"posec3d-{clip_index:03d}",
+        )
+        run.record_feature(
+            _posec3d_event(
+                run_id=run.run_id,
+                clip_index=clip_index,
+                observation_id=observation_id,
+                result=posec3d_result,
+            )
+        )
     coverage_end_ms = values[-1].timestamp_ms + sample_period_ms
     if clip.duration_ms - coverage_end_ms > sample_period_ms:
         raise ValueError("capture replay ended before the declared clip duration")
@@ -463,6 +603,11 @@ def _run_clip(
         tracked_frames=tracked_frames,
         unique_track_count=len(track_ids),
         fall_feature_metrics=metrics,
+        prediction_summary=(
+            prediction_extractor.summary()
+            if prediction_extractor is not None
+            else None
+        ),
         timing_ms={
             "replay_wall": round(replay_wall_ms, 3),
             "pose_inference_total": round(sum(inference_latencies), 3),
@@ -506,6 +651,9 @@ def run_fall_feature_capture(
     source_type: SourceType = SourceType.FIXTURE,
     sample_fps: float = 5.0,
     allow_dirty_readiness: bool = False,
+    prediction_policy_path: Path | None = None,
+    posec3d_mode: str = "off",
+    face_mode: str = "off",
 ) -> tuple[RunArtifacts, FallFeatureCaptureSet, FallFeatureCaptureReport]:
     """Run one frozen pose variant and G4 extractor over every capture clip."""
 
@@ -514,10 +662,22 @@ def run_fall_feature_capture(
         raise ValueError("capture feature replay can provide at most E2 evidence")
     if sample_fps <= 0:
         raise ValueError("capture feature sample_fps must be positive")
+    if posec3d_mode not in {"off", "auto"}:
+        raise ValueError("posec3d_mode must be off or auto")
+    if face_mode not in {"off", "auto"}:
+        raise ValueError("face_mode must be off or auto")
     capture_manifest_path = Path(capture_manifest_path).resolve()
     config_path = Path(config_path).resolve()
     if not config_path.is_file():
         raise FileNotFoundError("fall feature policy not found")
+    prediction_config: PredictionFeatureConfig | None = None
+    prediction_config_sha256: str | None = None
+    if prediction_policy_path is not None:
+        prediction_policy_path = Path(prediction_policy_path).resolve()
+        if not prediction_policy_path.is_file():
+            raise FileNotFoundError("prediction feature policy not found")
+        prediction_config = load_prediction_feature_config(prediction_policy_path)
+        prediction_config_sha256 = sha256_file(prediction_policy_path)
     context = load_m2c_inference_context(
         capture_manifest_path,
         variant_id=variant_id,
@@ -550,6 +710,9 @@ def run_fall_feature_capture(
         "fall_feature_policy_sha256": config_sha256,
         "feature_version": feature_config.feature_version,
         "sample_fps": sample_fps,
+        "prediction_feature_policy_sha256": prediction_config_sha256,
+        "posec3d_mode": posec3d_mode,
+        "face_mode": face_mode,
         "input_paths_persisted": False,
         "labels_read_during_generation": False,
         "risk_assessment_emitted": False,
@@ -624,6 +787,17 @@ def run_fall_feature_capture(
                         contains_raw_media=contains_raw_media,
                     )
                 )
+            if prediction_policy_path is not None:
+                record_asset_once(
+                    _source_asset(
+                        prediction_policy_path,
+                        kind="prediction_feature_policy",
+                        modality=Modality.DEVICE_SNAPSHOT,
+                        source_type=source_type,
+                        evidence_level=evidence_level,
+                        privacy_level=PrivacyLevel.AGGREGATE,
+                    )
+                )
             for clip in context.clips:
                 record_asset_once(
                     _source_asset(
@@ -646,6 +820,38 @@ def run_fall_feature_capture(
                     model_policy_path=context.model_policy_path,
                 )
             model_load_ms = (perf_counter() - model_load_started) * 1000.0
+            posec3d_runner: PoseC3DBatchRunner | None = None
+            if posec3d_mode == "auto":
+                posec3d_runner = PoseC3DBatchRunner(
+                    (
+                        prediction_config.posec3d
+                        if prediction_config is not None
+                        else load_prediction_feature_config(
+                            project_dir / "configs/v1-g4-prediction-features.json"
+                        ).posec3d
+                    ),
+                    python_executable=project_dir / ".venv-posec3d/bin/python",
+                    service_file=(
+                        project_dir
+                        / "src/kangshield/information/prediction_sync/posec3d_service.py"
+                    ),
+                    checkpoint=(
+                        project_dir
+                        / "models/posec3d/posec3d-ntu60-xsub-keypoint.pth"
+                    ),
+                    labels=project_dir / "models/posec3d/label_map_ntu60.txt",
+                    mmaction_config=(
+                        project_dir
+                        / "vendor/mmaction2/configs/skeleton/posec3d/"
+                        "slowonly_r50_8xb16-u48-240e_ntu60-xsub-keypoint.py"
+                    ),
+                )
+            face_runner: FaceIdentityRunner | None = None
+            if face_mode == "auto":
+                face_runner = FaceIdentityRunner(
+                    model_dir=project_dir / "models/face",
+                    gallery_path=project_dir / "data/face/gallery.npz",
+                )
             clip_runtimes = [
                 _run_clip(
                     context=context,
@@ -655,6 +861,9 @@ def run_fall_feature_capture(
                     config_path=config_path,
                     run=run,
                     sample_fps=sample_fps,
+                    prediction_config=prediction_config,
+                    posec3d_runner=posec3d_runner,
+                    face_runner=face_runner,
                 )
                 for index in range(len(context.clips))
             ]
@@ -693,6 +902,26 @@ def run_fall_feature_capture(
                 step.outputs.append(run.relative(feature_set_path))
 
             with run.step("write-fall-feature-capture-report") as step:
+                report_limitations = [
+                    "fixture_or_e1_output_is_tooling_evidence_only"
+                    if fixture
+                    else "e2_capture_output_still_requires_event_review",
+                    "largest_bbox_selection_is_not_multi_person_identity_tracking",
+                    "pose_and_fall_events_remain_derived_sensitive",
+                    "candidate_risk_and_alert_layers_are_not_executed",
+                ]
+                if prediction_config is not None:
+                    report_limitations.append(
+                        "prediction_indicators_are_candidate_values_not_assessments"
+                    )
+                if posec3d_runner is not None and not posec3d_runner.available:
+                    report_limitations.append(
+                        f"posec3d_unavailable: {posec3d_runner.unavailable_reason}"
+                    )
+                if face_runner is not None and not face_runner.available:
+                    report_limitations.append(
+                        f"face_identity_unavailable: {face_runner.unavailable_reason}"
+                    )
                 report = FallFeatureCaptureReport(
                     producer_version=FALL_FEATURE_CAPTURE_PRODUCER_VERSION,
                     source_run_id=run.run_id,
@@ -718,14 +947,7 @@ def run_fall_feature_capture(
                     clips=[item.report for item in clip_runtimes],
                     model_load_ms=round(model_load_ms, 3),
                     runtime_environment=_runtime_environment(),
-                    limitations=[
-                        "fixture_or_e1_output_is_tooling_evidence_only"
-                        if fixture
-                        else "e2_capture_output_still_requires_event_review",
-                        "largest_bbox_selection_is_not_multi_person_identity_tracking",
-                        "pose_and_fall_events_remain_derived_sensitive",
-                        "candidate_risk_and_alert_layers_are_not_executed",
-                    ],
+                    limitations=report_limitations,
                 )
                 report_path = run.write_report(
                     "fall-feature-capture-report.json",

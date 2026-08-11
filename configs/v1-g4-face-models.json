@@ -1,0 +1,49 @@
+{
+  "schema_version": "1.0",
+  "policy_id": "v1-g4-face-models",
+  "models": [
+    {
+      "model_id": "retinaface-resnet50",
+      "task": "face_detection",
+      "url": "https://github.com/xinntao/facexlib/releases/download/v0.1.0/detection_Resnet50_Final.pth",
+      "weight_sha256": null,
+      "weight_sha256_status": "pending_pin_at_prepare_time",
+      "output_path": "face/detection_Resnet50_Final.pth",
+      "implementation": "facexlib==0.3.0",
+      "implementation_license": "Apache-2.0",
+      "license": "model-artifact-license-review-required",
+      "distribution_status": "blocked_pending_review"
+    },
+    {
+      "model_id": "arcface-ir-se50",
+      "task": "face_recognition_embedding",
+      "url": "https://github.com/xinntao/facexlib/releases/download/v0.1.0/recognition_arcface_ir_se50.pth",
+      "weight_sha256": null,
+      "weight_sha256_status": "pending_pin_at_prepare_time",
+      "output_path": "face/recognition_arcface_ir_se50.pth",
+      "implementation": "facexlib==0.3.0",
+      "implementation_license": "Apache-2.0",
+      "training_data_terms": "insightface-ms1m-noncommercial-research",
+      "license": "model-artifact-license-review-required",
+      "distribution_status": "blocked_pending_review"
+    }
+  ],
+  "gallery": {
+    "path": "data/face/gallery.npz",
+    "schema_version": "kangshield-face-gallery-v1",
+    "privacy_level": "raw_sensitive",
+    "git_policy": "ignored",
+    "generation": "prediction_sync/face_enroll.py from authorized enrollment photos only"
+  },
+  "limitations": [
+    "no_liveness_detection_not_for_access_control_or_payment",
+    "face_embeddings_and_identity_results_are_sensitive_personal_information",
+    "weights_are_downloaded_at_prepare_time_and_are_not_committed",
+    "weight_digests_must_be_pinned_into_this_policy_before_formal_runs",
+    "similarity_threshold_requires_local_far_frr_evaluation_before_production"
+  ],
+  "license_sources": [
+    "https://github.com/xinntao/facexlib",
+    "https://github.com/deepinsight/insightface"
+  ]
+}

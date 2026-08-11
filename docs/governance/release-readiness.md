@@ -12,6 +12,13 @@
 - 最小 `core`、`speech` 和 `core+speech` runtime profile 未冻结；
 - competition dependency lock 和全新非 editable 环境未验证。
 
+## 新增待审模型资产（V1-G4 骨架同步）
+
+- PoseC3D SlowOnly-R50 NTU60-XSub checkpoint：实现 Apache-2.0，NTU RGB+D 训练数据仅研究用途，`configs/v1-g4-posec3d-model.json` 记为 `blocked_pending_review`，权重 sha256 待 prepare 时钉入；
+- RetinaFace-R50 / ArcFace IR-SE50：facexlib 分发，ArcFace 血缘 InsightFace 非商业限制，`configs/v1-g4-face-models.json` 记为 `blocked_pending_review`，权重 sha256 待钉入；
+- 人脸白名单库 `data/face/gallery.npz` 属敏感个人信息，不进 Git，需要最小权限、留存期限和删除机制；
+- 同步代码 `src/kangshield/information/prediction_sync/` 以 fall-detection 仓（commit `b263b3f`）为算法权威来源，再分发前需确认该仓许可证口径。
+
 ## Runtime 必须冻结
 
 - OS、架构、Python、GPU、CUDA/cuDNN；

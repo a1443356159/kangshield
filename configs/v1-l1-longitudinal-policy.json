@@ -1,0 +1,33 @@
+{
+  "schema_version": "1.0",
+  "policy_id": "v1-l1-longitudinal-policy",
+  "revision": "longitudinal-baseline-v0.1.0",
+  "day_start_hour": 6,
+  "day_end_hour": 18,
+  "window_days": 28,
+  "min_baseline_samples": 10,
+  "ewma_alpha": 0.3,
+  "score_z_thresholds": {
+    "1": 1.5,
+    "2": 2.5,
+    "3": 3.5
+  },
+  "zero_mad_score": 1,
+  "indicators": [
+    {"indicator_id": "gait_speed", "risk_direction": "below"},
+    {"indicator_id": "gait_cadence", "risk_direction": "below"},
+    {"indicator_id": "sit_to_stand_duration", "risk_direction": "above"},
+    {"indicator_id": "turn_180_duration", "risk_direction": "above"},
+    {"indicator_id": "turn_360_duration", "risk_direction": "above"},
+    {"indicator_id": "sleep_heart_rate_trend", "risk_direction": "both"},
+    {"indicator_id": "sleep_respiratory_rate_trend", "risk_direction": "both"}
+  ],
+  "limitations": [
+    "baseline_period_emits_no_scores_until_min_samples_reached",
+    "unscaled_or_uncalibrated_gait_speed_must_not_enter_baseline",
+    "deviation_candidates_are_owner_only_and_never_confirm_fall",
+    "mad_zero_uses_fixed_low_score_degenerate_rule",
+    "day_night_bucket_boundaries_follow_local_timestamp_offsets",
+    "policy_changes_after_held_out_b_require_new_revision_per_dec_013"
+  ]
+}

@@ -8,6 +8,7 @@ __pycache__/
 .env.*
 !.env.example
 runs/
+logs/
 data/raw/
 data/processed/
 secrets/
