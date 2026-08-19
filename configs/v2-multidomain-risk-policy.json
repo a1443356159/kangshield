@@ -1,0 +1,66 @@
+{
+  "schema_version": "2.0",
+  "policy_id": "v2-multidomain-risk-policy",
+  "revision": "2026-08-19.1",
+  "pilot_unvalidated": true,
+  "stale_after_hours": 6,
+  "initial_lookback_days": 14,
+  "scan_interval_seconds": 300,
+  "fall": {
+    "speech_cooccurrence_seconds": 10,
+    "zero_pose_minutes_24h": 10,
+    "mild_z": 1.5,
+    "severe_z": 2.5
+  },
+  "mental_wellbeing": {
+    "daytime_start_hour": 6,
+    "daytime_end_hour": 18,
+    "baseline_window_days": 28,
+    "minimum_baseline_days": 7,
+    "minimum_segments_per_day": 3,
+    "mild_z": 1.5,
+    "severe_z": 2.5,
+    "level_two_streak_days": 3,
+    "features": [
+      "daytime_presence",
+      "activity_level",
+      "speech_interaction",
+      "sleep_regularity"
+    ]
+  },
+  "fraud": {
+    "combination_window_seconds": 30,
+    "zero_audio_minutes_24h": 10,
+    "categories": {
+      "credential_request": ["验证码", "密码", "银行卡号", "身份证号"],
+      "transfer_investment": ["转账", "汇款", "投资", "安全账户", "收益"],
+      "impersonation": ["公安局", "检察院", "法院", "客服", "领导", "银行工作人员"],
+      "urgency_secrecy": ["马上", "立即", "保密", "不要告诉", "来不及"],
+      "remote_control": ["远程控制", "屏幕共享", "下载软件", "安装应用"]
+    },
+    "hard_negative": [
+      "防诈骗",
+      "反诈宣传",
+      "新闻报道",
+      "电视剧",
+      "电视里说",
+      "他转述",
+      "不要转账",
+      "不会转账",
+      "不给验证码",
+      "拒绝提供"
+    ]
+  },
+  "policy_summary": {
+    "fall": "候选事件、语音共现、人工复核和个人行动偏离的0至3级规则",
+    "mental_wellbeing": "日间出现、活动、语言互动和已确认睡眠规律相对个人基线的0至3级规则",
+    "fraud": "摄像头可听环境对话中五类可疑上下文及硬负例的0至3级规则"
+  },
+  "limitations": [
+    "pilot_unvalidated_not_probability",
+    "not_clinical_diagnosis",
+    "fraud_domain_is_suspicion_not_confirmation",
+    "no_global_score",
+    "no_external_automatic_alert"
+  ]
+}

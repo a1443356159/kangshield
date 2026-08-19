@@ -17,6 +17,7 @@ from .contracts import (
     StreamCaptureReport,
     StreamCaptureTrack,
     ensure_source_evidence_compatible,
+    utc_now,
 )
 from .media_probe import probe_media
 
@@ -543,12 +544,14 @@ def capture_stream(
         device_ref=device_ref,
         config=config,
     )
+    capture_started_at = utc_now()
     stats = _capture_packets(
         endpoint=endpoint,
         endpoint_scheme=endpoint_scheme,
         output_path=output_path,
         config=config,
     )
+    capture_ended_at = utc_now()
     try:
         media_probe = probe_media(
             output_path,
@@ -576,6 +579,8 @@ def capture_stream(
             transport=config.transport,
             requested_duration_ms=round(config.duration_s * 1000),
             minimum_duration_ms=minimum_duration_ms,
+            capture_started_at=capture_started_at,
+            capture_ended_at=capture_ended_at,
             captured_media_span_ms=captured_media_span_ms,
             open_timeout_ms=round(config.open_timeout_s * 1000),
             read_timeout_ms=round(config.read_timeout_s * 1000),

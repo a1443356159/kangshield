@@ -1884,6 +1884,8 @@ class StreamCaptureReport(ContractModel):
     transport: Literal["auto", "tcp", "udp"]
     requested_duration_ms: int = Field(gt=0)
     minimum_duration_ms: int = Field(gt=0)
+    capture_started_at: datetime | None = None
+    capture_ended_at: datetime | None = None
     captured_media_span_ms: int = Field(ge=0)
     open_timeout_ms: int = Field(gt=0)
     read_timeout_ms: int = Field(gt=0)
@@ -3461,6 +3463,108 @@ class IndicatorSummaryReport(ContractModel):
     def _public_report_is_value_free(self) -> "IndicatorSummaryReport":
         if self.visibility == "public_evidence" and self.observations:
             raise ValueError("public evidence report must not contain indicator values")
+        return self
+
+
+class RiskDomain(StrEnum):
+    FALL = "fall"
+    MENTAL_WELLBEING = "mental_wellbeing"
+    FRAUD = "fraud"
+
+
+class DomainRiskStatus(StrEnum):
+    ASSESSED = "assessed"
+    INSUFFICIENT_DATA = "insufficient_data"
+    DATA_STALE = "data_stale"
+    MODEL_UNAVAILABLE = "model_unavailable"
+
+
+class CandidateReviewStatus(StrEnum):
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+    REJECTED = "rejected"
+
+
+class ReviewDecision(StrEnum):
+    CONFIRMED = "confirmed"
+    REJECTED = "rejected"
+
+
+class DomainRiskAssessment(ContractModel):
+    """One rule-based pilot assessment; score is never a probability."""
+
+    schema_version: str = "2.0"
+    domain: RiskDomain
+    score: int | None = Field(default=None, ge=0, le=3)
+    status: DomainRiskStatus
+    window: TimeRange
+    data_coverage: dict[str, int | float | str | bool | None] = Field(
+        default_factory=dict
+    )
+    evidence_summary: list[str] = Field(default_factory=list)
+    policy_revision: str = Field(min_length=1)
+    policy_digest: str = Field(min_length=64, max_length=64)
+    policy_summary: str = Field(min_length=1)
+    pilot_unvalidated: Literal[True] = True
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _score_matches_status(self) -> "DomainRiskAssessment":
+        if self.score is None:
+            if self.status is DomainRiskStatus.ASSESSED:
+                raise ValueError("assessed domain requires a 0-3 score")
+            if not self.limitations:
+                raise ValueError("null domain score requires a limitation reason")
+        elif self.status is not DomainRiskStatus.ASSESSED:
+            raise ValueError("non-assessed domain must have a null score")
+        return self
+
+
+class DomainCandidate(ContractModel):
+    schema_version: str = "2.0"
+    candidate_id: str = Field(min_length=1)
+    domain: RiskDomain
+    category: str = Field(min_length=1)
+    occurred_at: datetime
+    evidence_refs: list[str] = Field(min_length=1)
+    evidence_summary: list[str] = Field(default_factory=list)
+    quality: float | None = Field(default=None, ge=0, le=1)
+    review_status: CandidateReviewStatus = CandidateReviewStatus.PENDING
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class CandidateReviewDecision(ContractModel):
+    schema_version: str = "2.0"
+    candidate_id: str = Field(min_length=1)
+    decision: ReviewDecision
+    decided_at: datetime = Field(default_factory=utc_now)
+    operator: str = Field(min_length=1, max_length=64)
+    owner_note: str | None = Field(default=None, max_length=2000)
+
+
+class MultidomainSnapshotReport(ContractModel):
+    schema_version: str = "2.0"
+    report_version: str
+    generated_at: datetime = Field(default_factory=utc_now)
+    visibility: Literal["owner_only", "public_evidence"] = "owner_only"
+    assessments: list[DomainRiskAssessment]
+    data_freshness: dict[str, str | int | float | bool | None] = Field(
+        default_factory=dict
+    )
+    timeline: list[DomainCandidate] = Field(default_factory=list)
+    quality_status: dict[str, str | int | float | bool | None] = Field(
+        default_factory=dict
+    )
+    global_score: None = None
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _exactly_three_domains(self) -> "MultidomainSnapshotReport":
+        domains = [item.domain for item in self.assessments]
+        if len(domains) != 3 or set(domains) != set(RiskDomain):
+            raise ValueError("snapshot requires each of the three risk domains once")
+        if self.visibility == "public_evidence" and self.timeline:
+            raise ValueError("public snapshot must not expose candidate timeline")
         return self
 
 

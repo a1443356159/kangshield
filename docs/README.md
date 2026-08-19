@@ -3,7 +3,7 @@
 状态：Active v2.0
 更新时间：2026-08-09
 
-当前指标需求源为 [跌倒新指标](references/fall-risk-indicators.docx)，owner 已另行明确把 C6c 语音辅助链纳入 D1。项目范围为单机位跌倒风险指标、跌倒/语音 candidate、SDHY1 睡眠数据和音视频人工复核；不恢复诈骗、情绪、认知、抑郁、表情或社交评分。
+当前指标需求源为 [跌倒新指标](references/fall-risk-indicators.docx)。现行产品范围为目标 C6c 单机位的跌倒、心理健康、诈骗三域本地试点、SDHY1 睡眠、candidate 与人工复核；不做全局总分、临床诊断、诈骗确认、外部自动告警、表情或声学情绪识别。
 
 ## 推荐阅读顺序
 
@@ -14,6 +14,7 @@
 5. [有效决策](governance/decisions.md)
 6. [指标公共契约](design/indicator-contracts.md)
 7. [指标、模型与语音实现方案](design/indicator-implementation.md)
+8. [三域风险产品 MVP](design/multidomain-risk-mvp.md)
 
 ## 设计
 
@@ -25,6 +26,7 @@
 | [指标公共契约](design/indicator-contracts.md) | Observation、Assessment、双版本静态报告与 fail-closed 规则 |
 | [指标、模型与语音实现方案](design/indicator-implementation.md) | 视频/睡眠指标算法、模型选择、语音 candidate、输出与 A/B 验收 |
 | [长程记忆库](design/longitudinal-memory.md) | 三链路指标分层存储、以人为中心的 SQLite 长程库、L0 持久化与 L1 个人基线偏离 |
+| [三域风险产品 MVP](design/multidomain-risk-mvp.md) | 三域规则、增量分析、SQLite v2、localhost 看板、复核与双版本导出 |
 
 ## 开发治理
 

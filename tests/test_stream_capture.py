@@ -216,6 +216,9 @@ def test_http_stream_capture_is_bounded_private_and_pipeline_replayable(tmp_path
     assert report.endpoint_scheme == "http"
     assert report.endpoint_log_messages_persisted is False
     assert report.termination_reason == "duration_limit"
+    assert report.capture_started_at is not None
+    assert report.capture_ended_at is not None
+    assert report.capture_ended_at >= report.capture_started_at
     assert report.capture_artifact_ready is True
     assert report.same_container_multimodal_ready is True
     assert report.device_platform_integration_proven is False

@@ -23,6 +23,8 @@
 | DEC-015 | owner 明确把 C6c 语音辅助链重新纳入 D1，取代原 DEC-009 的语音排除部分 | 包含 VAD、普通话 ASR、help/fall candidate 和 PTS 人工复核；诈骗、情绪、认知、抑郁、表情、社交仍排除 |
 | DEC-016 | 语音 candidate 与视频/风险指标分离 | 只提高人工复核优先级，不直接确认跌倒、不评分、不触发临床结论 |
 | DEC-017 | 生产环境视频指标为日常被动事件指标：`gait_speed_normalized`（腿长归一、免标定）、`sts_transition_duration`、`turn_duration`；协议版步速/5xSTS/C13/C14 仅用于开发集验证 | 居家免重复标定、免测试动作；`gait_speed`（m/s）完整标定前保持 `not_assessable`；被动指标白名单进 L1 长程基线 |
+| DEC-018 | 本地 MVP 冻结跌倒、心理健康、诈骗三域独立 0–3/null 规则，统一标记 `pilot_unvalidated`，`global_score=null` | 证据不足、数据过期或模型失败 fail closed；不形成临床/诈骗结论，不自动外部告警 |
+| DEC-019 | 产品服务只绑定 `127.0.0.1`，复核要求同源、CSRF 与 JSON；public 仅导出脱敏域等级和按日趋势 | 不提供媒体/任意文件路由；public 不含标识、原始指标、逐字稿、备注、路径或精确事件时间 |
 
 ## 待决定
 

@@ -15,7 +15,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Iterator
 
-SCHEMA_VERSION = "1"
+SCHEMA_VERSION = "2"
 DEFAULT_STORE_ROOT = Path("data/processed/longitudinal")
 
 _ELDER_REF_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
@@ -103,6 +103,74 @@ CREATE TABLE IF NOT EXISTS deviation_candidates (
     baseline_sample_count INTEGER NOT NULL,
     limitations_json TEXT NOT NULL DEFAULT '[]'
 );
+CREATE TABLE IF NOT EXISTS analysis_ledger (
+    media_digest TEXT PRIMARY KEY,
+    report_digest TEXT NOT NULL,
+    run_id TEXT NOT NULL,
+    device_ref TEXT,
+    captured_start_at TEXT,
+    captured_end_at TEXT,
+    status TEXT NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 1,
+    last_error TEXT,
+    pose_quality_seconds REAL NOT NULL DEFAULT 0,
+    audio_valid_seconds REAL NOT NULL DEFAULT 0,
+    first_attempt_at TEXT NOT NULL,
+    last_attempt_at TEXT NOT NULL,
+    completed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_analysis_ledger_device_time
+    ON analysis_ledger (device_ref, captured_start_at, status);
+CREATE TABLE IF NOT EXISTS daily_features (
+    local_date TEXT PRIMARY KEY,
+    eligible_segments INTEGER NOT NULL,
+    daytime_presence REAL,
+    activity_level REAL,
+    speech_interaction REAL,
+    sleep_regularity REAL,
+    sleep_confirmed INTEGER NOT NULL DEFAULT 0,
+    source_refs_json TEXT NOT NULL DEFAULT '[]',
+    updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS domain_candidates (
+    candidate_id TEXT PRIMARY KEY,
+    device_ref TEXT,
+    domain TEXT NOT NULL,
+    category TEXT NOT NULL,
+    occurred_at TEXT NOT NULL,
+    evidence_refs_json TEXT NOT NULL,
+    evidence_summary_json TEXT NOT NULL DEFAULT '[]',
+    quality REAL,
+    review_status TEXT NOT NULL DEFAULT 'pending',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    payload_json TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_domain_candidates_domain_time
+    ON domain_candidates (domain, occurred_at);
+CREATE TABLE IF NOT EXISTS domain_assessments (
+    assessment_id TEXT PRIMARY KEY,
+    domain TEXT NOT NULL,
+    score INTEGER,
+    status TEXT NOT NULL,
+    assessed_at TEXT NOT NULL,
+    policy_revision TEXT NOT NULL,
+    policy_digest TEXT NOT NULL,
+    payload_json TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_domain_assessments_domain_time
+    ON domain_assessments (domain, assessed_at);
+CREATE TABLE IF NOT EXISTS candidate_reviews (
+    id INTEGER PRIMARY KEY,
+    candidate_id TEXT NOT NULL,
+    decision TEXT NOT NULL,
+    decided_at TEXT NOT NULL,
+    operator TEXT NOT NULL,
+    owner_note TEXT,
+    FOREIGN KEY(candidate_id) REFERENCES domain_candidates(candidate_id)
+);
+CREATE INDEX IF NOT EXISTS idx_candidate_reviews_candidate_time
+    ON candidate_reviews (candidate_id, decided_at);
 """
 
 
@@ -121,7 +189,7 @@ class LongitudinalStore:
         self.elder_dir.mkdir(parents=True, exist_ok=True)
         self.elder_dir.chmod(0o700)
         self.db_path = self.elder_dir / "longitudinal.sqlite"
-        self._connection = sqlite3.connect(self.db_path)
+        self._connection = sqlite3.connect(self.db_path, timeout=30)
         self._connection.row_factory = sqlite3.Row
         self._connection.execute("PRAGMA journal_mode=WAL")
         self._connection.execute("PRAGMA foreign_keys=ON")
@@ -405,12 +473,227 @@ class LongitudinalStore:
             "deviation_candidates": scalar(
                 "SELECT COUNT(*) FROM deviation_candidates"
             ),
+            "analysis_runs": scalar("SELECT COUNT(*) FROM analysis_ledger"),
+            "analysis_failures": scalar(
+                "SELECT COUNT(*) FROM analysis_ledger WHERE status = 'failed'"
+            ),
+            "daily_features": scalar("SELECT COUNT(*) FROM daily_features"),
+            "domain_candidates": scalar("SELECT COUNT(*) FROM domain_candidates"),
+            "domain_assessments": scalar("SELECT COUNT(*) FROM domain_assessments"),
+            "candidate_reviews": scalar("SELECT COUNT(*) FROM candidate_reviews"),
             "observation_span": {"start": span[0], "end": span[1]},
         }
 
     def iter_ledger(self) -> Iterator[sqlite3.Row]:
         yield from self._connection.execute(
             "SELECT * FROM ingest_ledger ORDER BY ingested_at"
+        )
+
+    def record_analysis_attempt(
+        self,
+        *,
+        media_digest: str,
+        report_digest: str,
+        run_id: str,
+        device_ref: str | None,
+        attempted_at: str,
+        captured_start_at: str | None,
+        captured_end_at: str | None,
+        status: str,
+        error: str | None = None,
+        pose_quality_seconds: float = 0,
+        audio_valid_seconds: float = 0,
+    ) -> None:
+        with self._connection:
+            self._connection.execute(
+                "INSERT INTO analysis_ledger (media_digest, report_digest, run_id,"
+                " device_ref, captured_start_at, captured_end_at, status, attempts,"
+                " last_error, pose_quality_seconds, audio_valid_seconds,"
+                " first_attempt_at, last_attempt_at, completed_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)"
+                " ON CONFLICT(media_digest) DO UPDATE SET"
+                " report_digest=excluded.report_digest, run_id=excluded.run_id,"
+                " device_ref=excluded.device_ref,"
+                " captured_start_at=excluded.captured_start_at,"
+                " captured_end_at=excluded.captured_end_at, status=excluded.status,"
+                " attempts=analysis_ledger.attempts + 1,"
+                " last_error=excluded.last_error,"
+                " pose_quality_seconds=excluded.pose_quality_seconds,"
+                " audio_valid_seconds=excluded.audio_valid_seconds,"
+                " last_attempt_at=excluded.last_attempt_at,"
+                " completed_at=excluded.completed_at",
+                (
+                    media_digest,
+                    report_digest,
+                    run_id,
+                    device_ref,
+                    captured_start_at,
+                    captured_end_at,
+                    status,
+                    error,
+                    pose_quality_seconds,
+                    audio_valid_seconds,
+                    attempted_at,
+                    attempted_at,
+                    attempted_at if status == "completed" else None,
+                ),
+            )
+
+    def analysis_status(self, media_digest: str) -> str | None:
+        row = self._connection.execute(
+            "SELECT status FROM analysis_ledger WHERE media_digest = ?",
+            (media_digest,),
+        ).fetchone()
+        return None if row is None else str(row["status"])
+
+    def latest_successful_capture(self, device_ref: str) -> sqlite3.Row | None:
+        return self._connection.execute(
+            "SELECT * FROM analysis_ledger WHERE device_ref = ? AND status = 'completed'"
+            " ORDER BY captured_end_at DESC LIMIT 1",
+            (device_ref,),
+        ).fetchone()
+
+    def coverage_since(self, start_at: str, device_ref: str) -> dict[str, float]:
+        row = self._connection.execute(
+            "SELECT COALESCE(SUM(pose_quality_seconds), 0),"
+            " COALESCE(SUM(audio_valid_seconds), 0) FROM analysis_ledger"
+            " WHERE device_ref = ? AND status = 'completed'"
+            " AND captured_end_at >= ?",
+            (device_ref, start_at),
+        ).fetchone()
+        return {"pose_seconds": float(row[0]), "audio_seconds": float(row[1])}
+
+    def upsert_daily_feature(self, row: dict[str, Any]) -> None:
+        columns = [
+            "local_date",
+            "eligible_segments",
+            "daytime_presence",
+            "activity_level",
+            "speech_interaction",
+            "sleep_regularity",
+            "sleep_confirmed",
+            "source_refs_json",
+            "updated_at",
+        ]
+        with self._connection:
+            self._connection.execute(
+                f"INSERT OR REPLACE INTO daily_features ({', '.join(columns)})"
+                f" VALUES ({', '.join('?' for _ in columns)})",
+                tuple(row[column] for column in columns),
+            )
+
+    def fetch_daily_features(self, *, limit: int = 60) -> list[sqlite3.Row]:
+        return list(
+            self._connection.execute(
+                "SELECT * FROM daily_features ORDER BY local_date DESC LIMIT ?", (limit,)
+            )
+        )
+
+    def upsert_domain_candidate(self, row: dict[str, Any]) -> bool:
+        with self._connection:
+            cursor = self._connection.execute(
+                "INSERT OR IGNORE INTO domain_candidates (candidate_id, device_ref,"
+                " domain, category, occurred_at, evidence_refs_json,"
+                " evidence_summary_json, quality, review_status, created_at,"
+                " updated_at, payload_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    row["candidate_id"],
+                    row.get("device_ref"),
+                    row["domain"],
+                    row["category"],
+                    row["occurred_at"],
+                    row["evidence_refs_json"],
+                    row.get("evidence_summary_json", "[]"),
+                    row.get("quality"),
+                    row.get("review_status", "pending"),
+                    row["created_at"],
+                    row["updated_at"],
+                    row.get("payload_json", "{}"),
+                ),
+            )
+        return cursor.rowcount > 0
+
+    def fetch_domain_candidates(
+        self, *, domain: str | None = None, include_rejected: bool = True
+    ) -> list[sqlite3.Row]:
+        statement = "SELECT * FROM domain_candidates"
+        clauses: list[str] = []
+        parameters: list[Any] = []
+        if domain is not None:
+            clauses.append("domain = ?")
+            parameters.append(domain)
+        if not include_rejected:
+            clauses.append("review_status != 'rejected'")
+        if clauses:
+            statement += " WHERE " + " AND ".join(clauses)
+        statement += " ORDER BY occurred_at DESC, candidate_id"
+        return list(self._connection.execute(statement, parameters))
+
+    def review_candidate(
+        self,
+        *,
+        candidate_id: str,
+        decision: str,
+        decided_at: str,
+        operator: str,
+        owner_note: str | None,
+    ) -> None:
+        with self._connection:
+            cursor = self._connection.execute(
+                "UPDATE domain_candidates SET review_status = ?, updated_at = ?"
+                " WHERE candidate_id = ?",
+                (decision, decided_at, candidate_id),
+            )
+            if cursor.rowcount != 1:
+                raise KeyError(candidate_id)
+            self._connection.execute(
+                "INSERT INTO candidate_reviews (candidate_id, decision, decided_at,"
+                " operator, owner_note) VALUES (?, ?, ?, ?, ?)",
+                (candidate_id, decision, decided_at, operator, owner_note),
+            )
+
+    def fetch_candidate_reviews(self, candidate_id: str | None = None) -> list[sqlite3.Row]:
+        if candidate_id is None:
+            return list(
+                self._connection.execute(
+                    "SELECT * FROM candidate_reviews ORDER BY decided_at, id"
+                )
+            )
+        return list(
+            self._connection.execute(
+                "SELECT * FROM candidate_reviews WHERE candidate_id = ?"
+                " ORDER BY decided_at, id",
+                (candidate_id,),
+            )
+        )
+
+    def record_domain_assessment(self, row: dict[str, Any]) -> None:
+        with self._connection:
+            self._connection.execute(
+                "INSERT INTO domain_assessments (assessment_id, domain, score, status,"
+                " assessed_at, policy_revision, policy_digest, payload_json)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    row["assessment_id"],
+                    row["domain"],
+                    row.get("score"),
+                    row["status"],
+                    row["assessed_at"],
+                    row["policy_revision"],
+                    row["policy_digest"],
+                    row["payload_json"],
+                ),
+            )
+
+    def fetch_assessment_history(self, *, days: int = 28) -> list[sqlite3.Row]:
+        modifier = f"-{int(days)} days"
+        return list(
+            self._connection.execute(
+                "SELECT * FROM domain_assessments"
+                " WHERE assessed_at >= datetime('now', ?)"
+                " ORDER BY assessed_at, domain",
+                (modifier,),
+            )
         )
 
 

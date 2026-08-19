@@ -589,6 +589,42 @@ def build_parser() -> argparse.ArgumentParser:
         "--evidence-level", type=_evidence, default=EvidenceLevel.E1
     )
 
+    product = subparsers.add_parser(
+        "serve-product",
+        help="Serve the local-only three-domain pilot dashboard and review API",
+    )
+    product.add_argument("--elder-ref", required=True)
+    product.add_argument("--device-ref", required=True)
+    product.add_argument("--host", default="127.0.0.1")
+    product.add_argument("--port", type=int, default=8765)
+    product.add_argument(
+        "--store-root", type=Path, default=Path("data/processed/longitudinal")
+    )
+    product.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    product.add_argument(
+        "--policy", type=Path, default=Path("configs/v2-multidomain-risk-policy.json")
+    )
+    product.add_argument("--scan-interval-seconds", type=int, default=300)
+
+    product_export = subparsers.add_parser(
+        "export-product-report",
+        help="Generate an offline owner-only or redacted public product report",
+    )
+    product_export.add_argument("--elder-ref", required=True)
+    product_export.add_argument("--device-ref")
+    product_export.add_argument(
+        "--visibility",
+        required=True,
+        choices=("owner_only", "public_evidence"),
+    )
+    product_export.add_argument("--output", type=Path, required=True)
+    product_export.add_argument(
+        "--store-root", type=Path, default=Path("data/processed/longitudinal")
+    )
+    product_export.add_argument(
+        "--policy", type=Path, default=Path("configs/v2-multidomain-risk-policy.json")
+    )
+
     distribution = subparsers.add_parser(
         "assess-distribution-readiness",
         help="Assess the fail-closed V2 competition bundle license and distribution gate",
@@ -2874,6 +2910,47 @@ def _benchmark_static_home_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def _serve_product_command(args: argparse.Namespace) -> int:
+    from .product import serve_product
+
+    serve_product(
+        elder_ref=args.elder_ref,
+        device_ref=args.device_ref,
+        host=args.host,
+        port=args.port,
+        store_root=args.store_root,
+        runs_dir=args.runs_dir,
+        policy_path=args.policy,
+        scan_interval_seconds=args.scan_interval_seconds,
+    )
+    return 0
+
+
+def _export_product_report_command(args: argparse.Namespace) -> int:
+    from .product import export_product_report
+
+    html_path, json_path = export_product_report(
+        elder_ref=args.elder_ref,
+        device_ref=args.device_ref,
+        visibility=args.visibility,
+        output=args.output,
+        store_root=args.store_root,
+        policy_path=args.policy,
+    )
+    print(
+        json.dumps(
+            {
+                "visibility": args.visibility,
+                "html": str(html_path),
+                "json": str(json_path),
+                "global_score": None,
+            },
+            ensure_ascii=False,
+        )
+    )
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "capture-stream":
@@ -2914,6 +2991,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _assess_longitudinal_command(args)
     if args.command == "inspect-longitudinal":
         return _inspect_longitudinal_command(args)
+    if args.command == "serve-product":
+        return _serve_product_command(args)
+    if args.command == "export-product-report":
+        return _export_product_report_command(args)
     if args.command == "assess-distribution-readiness":
         return _assess_distribution_readiness_command(args)
     if args.command == "assess-runtime-closure":
