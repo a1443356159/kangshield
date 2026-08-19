@@ -551,6 +551,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     longi_ingest.add_argument("reports", type=Path, nargs="+")
     longi_ingest.add_argument("--elder-ref", required=True)
+    longi_ingest.add_argument("--device-ref")
     longi_ingest.add_argument(
         "--store-root", type=Path, default=Path("data/processed/longitudinal")
     )
@@ -1738,6 +1739,7 @@ def _ingest_longitudinal_command(args: argparse.Namespace) -> int:
                     elder_ref=args.elder_ref,
                     store=store,
                     run_id=run.run_id,
+                    device_ref=args.device_ref,
                 )
             output = run.write_report("longitudinal-ingest.json", report)
             step.outputs.append(run.relative(output))

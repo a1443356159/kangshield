@@ -12,6 +12,7 @@ def _observation_row(**overrides):
     row = {
         "observed_at": "2026-08-01T10:00:00+08:00",
         "bucket": "day",
+        "device_ref": None,
         "indicator_id": "gait_speed",
         "group_id": "gait",
         "source_modality": "video",

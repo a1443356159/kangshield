@@ -37,6 +37,24 @@ export KANG_STREAM_ENDPOINT
 unset KANG_STREAM_ENDPOINT
 ```
 
+## 2.1 开放平台取地址与已知设备差异
+
+直播地址每次会话现取（有过期时间）。`scripts/ezviz_live_endpoint.py` 从 `YS7_APP_KEY`/`YS7_APP_SECRET` 环境变量换 token 并打印 `protocol=4, quality=1, supportH265=1` 的 FLV 地址到 stdout，密钥与地址均不落盘：
+
+```bash
+export KANG_STREAM_ENDPOINT="$(
+  .venv/bin/python scripts/ezviz_live_endpoint.py <deviceSerial>
+)"
+```
+
+- 云端流未建立时拉流返回 404：先 `curl -r 0-1023` 预热一次（或在平台 App 看一眼画面）再 `capture-stream`。
+- 揭榜挂帅/资源包设备需先按设备绑定激活码（`mall/device/package/code/active`，每设备一个码），否则地址可生成但拉流 404。
+- 音频 codec 随设备而异：C6c 为 AAC 16 kHz；HK-Q1S4M 为 pcm_alaw 8 kHz，Matroska 无法直拷，取流时透明转码为 pcm_s16le 并在报告挂 `audio_track_transcoded_to_pcm_s16le`（契约字段 `output_codec_name` 记录落盘 codec）。
+
+## 2.2 定时自动采集
+
+`scripts/scheduled_capture.sh` 由系统 crontab 驱动（当前 `23 */2 * * *`）：每台设备取新地址、curl 预热、`capture-stream` 60 秒（内置 probe 质检），每台设备写一行无值状态到 `logs/scheduled_capture/status.jsonl`（ready、包数、音频 RMS——RMS 用于当场发现无声/异常录制）；凭证和设备列表均从 `secrets/ys7.env`（0600，gitignored）读取，设备列表格式为 `KANG_CAPTURE_DEVICES='serial:pseudonymous_ref ...'`，真实序列号不得写入脚本或文档；14 天前的 `stream-capture.mkv` 自动清理。冒烟用 `DURATION_S=10 bash scripts/scheduled_capture.sh`。调整节奏或停用用 `crontab -e`。
+
 ## 3. 短取流与资格门
 
 ```bash

@@ -108,3 +108,15 @@ def test_unrecognized_report_shape_is_rejected(tmp_path):
     with LongitudinalStore("elder_a", root=tmp_path) as store:
         with pytest.raises(ValueError, match="unrecognized longitudinal report"):
             ingest_report(path, elder_ref="elder_a", store=store)
+
+
+def test_device_ref_is_stamped_on_ingest(tmp_path):
+    path = _write_report(tmp_path, "sleep.json", extract_sleep_indicators(SLEEP_FIXTURE))
+    with LongitudinalStore("elder_a", root=tmp_path) as store:
+        ingest_report(path, elder_ref="elder_a", store=store, device_ref="c6c_demo_01")
+        counts = store.counts()
+        assert counts["device_refs"] == ["c6c_demo_01"]
+        row = store._connection.execute(
+            "SELECT device_ref FROM observations LIMIT 1"
+        ).fetchone()
+        assert row[0] == "c6c_demo_01"

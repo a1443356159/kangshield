@@ -1866,6 +1866,7 @@ class StreamCaptureTrack(ContractModel):
     codec_name: str | None = None
     copied_packet_count: int = Field(ge=0)
     missing_timestamp_count: int = Field(ge=0)
+    output_codec_name: str | None = None
 
 
 class StreamCaptureReport(ContractModel):

@@ -59,6 +59,7 @@ def _observation_row(
     *,
     report_digest: str,
     run_id: str | None,
+    device_ref: str | None,
 ) -> tuple[dict[str, Any], bool]:
     start_at = observation.time_range.start_at
     tz_aware = start_at is not None and start_at.utcoffset() is not None
@@ -71,6 +72,7 @@ def _observation_row(
     row = {
         "observed_at": start_at.isoformat() if tz_aware else None,
         "bucket": bucket_for(start_at) if tz_aware else None,
+        "device_ref": device_ref,
         "indicator_id": observation.indicator_id,
         "group_id": observation.group,
         "source_modality": observation.source_modality,
@@ -101,6 +103,7 @@ def _ingest_indicator_extraction(
     *,
     report_digest: str,
     run_id: str | None,
+    device_ref: str | None,
     store: LongitudinalStore,
 ) -> tuple[int, int]:
     report = IndicatorExtractionReport.model_validate(payload)
@@ -108,7 +111,10 @@ def _ingest_indicator_extraction(
     excluded = 0
     for observation in report.observations:
         row, eligible = _observation_row(
-            observation, report_digest=report_digest, run_id=run_id
+            observation,
+            report_digest=report_digest,
+            run_id=run_id,
+            device_ref=device_ref,
         )
         rows.append(row)
         if not eligible:
@@ -121,6 +127,7 @@ def _ingest_fall_candidate_prediction_set(
     payload: dict[str, Any],
     *,
     report_digest: str,
+    device_ref: str | None,
     store: LongitudinalStore,
 ) -> int:
     prediction_set = FallCandidatePredictionSet.model_validate(payload)
@@ -134,6 +141,7 @@ def _ingest_fall_candidate_prediction_set(
                         f"{clip.scenario_id}:{candidate.candidate_id}"
                     ),
                     "kind": "fall_candidate",
+                    "device_ref": device_ref,
                     "start_at": None,
                     "end_at": None,
                     "detected_at": None,
@@ -171,6 +179,7 @@ def ingest_report(
     elder_ref: str,
     store: LongitudinalStore,
     run_id: str | None = None,
+    device_ref: str | None = None,
 ) -> LongitudinalIngestEntry:
     report_digest = sha256_file(path)
     existing_kind = store.already_ingested(report_digest)
@@ -188,11 +197,18 @@ def ingest_report(
     excluded = 0
     if kind == "indicator_extraction":
         observations, excluded = _ingest_indicator_extraction(
-            payload, report_digest=report_digest, run_id=run_id, store=store
+            payload,
+            report_digest=report_digest,
+            run_id=run_id,
+            device_ref=device_ref,
+            store=store,
         )
     else:
         episodes = _ingest_fall_candidate_prediction_set(
-            payload, report_digest=report_digest, store=store
+            payload,
+            report_digest=report_digest,
+            device_ref=device_ref,
+            store=store,
         )
     store.record_ingest(
         report_digest=report_digest,
@@ -219,9 +235,16 @@ def ingest_reports(
     elder_ref: str,
     store: LongitudinalStore,
     run_id: str | None = None,
+    device_ref: str | None = None,
 ) -> LongitudinalIngestReport:
     entries = [
-        ingest_report(path, elder_ref=elder_ref, store=store, run_id=run_id)
+        ingest_report(
+            path,
+            elder_ref=elder_ref,
+            store=store,
+            run_id=run_id,
+            device_ref=device_ref,
+        )
         for path in paths
     ]
     limitations = [CLIP_RELATIVE_TIMING_LIMITATION] if any(

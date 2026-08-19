@@ -32,7 +32,7 @@
 `data/processed/longitudinal/<elder_ref>/longitudinal.sqlite`（WAL）：
 
 - `ingest_ledger`：报告 sha256 为主键，重复 ingest 是 no-op（行级 UNIQUE 约束兜底部分重试）。
-- `observations`：观测时间（带时区）、day/night 分桶、指标、值（不可评估存 NULL）、质量、样本数、场景、溯源、`baseline_eligible`。
+- `observations`：观测时间（带时区）、day/night 分桶、指标、值（不可评估存 NULL）、质量、样本数、场景、溯源、`baseline_eligible`；`device_ref` 记录来源设备（`ingest-longitudinal --device-ref` 写入），多机位基线分开计算前，生产库只接目标 C6c 的数据（DEC-002 补充：辅助设备数据不进生产基线）。
 - `episodes`：L0 candidate（`kind="fall_candidate"`，预留 `voice_candidate`），clip 相对时间放 payload。
 - `baselines`：(indicator, bucket) 主键，median/MAD/EWMA、`ready|insufficient_samples`。
 - `deviation_candidates`：owner-only 0–3 分，candidate_id 由 elder|indicator|bucket|观测时间派生，重复运行幂等。

@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS observations (
     id INTEGER PRIMARY KEY,
     observed_at TEXT,
     bucket TEXT,
+    device_ref TEXT,
     indicator_id TEXT NOT NULL,
     group_id TEXT NOT NULL,
     source_modality TEXT NOT NULL,
@@ -62,6 +63,7 @@ CREATE TABLE IF NOT EXISTS episodes (
     id INTEGER PRIMARY KEY,
     candidate_id TEXT NOT NULL,
     kind TEXT NOT NULL,
+    device_ref TEXT,
     start_at TEXT,
     end_at TEXT,
     detected_at TEXT,
@@ -124,12 +126,26 @@ class LongitudinalStore:
         self._connection.execute("PRAGMA journal_mode=WAL")
         self._connection.execute("PRAGMA foreign_keys=ON")
         self._connection.executescript(_SCHEMA)
+        self._add_column_if_missing("observations", "device_ref", "TEXT")
+        self._add_column_if_missing("episodes", "device_ref", "TEXT")
         self._connection.execute(
             "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)",
             (SCHEMA_VERSION,),
         )
         self._connection.commit()
         self.db_path.chmod(0o600)
+
+    def _add_column_if_missing(
+        self, table: str, column: str, declaration: str
+    ) -> None:
+        columns = {
+            str(row["name"])
+            for row in self._connection.execute(f"PRAGMA table_info({table})")
+        }
+        if column not in columns:
+            self._connection.execute(
+                f"ALTER TABLE {table} ADD COLUMN {column} {declaration}"
+            )
 
     def __enter__(self) -> "LongitudinalStore":
         return self
@@ -188,6 +204,7 @@ class LongitudinalStore:
         columns = [
             "observed_at",
             "bucket",
+            "device_ref",
             "indicator_id",
             "group_id",
             "source_modality",
@@ -223,6 +240,7 @@ class LongitudinalStore:
         columns = [
             "candidate_id",
             "kind",
+            "device_ref",
             "start_at",
             "end_at",
             "detected_at",
@@ -362,8 +380,16 @@ class LongitudinalStore:
         span = self._connection.execute(
             "SELECT MIN(observed_at), MAX(observed_at) FROM observations"
         ).fetchone()
+        devices = [
+            str(row[0])
+            for row in self._connection.execute(
+                "SELECT DISTINCT device_ref FROM observations"
+                " WHERE device_ref IS NOT NULL"
+            )
+        ]
         return {
             "ledger_reports": scalar("SELECT COUNT(*) FROM ingest_ledger"),
+            "device_refs": devices,
             "observations": scalar("SELECT COUNT(*) FROM observations"),
             "baseline_eligible_observations": scalar(
                 "SELECT COUNT(*) FROM observations WHERE baseline_eligible = 1"

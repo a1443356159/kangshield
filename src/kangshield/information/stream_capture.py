@@ -103,6 +103,7 @@ class _TrackStats:
     codec_name: str | None
     copied_packet_count: int
     missing_timestamp_count: int
+    output_codec_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -295,12 +296,28 @@ def _capture_packets(
             ) as output_container:
                 output_container.metadata.clear()
                 output_streams: dict[int, Any] = {}
+                # Audio tracks whose codec Matroska cannot hold (e.g. camera
+                # pcm_alaw over FLV) are transparently transcoded to pcm_s16le.
+                transcode_encoders: dict[int, Any] = {}
                 for source_stream in selected:
-                    output_stream = output_container.add_stream_from_template(
-                        source_stream
-                    )
+                    source_index = int(source_stream.index)
+                    try:
+                        output_stream = output_container.add_stream_from_template(
+                            source_stream
+                        )
+                    except ValueError:
+                        if source_stream.type != "audio":
+                            raise
+                        rate = source_stream.codec_context.rate or 8000
+                        output_stream = output_container.add_stream(
+                            "pcm_s16le", rate=rate
+                        )
+                        output_stream.layout = (
+                            source_stream.codec_context.layout or "mono"
+                        )
+                        transcode_encoders[source_index] = output_stream
                     output_stream.metadata.clear()
-                    output_streams[int(source_stream.index)] = output_stream
+                    output_streams[source_index] = output_stream
 
                 for packet in input_container.demux(selected):
                     if packet.size == 0 and packet.pts is None and packet.dts is None:
@@ -338,10 +355,28 @@ def _capture_packets(
                         termination_reason = "duration_limit"
                         break
 
+                    if source_index in transcode_encoders:
+                        for frame in source_stream.decode(packet):
+                            for encoded in transcode_encoders[source_index].encode(
+                                frame
+                            ):
+                                encoded.stream = output_streams[source_index]
+                                output_container.mux(encoded)
+                                track_counts[source_index] += 1
+                                copied_packet_count += 1
+                        continue
+
                     packet.stream = output_streams[source_index]
                     output_container.mux(packet)
                     track_counts[source_index] += 1
                     copied_packet_count += 1
+
+                for source_index, encoder in transcode_encoders.items():
+                    for encoded in encoder.encode(None):
+                        encoded.stream = output_streams[source_index]
+                        output_container.mux(encoded)
+                        track_counts[source_index] += 1
+                        copied_packet_count += 1
 
         if not first_video_packet_keyframe or media_origin_seconds is None:
             raise StreamCaptureError(
@@ -395,6 +430,9 @@ def _capture_packets(
             codec_name=source_codec_names[index],
             copied_packet_count=track_counts[index],
             missing_timestamp_count=missing_timestamp_counts[index],
+            output_codec_name=(
+                "pcm_s16le" if index in transcode_encoders else None
+            ),
         )
         for index in sorted(source_streams)
     )
@@ -554,6 +592,7 @@ def capture_stream(
                     codec_name=track.codec_name,
                     copied_packet_count=track.copied_packet_count,
                     missing_timestamp_count=track.missing_timestamp_count,
+                    output_codec_name=track.output_codec_name,
                 )
                 for track in stats.tracks
             ],
@@ -568,6 +607,11 @@ def capture_stream(
                 "fixture_capture_cannot_prove_target_device_or_platform_access",
                 "raw_media_requires_consent_controlled_storage_and_deletion",
                 "this_stage_does_not_emit_risk_assessment_or_alert",
+                *(
+                    ["audio_track_transcoded_to_pcm_s16le"]
+                    if any(track.output_codec_name for track in stats.tracks)
+                    else []
+                ),
             ],
         )
     except Exception as error:

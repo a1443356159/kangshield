@@ -133,6 +133,44 @@ def _write_av_container(
                 output.mux(packet)
 
 
+def _write_alaw_av_container(path: Path, *, seconds: int = 3) -> None:
+    """Container with an audio codec Matroska cannot hold (pcm_alaw)."""
+    av = pytest.importorskip("av")
+    np = pytest.importorskip("numpy")
+    fps = 10
+    sample_rate = 8000
+    samples_per_frame = sample_rate // fps
+    with av.open(str(path), "w", format="avi") as output:
+        video = output.add_stream("mpeg4", rate=fps)
+        video.width = 64
+        video.height = 48
+        video.pix_fmt = "yuv420p"
+        audio = output.add_stream("pcm_alaw", rate=sample_rate)
+        audio.layout = "mono"
+        for index in range(seconds * fps):
+            pixels = np.full((48, 64, 3), index * 3, dtype=np.uint8)
+            video_frame = av.VideoFrame.from_ndarray(pixels, format="rgb24")
+            video_frame.pts = index
+            video_frame.time_base = Fraction(1, fps)
+            for packet in video.encode(video_frame):
+                output.mux(packet)
+            samples = np.full((1, samples_per_frame), 1000, dtype=np.int16)
+            audio_frame = av.AudioFrame.from_ndarray(
+                samples,
+                format="s16",
+                layout="mono",
+            )
+            audio_frame.sample_rate = sample_rate
+            audio_frame.pts = index * samples_per_frame
+            audio_frame.time_base = Fraction(1, sample_rate)
+            for packet in audio.encode(audio_frame):
+                output.mux(packet)
+        for packet in video.encode():
+            output.mux(packet)
+        for packet in audio.encode():
+            output.mux(packet)
+
+
 class _QuietHandler(SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
         return None
@@ -221,6 +259,50 @@ def test_http_stream_capture_is_bounded_private_and_pipeline_replayable(tmp_path
     assert pipeline.same_container_av is True
     assert pipeline.input_layout == "same_container_pts"
     assert pipeline.sampled_video_frames == 2
+
+
+def test_alaw_audio_is_transcoded_for_matroska(tmp_path):
+    source = tmp_path / "alaw-source.avi"
+    output = tmp_path / "artifacts" / "stream-capture.mkv"
+    output.parent.mkdir(mode=0o700)
+    _write_alaw_av_container(source, seconds=3)
+
+    with _http_endpoint(tmp_path, source.name) as endpoint:
+        report = capture_stream(
+            endpoint=endpoint,
+            output_path=output,
+            output_artifact="artifacts/stream-capture.mkv",
+            evidence_level=EvidenceLevel.E1,
+            source_type=SourceType.FIXTURE,
+            config=StreamCaptureConfig(
+                duration_s=1.5,
+                minimum_duration_s=1.0,
+                open_timeout_s=2.0,
+                read_timeout_s=2.0,
+            ),
+        )
+
+    assert report.capture_artifact_ready is True
+    audio_track = next(
+        track for track in report.tracks if track.stream_type == "audio"
+    )
+    assert audio_track.codec_name == "pcm_alaw"
+    assert audio_track.output_codec_name == "pcm_s16le"
+    assert audio_track.copied_packet_count > 0
+    assert "audio_track_transcoded_to_pcm_s16le" in report.limitations
+
+    av = pytest.importorskip("av")
+    with av.open(str(output), mode="r") as captured:
+        audio_streams = list(captured.streams.audio)
+        assert len(audio_streams) == 1
+        assert audio_streams[0].codec_context.name == "pcm_s16le"
+        assert audio_streams[0].codec_context.rate == 8000
+
+    timing = report.media_probe.container_timing
+    audio_timing = next(
+        stream for stream in timing.streams if stream.stream_type == "audio"
+    )
+    assert audio_timing.missing_pts_count == 0
 
 
 def test_capture_stream_cli_uses_environment_and_owner_only_artifacts(

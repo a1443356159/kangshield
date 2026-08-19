@@ -46,6 +46,7 @@ def _insert_samples(store, indicator_id, values, *, start_day=1, hour=10):
             {
                 "observed_at": moment.isoformat(),
                 "bucket": "day" if 6 <= hour < 18 else "night",
+                "device_ref": None,
                 "indicator_id": indicator_id,
                 "group_id": "test",
                 "source_modality": "sleep",
