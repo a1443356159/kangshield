@@ -33,6 +33,8 @@ kangshield-info serve-product \
 
 浏览器打开 [http://127.0.0.1:8765](http://127.0.0.1:8765)。演示数据随启动时间生成，走真实 SQLite、评分器、复核 API、问卷、异常归档和导出链；页面可播放明确标注为合成演示的带声音 MP4，不读取真实老人或设备资产。
 
+Slurm 交付验收使用 [`requirements-demo.lock`](requirements-demo.lock) 固定 CPython 3.13 / Linux x86_64 的 demo 依赖及 wheel SHA-256；它不是跨平台锁，也不包含外置边缘模型依赖。
+
 ## 面向用户的能力
 
 - 三张风险卡分别说明等级、原因、数据覆盖和更新时间。
@@ -130,16 +132,28 @@ kangshield-info delete-product-data \
 
 ## 验证与发布边界
 
+登录节点只准备二进制 wheelhouse，不运行测试：
+
 ```bash
-make test PYTHON=.venv/bin/python
-git diff --check
+mkdir -p "/cache/DeepLearning/$USER/kangshield-validation/wheelhouse"
+.venv/bin/python -m pip --isolated download \
+  --no-deps --only-binary=:all: --require-hashes \
+  --requirement requirements-demo.lock \
+  --dest "/cache/DeepLearning/$USER/kangshield-validation/wheelhouse"
+```
+
+计算与验收只提交给 Slurm：
+
+```bash
+sbatch scripts/slurm/validate_submission.sbatch
+sbatch scripts/slurm/smoke_installed_demo.sbatch
 ```
 
 `data/`、`models/`、`runs/`、`logs/`、`secrets/` 和 `.env*` 均被 Git 忽略。最终提交只保留产品运行所需的 `data/processed/` 私有状态；旧模型、历史采集、旧原始数据与日志已可恢复地迁到 `/cache/.../kangshield-legacy-archive/20260831/`，不进入仓库。
 
-当前作品可直接本地演示，但仍是未验证试点。项目 LICENSE、第三方 NOTICE、依赖锁、模型许可证和真实目标域 held-out 校准关闭前，不应宣传为公开发布或临床级产品。月度自评采用[世界卫生组织 WHO-5（2024）](https://www.who.int/publications/m/item/WHO-UCN-MSD-MHE-2024.01)，当前按 CC BY-NC-SA 3.0 IGO 用于带署名的本地非商业试点。
+当前作品可直接本地演示，但仍是未验证试点。demo 平台锁与非 editable 安装已验证；项目 LICENSE、第三方 NOTICE、edge 完整依赖锁、模型许可证和真实目标域 held-out 校准关闭前，不应宣传为公开发布或临床级产品。月度自评采用[世界卫生组织 WHO-5（2024）](https://www.who.int/publications/m/item/WHO-UCN-MSD-MHE-2024.01)，当前按 CC BY-NC-SA 3.0 IGO 用于带署名的本地非商业试点。
 
-冻结版在 CAUCAFall 开发重放上通过预注册工程门，但唯一一次 Subject 6–10 留出评估未通过（轻量跌倒召回 0.68、ADL 片段误报率 0.16）。结果、门槛与未通过项完整记录在[公开数据集交付验证报告](docs/governance/delivery-validation-report.md)，未使用留出集继续调参。
+冻结版在 CAUCAFall 开发重放上通过预注册工程门，但唯一一次 Subject 6–10 留出评估未通过（轻量跌倒召回 0.68、ADL 片段误报率 0.16）。FBS 中文短信留出词法门通过（源诈骗类别标记率 0.536437、源非诈骗类别标记率 0.113744），CASAS 单人居家留出的个人 28 天基线门也通过。两者分别只是短信规则和行为基线机制的工程证据，不代表摄像头 ASR 诈骗准确率或心理健康预测准确率。结果、门槛与未通过项完整记录在[公开数据集交付验证报告](docs/governance/delivery-validation-report.md)，所有留出结果均未用于继续调参。
 
 ## 文档
 

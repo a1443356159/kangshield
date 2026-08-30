@@ -37,6 +37,14 @@ kangshield-info = "kangshield.information.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.data-files]
+"share/kangshield/configs" = [
+    "configs/v1-g4-event-candidate-policy.json",
+    "configs/v1-g4-fall-features.json",
+    "configs/v2-edge-segment-policy.json",
+    "configs/v2-multidomain-risk-policy.json",
+]
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]

@@ -10,6 +10,7 @@ from typing import Sequence
 from kangshield import __version__
 
 from .contracts import EvidenceLevel, SourceType
+from .resources import policy_path
 
 
 def _evidence(value: str) -> EvidenceLevel:
@@ -61,12 +62,12 @@ def build_parser() -> argparse.ArgumentParser:
     monitor.add_argument(
         "--risk-policy",
         type=Path,
-        default=Path("configs/v2-multidomain-risk-policy.json"),
+        default=policy_path("v2-multidomain-risk-policy.json"),
     )
     monitor.add_argument(
         "--edge-policy",
         type=Path,
-        default=Path("configs/v2-edge-segment-policy.json"),
+        default=policy_path("v2-edge-segment-policy.json"),
     )
     monitor.add_argument(
         "--pose-model",
@@ -110,7 +111,7 @@ def build_parser() -> argparse.ArgumentParser:
     product.add_argument(
         "--policy",
         type=Path,
-        default=Path("configs/v2-multidomain-risk-policy.json"),
+        default=policy_path("v2-multidomain-risk-policy.json"),
     )
     product.add_argument("--continuous", action="store_true")
     product.add_argument("--edge-endpoint-env", default="KANG_STREAM_ENDPOINT")
@@ -122,7 +123,7 @@ def build_parser() -> argparse.ArgumentParser:
     product.add_argument(
         "--edge-policy",
         type=Path,
-        default=Path("configs/v2-edge-segment-policy.json"),
+        default=policy_path("v2-edge-segment-policy.json"),
     )
     product.add_argument(
         "--pose-model",
@@ -165,7 +166,7 @@ def build_parser() -> argparse.ArgumentParser:
     export.add_argument(
         "--policy",
         type=Path,
-        default=Path("configs/v2-multidomain-risk-policy.json"),
+        default=policy_path("v2-multidomain-risk-policy.json"),
     )
 
     delete = commands.add_parser(

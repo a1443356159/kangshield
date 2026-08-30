@@ -134,3 +134,57 @@ def test_public_domain_freeze_matches_rule_policy_and_validator():
     serialized = json.dumps(payload, ensure_ascii=False)
     assert "/home/" not in serialized
     assert "/cache/" not in serialized
+
+
+def test_frozen_public_domain_reports_match_freeze_and_hide_raw_records():
+    manifest = json.loads(
+        (ROOT / "artifacts/validation/public-domains-policy-freeze.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    reports = {
+        "dev": (
+            "public-domains-dev.json",
+            "265728ef2cea1c4bc8718a5c61fbd633526c0b9206b742fa0bb56599790faf12",
+        ),
+        "holdout": (
+            "public-domains-holdout.json",
+            "997e29cff69ae2817647a8fad27b4675e49490c20dcf5cb866a8ffb13ce97b72",
+        ),
+    }
+    forbidden = (
+        "/home/",
+        "/cache/",
+        "device_ref",
+        "elder_ref",
+        "transcript",
+        "local_path",
+        "download_url",
+    )
+    for split, (filename, digest) in reports.items():
+        path = ROOT / "artifacts/validation" / filename
+        assert _digest(path) == digest
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        assert payload["evaluation_contract"]["split"] == split
+        assert payload["passed"] is True
+        assert all(
+            gate["passed"] is True
+            for gate in payload["engineering_gates"].values()
+        )
+        assert payload["bindings"]["multidomain_policy"] == manifest["bindings"][
+            "multidomain_policy"
+        ]
+        assert payload["sources"]["fraud"]["archive_sha256"] == manifest[
+            "sources"
+        ]["fbs_sms"]["archive_sha256"]
+        assert payload["sources"]["fraud"]["raw_text_in_report"] is False
+        assert (
+            payload["sources"]["mental_wellbeing"]["raw_timestamps_in_report"]
+            is False
+        )
+        assert payload["execution"] == {
+            "login_node_compute_prohibited": True,
+            "surface": "slurm_compute_node",
+        }
+        serialized = json.dumps(payload, ensure_ascii=False)
+        assert not any(value in serialized for value in forbidden)

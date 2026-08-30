@@ -6,13 +6,14 @@
 ## 当前阻断
 
 - 仓库尚未包含 owner 批准的项目 LICENSE 和第三方 NOTICE。
-- 最终 Python 依赖锁与全新、非 editable 环境安装验证尚未冻结。
+- CPython 3.13 / Linux x86_64 demo 依赖已用 SHA-256 锁定并通过全新非 editable 离线安装；Torch、Ultralytics、FunASR 等 edge 依赖的完整跨平台锁仍未冻结。
 - 姿态与语音模型权重不在 Git 中；YOLO26s 姿态权重已冻结名称、SHA-256、推理尺寸和置信度，但来源携带方式、语音模型摘要与许可证尚未全部关闭。
 - Ultralytics 代码/模型适用 AGPL-3.0 或企业许可选择，必须由 owner 根据提交与分发方式决定。
 - 萤石当前提供 [`@ezuikit/player-hls`](https://www.npmjs.com/package/%40ezuikit/player-hls) 跨浏览器播放器，但其 npm 元数据未声明许可证，且需要自托管 JS/WASM/Worker；本提交不捆绑该 SDK，只使用浏览器原生 HLS 与新窗口降级。跨浏览器播放器在许可证关闭后再决定是否纳入。
 - WHO-5 当前按 CC BY-NC-SA 3.0 IGO、带署名用于本地非商业试点；若提交渠道涉及商业使用或重新许可，需单独复核。
 - CAUCAFall 公开模拟数据只覆盖跌倒候选工程链；目标 C6c 的真实 held-out 三域校准、连续长稳和云回看时间一致性仍未完成。
 - 冻结版唯一一次 CAUCAFall 留出评估未通过预注册工程门：ADL 片段误报率、运动门保留率和相对完整帧召回损失三项不达标；不得将开发集通过或局部指标包装成发布就绪。
+- FBS 中文短信与 CASAS 单人居家数据的一次性留出工程门已通过，但前者不经过摄像头远场音频、VAD/ASR 且负类不是普通对话，后者没有心理健康结局标签且传感器特征只是代理；两者不能关闭真实三域准确率或目标设备门。
 - 本机异常片段包含高度敏感的画面与声音；公开部署前必须由 owner 确认磁盘加密、备份排除、30 天/2 GiB 留存值和操作系统账户边界。
 
 因此页面和报告必须继续显示“本地试点”与非诊断边界，不能宣传为公开发布或临床就绪。
@@ -44,11 +45,11 @@
 
 ## 发布验收命令
 
+登录节点只下载 [`requirements-demo.lock`](../../requirements-demo.lock) 中带摘要的二进制 wheel 到 `/cache/DeepLearning/$USER/kangshield-validation/wheelhouse`，不运行测试、数据解析或模型；具体命令见根目录 README。随后只负责提交任务：
+
 ```bash
-make test PYTHON=.venv/bin/python
-bash -n scripts/run_product.sh
-bash -n scripts/slurm/benchmark_caucafall.sbatch
-git diff --check
+sbatch scripts/slurm/validate_submission.sbatch
+sbatch scripts/slurm/smoke_installed_demo.sbatch
 ```
 
-另外必须运行 Markdown 链接、前端 JavaScript 语法、隐私字符串、跟踪媒体/数据库文件和 public 报告泄露扫描。工程检查不能替代法律审查或真实目标域验证。
+前者在计算节点统一运行全量 pytest、编译、Shell 语法、`git diff --check`、Markdown 链接、前端行为、隐私字符串、跟踪媒体/数据库文件和 public 报告泄露测试；后者在 `/cache` 构建 wheel、全新非 editable 安装并启动完整 demo。工程检查不能替代法律审查或真实目标域验证。

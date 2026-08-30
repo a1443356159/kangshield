@@ -20,11 +20,11 @@ from urllib.parse import urlsplit
 from .contracts import CandidateReviewDecision, WellbeingCheckinSubmission
 from .longitudinal.store import DEFAULT_STORE_ROOT, LongitudinalStore
 from .multidomain import (
-    DEFAULT_POLICY_PATH,
     build_snapshot,
     candidate_from_row,
     load_policy,
 )
+from .resources import policy_path as bundled_policy_path
 from .product_ui import dashboard_html, documentation_html, offline_report_html
 
 PRODUCT_VERSION = "multidomain-product-v0.6.0"
@@ -66,13 +66,13 @@ class ProductRuntime:
         elder_ref: str,
         device_ref: str,
         store_root: Path = DEFAULT_STORE_ROOT,
-        policy_path: Path = DEFAULT_POLICY_PATH,
+        policy_path: Path = bundled_policy_path("v2-multidomain-risk-policy.json"),
         continuous: bool = False,
         edge_endpoint_env: str = "KANG_STREAM_ENDPOINT",
         edge_provider: str = "endpoint_env",
         edge_device_serial_env: str = "KANG_DEVICE_SERIAL",
         edge_endpoint_refresh_seconds: float = 1800.0,
-        edge_policy_path: Path = Path("configs/v2-edge-segment-policy.json"),
+        edge_policy_path: Path = bundled_policy_path("v2-edge-segment-policy.json"),
         edge_pose_model_path: Path | None = None,
         edge_failure_backoff_s: float = 2.0,
         archive_anomaly_clips: bool | None = None,
@@ -942,14 +942,14 @@ def serve_product(
     host: str = "127.0.0.1",
     port: int = 8765,
     store_root: Path = DEFAULT_STORE_ROOT,
-    policy_path: Path = DEFAULT_POLICY_PATH,
+    policy_path: Path = bundled_policy_path("v2-multidomain-risk-policy.json"),
     demo: bool = False,
     continuous: bool = False,
     edge_endpoint_env: str = "KANG_STREAM_ENDPOINT",
     edge_provider: str = "endpoint_env",
     edge_device_serial_env: str = "KANG_DEVICE_SERIAL",
     edge_endpoint_refresh_seconds: float = 1800.0,
-    edge_policy_path: Path = Path("configs/v2-edge-segment-policy.json"),
+    edge_policy_path: Path = bundled_policy_path("v2-edge-segment-policy.json"),
     edge_pose_model_path: Path | None = None,
     edge_failure_backoff_s: float = 2.0,
     archive_anomaly_clips: bool | None = None,
@@ -1004,7 +1004,7 @@ def export_product_report(
     visibility: str,
     output: Path,
     store_root: Path = DEFAULT_STORE_ROOT,
-    policy_path: Path = DEFAULT_POLICY_PATH,
+    policy_path: Path = bundled_policy_path("v2-multidomain-risk-policy.json"),
 ) -> tuple[Path, Path]:
     if visibility not in {"owner_only", "public_evidence"}:
         raise ValueError("unsupported report visibility")

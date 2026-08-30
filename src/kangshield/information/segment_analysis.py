@@ -222,11 +222,13 @@ class SegmentResultSummarizer:
         )
         from .fall_features import FallMotionFeatureExtractor, load_fall_feature_config
 
+        from .resources import policy_path
+
         feature_config = load_fall_feature_config(
-            Path("configs/v1-g4-fall-features.json")
+            policy_path("v1-g4-fall-features.json")
         )
         candidate_policy = load_fall_candidate_policy(
-            Path("configs/v1-g4-event-candidate-policy.json")
+            policy_path("v1-g4-event-candidate-policy.json")
         )
         extractor = FallMotionFeatureExtractor(
             feature_config, frame_width=frame_width, frame_height=frame_height

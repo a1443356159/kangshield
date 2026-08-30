@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Any
 
 from .longitudinal.store import DEFAULT_STORE_ROOT, LongitudinalStore
-from .multidomain import DEFAULT_POLICY_PATH, build_snapshot, load_policy
+from .multidomain import build_snapshot, load_policy
+from .resources import policy_path as bundled_policy_path
 
 
 def seed_product_demo(
@@ -17,8 +18,8 @@ def seed_product_demo(
     elder_ref: str,
     device_ref: str,
     store_root: Path = DEFAULT_STORE_ROOT,
-    policy_path: Path = DEFAULT_POLICY_PATH,
-    edge_policy_path: Path = Path("configs/v2-edge-segment-policy.json"),
+    policy_path: Path = bundled_policy_path("v2-multidomain-risk-policy.json"),
+    edge_policy_path: Path = bundled_policy_path("v2-edge-segment-policy.json"),
     now: datetime | None = None,
 ) -> dict[str, int]:
     """Seed an idempotent demo without real-person, device, or raw-stream data."""

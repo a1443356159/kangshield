@@ -30,9 +30,25 @@ def test_edge_monitor_defaults_to_policy_controlled_anomaly_archive():
     assert args.provider == "endpoint_env"
     assert args.max_segments == 0
     assert args.edge_policy.name == "v2-edge-segment-policy.json"
+    assert args.edge_policy.is_file()
+    assert args.risk_policy.is_file()
     assert args.evidence_level.value == "E2"
     assert args.local_anomaly_archive is None
     assert args.pose_model is None
+
+
+def test_parser_defaults_to_bundled_product_policies():
+    args = build_parser().parse_args(
+        [
+            "serve-product",
+            "--elder-ref",
+            "elder-a",
+            "--device-ref",
+            "c6c-a",
+        ]
+    )
+    assert args.policy.is_file()
+    assert args.edge_policy.is_file()
 
 
 def test_product_parser_enables_cloud_playback_automatically_for_ezviz():

@@ -1,0 +1,308 @@
+{
+  "bindings": {
+    "multidomain_policy": {
+      "filename": "v2-multidomain-risk-policy.json",
+      "sha256": "0c495432498e355b28f2e73ec0c37e972bcaf4cbf050c726d9a4f3d4a051b800"
+    }
+  },
+  "engineering_gates": {
+    "fraud": {
+      "checks": {
+        "evaluated_message_count": true,
+        "source_fraud_category_recall": true,
+        "source_non_fraud_category_flag_rate": true
+      },
+      "observed": {
+        "evaluated_message_count": 2604,
+        "source_fraud_category_recall": 0.536437,
+        "source_non_fraud_category_flag_rate": 0.113744
+      },
+      "passed": true,
+      "revision": "fbs-fraud-context-engineering-gate-v1",
+      "scope": "public_chinese_sms_lexical_context_engineering_only",
+      "thresholds": {
+        "maximum_source_non_fraud_category_flag_rate": 0.15,
+        "minimum_evaluated_message_count": 1000,
+        "minimum_source_fraud_category_recall": 0.5
+      }
+    },
+    "mental_wellbeing": {
+      "checks": {
+        "controlled_response_levels": true,
+        "invalid_event_line_rate": true,
+        "minimum_eligible_days": true,
+        "post_baseline_assessment_rate": true,
+        "prebaseline_fail_closed": true
+      },
+      "observed": {
+        "all_controlled_responses_match": true,
+        "all_prebaseline_days_fail_closed": true,
+        "invalid_event_line_rate": 0.0,
+        "mean_post_baseline_assessment_rate": 1.0,
+        "minimum_eligible_days": 36
+      },
+      "passed": true,
+      "revision": "casas-personal-baseline-engineering-gate-v1",
+      "scope": "public_smart_home_personal_baseline_engineering_only",
+      "thresholds": {
+        "maximum_invalid_line_rate": 0.001,
+        "minimum_eligible_days_per_home": 28,
+        "minimum_post_baseline_assessment_rate": 0.9
+      }
+    }
+  },
+  "evaluation_contract": {
+    "development_homes": [
+      "hh101",
+      "hh102",
+      "hh103"
+    ],
+    "fbs_partition": "sha256_case_ref_mod_5; holdout_bucket_0",
+    "holdout_homes": [
+      "hh104",
+      "hh105",
+      "hh106"
+    ],
+    "labels_visible_to_rule_matching": false,
+    "split": "holdout"
+  },
+  "execution": {
+    "login_node_compute_prohibited": true,
+    "surface": "slurm_compute_node"
+  },
+  "generated_at": "2026-08-30T19:11:06.863574+00:00",
+  "limitations": [
+    "public_data_engineering_checks_are_not_clinical_validation",
+    "fbs_sms_labels_are_not_camera_audio_or_asr_outputs",
+    "fbs_non_fraud_categories_are_spam_or_illicit_content_not_benign_dialogue",
+    "casas_ambient_sensors_are_proxies_not_camera_derived_features",
+    "casas_has_no_mental_health_outcome_ground_truth",
+    "controlled_behavior_changes_are_sensitivity_checks_not_diagnoses",
+    "results_do_not_establish_target_c6c_performance"
+  ],
+  "metrics": {
+    "fraud": {
+      "case_set_digest": "6be790d1775d6a060b3a79ba18603705d7b9a306f77a5375a0152543649dc330",
+      "hard_negative_suppressed_count": 3,
+      "matched_context_distribution": {
+        "credential_request": 117,
+        "impersonation": 199,
+        "transfer_investment": 61,
+        "urgency_secrecy": 200
+      },
+      "message_count": 2604,
+      "score_distribution": {
+        "0": 2099,
+        "1": 437,
+        "2": 19,
+        "3": 49
+      },
+      "source_category_metrics": {
+        "AD:Loan": {
+          "flag_rate": 0.0,
+          "flagged_count": 0,
+          "message_count": 46
+        },
+        "AD:Network_service": {
+          "flag_rate": 0.185102,
+          "flagged_count": 82,
+          "message_count": 443
+        },
+        "AD:Other": {
+          "flag_rate": 0.103175,
+          "flagged_count": 13,
+          "message_count": 126
+        },
+        "AD:Real_estate": {
+          "flag_rate": 0.074074,
+          "flagged_count": 4,
+          "message_count": 54
+        },
+        "AD:Retail": {
+          "flag_rate": 0.043094,
+          "flagged_count": 39,
+          "message_count": 905
+        },
+        "FR:Financial": {
+          "flag_rate": 0.44,
+          "flagged_count": 11,
+          "message_count": 25
+        },
+        "FR:Other": {
+          "flag_rate": 0.225225,
+          "flagged_count": 25,
+          "message_count": 111
+        },
+        "FR:Phishing(Bank)": {
+          "flag_rate": 0.643258,
+          "flagged_count": 229,
+          "message_count": 356
+        },
+        "FR:Phishing(Other)": {
+          "flag_rate": 0.0,
+          "flagged_count": 0,
+          "message_count": 2
+        },
+        "IL:Escort_service": {
+          "flag_rate": 0.037037,
+          "flagged_count": 1,
+          "message_count": 27
+        },
+        "IL:Fake_ID_and_invoice": {
+          "flag_rate": 0.0,
+          "flagged_count": 0,
+          "message_count": 109
+        },
+        "IL:Gambling": {
+          "flag_rate": 0.283439,
+          "flagged_count": 89,
+          "message_count": 314
+        },
+        "IL:Political_propaganda": {
+          "flag_rate": 0.153846,
+          "flagged_count": 8,
+          "message_count": 52
+        },
+        "Other": {
+          "flag_rate": 0.117647,
+          "flagged_count": 4,
+          "message_count": 34
+        }
+      },
+      "source_fraud_category_count": 494,
+      "source_fraud_category_recall": 0.536437,
+      "source_non_fraud_category_count": 2110,
+      "source_non_fraud_category_flag_rate": 0.113744
+    },
+    "mental_wellbeing": {
+      "all_controlled_responses_match": true,
+      "all_prebaseline_days_fail_closed": true,
+      "home_count": 3,
+      "homes": {
+        "hh104": {
+          "controlled_response": {
+            "available": true,
+            "expected_levels": {
+              "one_mild": 1,
+              "one_severe": 2,
+              "three_day_level_two": 3,
+              "two_severe": 3
+            },
+            "expected_levels_observed": true,
+            "observed_levels": {
+              "one_mild": 1,
+              "one_severe": 2,
+              "three_day_level_two": 3,
+              "two_severe": 3
+            },
+            "usable_variable_feature_count": 3
+          },
+          "eligible_day_count": 61,
+          "input_digest": "58862bc8af50f428d8d84e1249a9d0a644b6096bea84d197e2d71e3ba4776349",
+          "observed_day_count": 61,
+          "post_baseline_assessment_rate": 1.0,
+          "prebaseline_all_fail_closed": true,
+          "score_distribution": {
+            "0": 18,
+            "1": 10,
+            "2": 16,
+            "3": 10,
+            "null": 7
+          }
+        },
+        "hh105": {
+          "controlled_response": {
+            "available": true,
+            "expected_levels": {
+              "one_mild": 1,
+              "one_severe": 2,
+              "three_day_level_two": 3,
+              "two_severe": 3
+            },
+            "expected_levels_observed": true,
+            "observed_levels": {
+              "one_mild": 1,
+              "one_severe": 2,
+              "three_day_level_two": 3,
+              "two_severe": 3
+            },
+            "usable_variable_feature_count": 3
+          },
+          "eligible_day_count": 36,
+          "input_digest": "133f35db0fdfa4f049c9e7206763baa68f8ac6a26aa076504f30837b92765626",
+          "observed_day_count": 46,
+          "post_baseline_assessment_rate": 1.0,
+          "prebaseline_all_fail_closed": true,
+          "score_distribution": {
+            "0": 6,
+            "1": 7,
+            "2": 8,
+            "3": 8,
+            "null": 7
+          }
+        },
+        "hh106": {
+          "controlled_response": {
+            "available": true,
+            "expected_levels": {
+              "one_mild": 1,
+              "one_severe": 2,
+              "three_day_level_two": 3,
+              "two_severe": 3
+            },
+            "expected_levels_observed": true,
+            "observed_levels": {
+              "one_mild": 1,
+              "one_severe": 2,
+              "three_day_level_two": 3,
+              "two_severe": 3
+            },
+            "usable_variable_feature_count": 3
+          },
+          "eligible_day_count": 48,
+          "input_digest": "64b17de9f514d5111da3076c9d60c218d4213a8f37ca3c6fd7f0af1b1b2c3b41",
+          "observed_day_count": 62,
+          "post_baseline_assessment_rate": 1.0,
+          "prebaseline_all_fail_closed": true,
+          "score_distribution": {
+            "0": 9,
+            "1": 11,
+            "2": 8,
+            "3": 13,
+            "null": 7
+          }
+        }
+      },
+      "invalid_event_line_count": 0,
+      "invalid_event_line_rate": 0.0,
+      "mean_post_baseline_assessment_rate": 1.0,
+      "minimum_eligible_days": 36,
+      "total_event_line_count": 694322
+    }
+  },
+  "passed": true,
+  "schema_version": "1.0",
+  "sources": {
+    "fraud": {
+      "archive_sha256": "3e958b6522f7ff058171837d571da2aebd7de51c8b18516869813a3c78705d18",
+      "name": "FBS Spam SMS Dataset",
+      "raw_text_in_report": false,
+      "source_commit": "49173b12ab0a42eb9f6ce42e401e6acaef1fbdfd",
+      "source_url": "https://github.com/Cypher-Z/FBS_SMS_Dataset",
+      "spdx_license": null,
+      "usage_terms": "public_research_release_requires_source_and_ccs2020_citation"
+    },
+    "mental_wellbeing": {
+      "archive_md5": "ec37d679e85a6ae39e84994888afd514",
+      "archive_sha256": "7d9e976308e1cb5bc91cb39937848bfe073fc7b44c8a33cf166de203014b0091",
+      "archive_size_bytes": 236037656,
+      "doi": "10.5281/zenodo.15708568",
+      "license": "CC-BY-4.0",
+      "name": "CASAS Smart Home dataset - free living, motion, door, activity labels",
+      "raw_timestamps_in_report": false,
+      "record_id": 15708568,
+      "source_url": "https://zenodo.org/records/15708568"
+    }
+  },
+  "status": "pilot_unvalidated"
+}

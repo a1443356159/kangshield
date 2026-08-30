@@ -13,7 +13,7 @@
 4. [当前状态](governance/current-status.md)：已完成能力、验证结果和仍待关闭事项。
 5. [有效决策](governance/decisions.md)：当前设计不可随意漂移的决定。
 6. [发布门](governance/release-readiness.md)：许可证、模型、锁文件和真实校准要求。
-7. [公开数据集交付验证报告](governance/delivery-validation-report.md)：公开样本、固定划分、策略绑定与最终盲测。
+7. [公开数据集交付验证报告](governance/delivery-validation-report.md)：三域公开代理数据、固定划分、策略冻结、一次性留出结果与证据边界。
 
 ## 源材料
 

@@ -2,7 +2,7 @@
 
 更新日期：2026-08-31
 
-当前状态：开发策略已冻结；唯一一次留出评估已完成，预注册工程门未通过
+当前状态：三域公开工程验证已完成；跌倒留出门未通过，诈骗与个人基线留出门通过
 产品口径：`pilot_unvalidated`
 
 ## 1. 这份报告回答什么
@@ -16,10 +16,12 @@
 | 数据 | 用途 | 固定划分 | 许可证与来源 |
 |---|---|---|---|
 | CAUCAFall v5 | 跌倒视频开发与一次性留出评估 | Subject 1–5 开发；Subject 6–10 留出 | [DOI 10.17632/7w7fccy7ky.5](https://doi.org/10.17632/7w7fccy7ky.5)，CC BY 4.0 |
+| FBS Spam SMS Dataset | 中文诈骗语境规则的词法工程评估 | 样本引用 SHA-256 对 5 取模；bucket 0 留出，其余开发 | [官方仓库](https://github.com/Cypher-Z/FBS_SMS_Dataset)，固定提交 `49173b1`；上游要求引用来源与 CCS 2020 论文，未声明 SPDX 许可证 |
+| CASAS Smart Home in a Box longitudinal data | 个人 28 天行为基线、缺数保护和规则响应评估 | hh101–hh103 开发；hh104–hh106 留出 | [DOI 10.5281/zenodo.15708568](https://doi.org/10.5281/zenodo.15708568)，CC BY 4.0 |
 
 CAUCAFall 每位受试者包含 5 类模拟跌倒与 5 类日常活动，因此开发集和留出集各为 25 条跌倒、25 条日常活动。媒体仅缓存到 `/cache` 文件系统；下载后必须同时通过官方字节数和 SHA-256 校验。留出集在策略冻结前不得下载、查看、试跑或参与阈值选择。
 
-本轮不把 CAUCAFall 当作心理健康或诈骗验证数据。音频、诈骗话术、月度 WHO-5 和个人 28 天基线需要各自证据，不能用视频跌倒指标替代。
+三个来源各自只回答一个有限问题，不能互相替代。FBS 是短信而不是摄像头听到的语音或 ASR 输出；CASAS 是环境传感器而不是摄像头派生指标，也没有心理健康结局标签；月度 WHO-5 仍只由合成夹具和规则测试覆盖。
 
 ## 3. 指标定义
 
@@ -128,9 +130,55 @@ sbatch \
 
 冻结策略后将 `--split dev` 改为 `--split holdout`。脚本固定记录数据集 DOI/版本/许可证、受试者、官方媒体哈希、三份策略哈希、姿态模型绑定、逐片段结果、工程门和限制，不记录缓存路径。仓库只同步最终小型 JSON 报告，不同步媒体、权重或 Slurm 日志。
 
-## 8. 交付结论与未关闭项
+## 8. 诈骗语境与个人基线验证契约
 
-KangShield 已具备可运行、可复核、可离线导出的本地三域工程演示链路；冻结版在开发重放上通过工程门，但在唯一一次 CAUCAFall 留出评估上**未通过**。因此本轮可以提交为透明标注限制的课程/工程展示作品，不能宣称公开数据泛化门、目标设备部署门或发布门已经关闭。
+FBS 验证器先对消息做 Unicode NFKC、大小写、空白和标点规范化，再调用产品正式规则；源标签只在规则输出完成后用于汇总。固定哈希划分不依赖文件顺序，开发集 10,424 条，留出集 2,604 条。指标是“源诈骗类别被规则标记率”和“源非诈骗类别被规则标记率”，不是摄像头对话中的召回率或误报率。后者仍由广告、博彩等垃圾或非法消息组成，并非普通居家对话。
+
+CASAS 每个家庭独立构建自己的日级序列，提取日间 15 分钟活动 bin、运动事件量和源数据已有的睡眠起点代理；不跨家庭建立人群基线，也不使用住户身份。验证器检查三件事：少于 7 个合格日期时必须 `null`；达到 28 天窗口后能够持续给出规则评估；对预先构造的一个轻度、一个严重、两个严重和等级 2 连续三天变化，必须分别响应 1、2、3、3。构造变化只验证规则灵敏度，不代表住户存在心理问题。
+
+冻结前声明两组工程门：
+
+- `fbs-fraud-context-engineering-gate-v1`：至少 1,000 条消息，源诈骗类别标记率 ≥ 0.50，源非诈骗类别标记率 ≤ 0.15。
+- `casas-personal-baseline-engineering-gate-v1`：每户至少 28 个合格日期，基线后可评估率 ≥ 0.90，无效行率 ≤ 0.001，基线不足全部 fail closed，四种受控变化全部符合预期等级。
+
+## 9. 开发、冻结与一次性留出
+
+诈骗开发初始基线对 10,424 条消息的源诈骗类别标记率为 0.327844，源非诈骗类别标记率为 0.103919。开发轮 D1 仅依据开发分区补充通用中文上下文并强化标点/空白混淆规范化，得到 0.599800 与 0.107720。CASAS 开发阶段修复公开 CSV 格式解析和受控响应的日历窗口后，hh101–hh103 最少有 54 个合格日期，基线后可评估率均为 1.0，基线前全部为 `null`，四种响应全部正确。
+
+策略于 `2026-08-30T19:08:39Z` 冻结，提交为 `a30fd59`，冻结清单见 [`public-domains-policy-freeze.json`](../../artifacts/validation/public-domains-policy-freeze.json)。清单绑定正式三域策略、评分实现、验证器和 Slurm runner 的 SHA-256，并预先固定两个数据集的开发/留出分区和门槛。源压缩包物理上包含全部分区，因此隔离是程序化的；冻结前没有请求 holdout 分区结果，冻结后只允许运行一次。
+
+| 域与划分 | 样本/家庭 | 主要指标 | 工程门 |
+|---|---:|---|---|
+| 诈骗开发 D1 | 10,424 条 | 源诈骗类别标记率 0.599800；源非诈骗类别标记率 0.107720 | 通过 |
+| 诈骗留出 | 2,604 条 | 源诈骗类别标记率 0.536437；源非诈骗类别标记率 0.113744 | 通过 |
+| 个人基线开发 | hh101–hh103 | 最少 54 个合格日期；基线后可评估率 1.0；无效行率 0.000002 | 通过 |
+| 个人基线留出 | hh104–hh106 | 最少 36 个合格日期；基线后可评估率 1.0；无效行率 0 | 通过 |
+
+唯一留出任务为 Slurm job `2909`，在 `hepnode3` 完成，状态 `COMPLETED/0:0`。结果生成后未修改正式策略、评分器或验证器。机器报告为 [`public-domains-dev.json`](../../artifacts/validation/public-domains-dev.json)（SHA-256 `265728ef2cea1c4bc8718a5c61fbd633526c0b9206b742fa0bb56599790faf12`）和 [`public-domains-holdout.json`](../../artifacts/validation/public-domains-holdout.json)（SHA-256 `997e29cff69ae2817647a8fad27b4675e49490c20dcf5cb866a8ffb13ce97b72`）；两份报告只保存聚合值与不可逆摘要，不含消息正文、时间戳、本地路径、老人或设备标识。
+
+## 10. 诈骗与个人基线复现命令
+
+公开源准备可在登录节点执行；解析、评分和基准只能提交给 Slurm 计算节点。缓存、日志与中间报告均写入 `/cache`：
+
+```bash
+sbatch \
+  --chdir="$PWD" \
+  --output="/cache/DeepLearning/$USER/kangshield-validation/logs/public-domains-%j.out" \
+  --error="/cache/DeepLearning/$USER/kangshield-validation/logs/public-domains-%j.err" \
+  scripts/slurm/benchmark_public_domains.sbatch \
+  --split dev \
+  --cache-root "/cache/DeepLearning/$USER/kangshield-public-data" \
+  --output "/cache/DeepLearning/$USER/kangshield-validation/results/public-domains-dev.json" \
+  --accept-fbs-source-terms \
+  --accept-casas-license CC-BY-4.0 \
+  --no-download
+```
+
+冻结后才可把 `--split dev` 改为 `--split holdout`；本次 holdout 已消耗，不能重复运行并继续称其为盲测。公开压缩包只保存在 `/cache`，不进入 Git 或 `/home` 提交面。
+
+## 11. 交付结论与未关闭项
+
+KangShield 已具备可运行、可复核、可离线导出的本地三域工程演示链路。诈骗语境与个人基线的一次性留出工程门通过，CAUCAFall 的唯一一次留出工程门**未通过**。因此本轮可以提交为透明标注限制的课程/工程展示作品，不能宣称三个域的真实准确率、公开数据全面泛化、目标设备部署门或发布门已经关闭。
 
 失败具有明确方向：留出集轻量路径仍能在不高于 0.50 的送模比例和实时系数低于 1.00 的条件下取得 0.68 跌倒召回，但 ADL 误报、运动门保留和相对完整帧召回损失未达到预注册阈值。后续工作应使用新的开发数据改进时序状态与负样本约束，再用新的独立测试集验证，而不是针对本次留出样本补规则。
 
@@ -138,15 +186,17 @@ KangShield 已具备可运行、可复核、可离线导出的本地三域工程
 
 - 模拟跌倒不能代替真实居家老人或目标 C6c 的前瞻验证。
 - CAUCAFall 不覆盖遮挡、夜视、多人、远场音频、中文诈骗或长期心理变化。
+- FBS 不经过摄像头远场音频、VAD 或 ASR，且其非诈骗类别不是普通居家对话；门通过只证明中文词法规则按预期工作。
+- CASAS 环境传感器只是日间出现、活动量和睡眠代理，没有心理健康结局；门通过只证明个人基线、缺数保护和等级响应工作。
 - Ultralytics 权重当前绑定 `AGPL-3.0-or-Ultralytics-Enterprise`；公开或商业交付前必须关闭许可证门。
 - 产品继续 fail closed：证据不足、过期或模型失败返回 `null`，不补猜、不合成总分、不自动外部告警。
 
-## 9. 最终仓库验收
+## 12. 最终仓库验收
 
 本轮最终验收日期为 2026-08-31：
 
-- Slurm seal job `2896` 在 `hepnode3` 先执行 `compileall`，再运行全量 `pytest -q`，状态 `COMPLETED/0:0`，结果为 `77 passed in 4.22s`；登录节点未运行 Python 测试或模型推理。
-- `bash -n scripts/run_product.sh`、`bash -n scripts/slurm/benchmark_caucafall.sbatch` 与 `git diff --check` 均通过。
-- 测试覆盖本地 Markdown 链接，并封印两份最终报告的 SHA-256、数据划分、50 条片段、工程门结果、策略/模型摘要和计算节点执行标记。
+- Slurm seal job `2919` 在 `hepnode3` 先执行 `compileall`，再运行全量 `pytest -q`，状态 `COMPLETED/0:0`，结果为 `85 passed in 4.22s`；同时通过全部 Slurm/启动脚本语法、`git diff --check`、隐私字符串和跟踪大资产扫描。登录节点未运行 Python 测试、数据解析或模型推理。
+- 测试覆盖本地 Markdown 链接，并封印四份最终公开报告的 SHA-256、固定划分、工程门结果、策略/模型摘要、无原始记录约束和计算节点执行标记。
+- Slurm installed-demo job `2918` 在 CPython 3.13 / Linux x86_64 上构建 wheel，在 `/cache` 全新虚拟环境以非 editable、`--no-index`、`--require-hashes` 方式安装 [`requirements-demo.lock`](../../requirements-demo.lock)，从源码目录外启动 localhost demo，并验证 health、三域 snapshot、文档页、owner/public 导出和 public 脱敏；状态 `COMPLETED/0:0`。四份运行策略随 wheel 安装，模型权重仍不进入 wheel。
 - 提交面扫描未发现 `/home` 用户路径、具体 `/cache` 用户路径、设备/老人标识、转写、本地媒体路径、下载临时链接，也没有跟踪视频、音频、模型权重、SQLite、`data/`、`models/`、`runs/`、`logs/` 或 `secrets/` 资产。
 - 旧 `models/`、`runs/`、`data/raw/` 与 `logs/` 分别由 Slurm job `2889`–`2892` 迁移到 `/cache/.../kangshield-legacy-archive/20260831/`，表观规模约为 982 MiB、1.1 GiB、720 MiB 与 258 KiB；job `2893`、`2894` 完成迁移审计。迁移可恢复且未执行删除，当前产品的 `data/processed/` 保留原位。

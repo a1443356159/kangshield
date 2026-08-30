@@ -26,8 +26,9 @@ from .contracts import (
     ensure_source_evidence_compatible,
 )
 from .longitudinal.store import DEFAULT_STORE_ROOT, LongitudinalStore, dumps_compact
-from .multidomain import DEFAULT_POLICY_PATH, build_snapshot, insert_candidate, load_policy
+from .multidomain import build_snapshot, insert_candidate, load_policy
 from .privacy import sha256_file
+from .resources import policy_path
 from .segment_analysis import (
     AnalysisResult,
     SegmentResultSummarizer,
@@ -39,7 +40,8 @@ from .speech_backend import AudioBuffer
 
 
 EDGE_MONITOR_VERSION = "edge-monitor-v0.2.0"
-DEFAULT_EDGE_POLICY_PATH = Path("configs/v2-edge-segment-policy.json")
+DEFAULT_RISK_POLICY_PATH = policy_path("v2-multidomain-risk-policy.json")
+DEFAULT_EDGE_POLICY_PATH = policy_path("v2-edge-segment-policy.json")
 DEFAULT_POSE_MODEL_PATH = Path("models/yolo26s-pose.pt")
 _PUBLIC_FAILURE_CODES = frozenset(
     {
@@ -813,7 +815,7 @@ class EdgeModelAnalyzer:
         self,
         *,
         selection_policy: EdgeSelectionPolicy,
-        risk_policy_path: Path = DEFAULT_POLICY_PATH,
+        risk_policy_path: Path = DEFAULT_RISK_POLICY_PATH,
         pose_model_path: Path | None = None,
         pose_backend: Any | None = None,
         speech_backend: Any | None = None,
@@ -1008,7 +1010,7 @@ class EdgeMonitor:
         device_ref: str,
         endpoint_provider: Callable[[], str],
         store_root: Path = DEFAULT_STORE_ROOT,
-        risk_policy_path: Path = DEFAULT_POLICY_PATH,
+        risk_policy_path: Path = DEFAULT_RISK_POLICY_PATH,
         selection_policy_path: Path = DEFAULT_EDGE_POLICY_PATH,
         pose_model_path: Path | None = None,
         evidence_level: EvidenceLevel = EvidenceLevel.E2,
