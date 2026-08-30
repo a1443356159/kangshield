@@ -77,6 +77,12 @@ def build_parser() -> argparse.ArgumentParser:
     monitor.add_argument("--transport", choices=("auto", "tcp", "udp"), default="auto")
     monitor.add_argument("--failure-backoff-s", type=float, default=2.0)
     monitor.add_argument(
+        "--local-anomaly-archive",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="按边缘策略归档异常事件 MP4；可用 --no-local-anomaly-archive 关闭",
+    )
+    monitor.add_argument(
         "--max-segments",
         type=int,
         default=0,
@@ -114,6 +120,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("configs/v2-edge-segment-policy.json"),
     )
     product.add_argument("--edge-failure-backoff-s", type=float, default=2.0)
+    product.add_argument(
+        "--local-anomaly-archive",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="连续模式下归档异常事件 MP4；默认读取边缘策略",
+    )
     product.add_argument(
         "--cloud-playback-provider",
         choices=("auto", "none", "ezviz"),
@@ -187,6 +199,7 @@ def _run_edge_monitor(args: argparse.Namespace) -> int:
         read_timeout_s=args.read_timeout_s,
         transport=args.transport,
         failure_backoff_s=args.failure_backoff_s,
+        archive_anomaly_clips=args.local_anomaly_archive,
     )
     try:
         counts = monitor.run(max_segments=args.max_segments)
@@ -196,10 +209,11 @@ def _run_edge_monitor(args: argparse.Namespace) -> int:
     print(
         json.dumps(
             {
-                "monitor_version": "edge-monitor-v0.1.0",
+                "monitor_version": "edge-monitor-v0.2.0",
                 "counts": counts,
                 "raw_video_persisted": False,
                 "raw_audio_persisted": False,
+                "derived_anomaly_archive_enabled": monitor.archive_anomaly_clips,
                 "cloud_recording_is_source_of_truth": True,
             },
             ensure_ascii=False,
@@ -226,6 +240,7 @@ def _serve_product(args: argparse.Namespace) -> int:
         edge_endpoint_refresh_seconds=args.edge_endpoint_refresh_seconds,
         edge_policy_path=args.edge_policy,
         edge_failure_backoff_s=args.edge_failure_backoff_s,
+        archive_anomaly_clips=args.local_anomaly_archive,
         cloud_playback_provider=args.cloud_playback_provider,
     )
     return 0

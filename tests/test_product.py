@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import threading
 import urllib.error
@@ -57,6 +58,40 @@ def _seed(store_root):
         )
 
 
+def _seed_local_archive(store_root):
+    _seed(store_root)
+    archive_id = "c" * 64
+    media = b"synthetic-owner-only-mp4-bytes"
+    with LongitudinalStore("elder_a", root=store_root) as store:
+        archive_dir = store.elder_dir / "anomaly_clips"
+        archive_dir.mkdir(mode=0o700)
+        path = archive_dir / f"{archive_id}.mp4"
+        path.write_bytes(media)
+        path.chmod(0o600)
+        now = datetime.now(timezone.utc)
+        store.record_candidate_media_archive(
+            {
+                "archive_id": archive_id,
+                "candidate_id": "fall-1",
+                "segment_id": "edge-1",
+                "device_ref": "target-camera-secret",
+                "relative_path": f"anomaly_clips/{archive_id}.mp4",
+                "mime_type": "video/mp4",
+                "started_at": (now - timedelta(seconds=10)).isoformat(),
+                "ended_at": (now + timedelta(seconds=20)).isoformat(),
+                "sha256": hashlib.sha256(media).hexdigest(),
+                "byte_size": len(media),
+                "has_video": 1,
+                "has_audio": 1,
+                "owner_only": 1,
+                "raw_stream_persisted": 0,
+                "created_at": now.isoformat(),
+                "retention_until": (now + timedelta(days=30)).isoformat(),
+            }
+        )
+    return media
+
+
 def test_serve_product_rejects_non_loopback(tmp_path):
     with pytest.raises(ValueError, match="127.0.0.1"):
         serve_product(
@@ -79,7 +114,7 @@ def test_dashboard_is_submission_ready_and_self_contained():
     assert "Promise.all" not in rendered
     assert "近期提醒" in rendered
     assert "播放异常片段" in rendered
-    assert "云端事件回看" in rendered
+    assert "安全事件回看" in rendered
     assert "pilot_unvalidated" not in rendered
     assert "global_score" not in rendered
     assert "KangShield" not in rendered
@@ -137,6 +172,7 @@ def test_demo_seed_requires_demo_refs_and_populates_all_domains(tmp_path):
     )
     assert seeded["captures"] == 1
     assert seeded["candidates"] == 3
+    assert seeded["archives"] == 3
     runtime = ProductRuntime(
         elder_ref="demo-elder",
         device_ref="demo-device",
@@ -158,6 +194,11 @@ def test_demo_seed_requires_demo_refs_and_populates_all_domains(tmp_path):
         item.get("transcript_excerpt") for item in runtime.candidates()
     }
     assert "请立即把钱转到安全账户，我来帮您处理。" in transcripts
+    assert all(
+        item["archived_locally"]
+        and item["playback_source"] == "local_archive"
+        for item in runtime.candidates()
+    )
 
 
 def test_review_api_requires_json_same_origin_and_csrf(tmp_path):
@@ -444,6 +485,82 @@ def test_candidate_cloud_playback_is_on_demand_and_not_persisted(tmp_path):
         thread.join(timeout=5)
 
 
+def test_local_archive_playback_uses_scoped_token_and_byte_ranges(tmp_path):
+    store_root = tmp_path / "store"
+    media = _seed_local_archive(store_root)
+
+    def cloud_must_not_run(start, end):
+        raise AssertionError("local archive must take priority over cloud playback")
+
+    runtime = ProductRuntime(
+        elder_ref="elder_a",
+        device_ref="target-camera-secret",
+        store_root=store_root,
+        playback_provider=cloud_must_not_run,
+    )
+    candidate = runtime.candidates()[0]
+    assert candidate["playback_available"] is True
+    assert candidate["playback_source"] == "local_archive"
+    assert candidate["archived_locally"] is True
+    direct = runtime.event_playback("fall-1")
+    assert direct["url"].startswith("/api/media/")
+    assert "anomaly_clips" not in json.dumps(direct)
+    assert direct["locally_persisted"] is True
+
+    placeholder = type("Placeholder", (), {})
+    server = ThreadingHTTPServer(("127.0.0.1", 0), placeholder)
+    port = server.server_port
+    server.server_close()
+    origin = f"http://127.0.0.1:{port}"
+    server = ThreadingHTTPServer(
+        ("127.0.0.1", port),
+        make_product_handler(runtime, host="127.0.0.1", port=port),
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        request = urllib.request.Request(
+            origin + "/api/candidates/fall-1/playback",
+            data=b"{}",
+            headers={
+                "Content-Type": "application/json",
+                "Origin": origin,
+                "X-CSRF-Token": runtime.csrf_token,
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(request) as response:
+            playback = json.load(response)
+        media_request = urllib.request.Request(
+            origin + playback["url"],
+            headers={"Range": "bytes=2-9", "Sec-Fetch-Site": "same-origin"},
+        )
+        with urllib.request.urlopen(media_request) as response:
+            assert response.status == 206
+            assert response.headers["Content-Type"] == "video/mp4"
+            assert response.headers["Content-Range"] == f"bytes 2-9/{len(media)}"
+            assert response.headers["Cross-Origin-Resource-Policy"] == "same-origin"
+            assert response.read() == media[2:10]
+
+        cross_site = urllib.request.Request(
+            origin + playback["url"], headers={"Sec-Fetch-Site": "cross-site"}
+        )
+        with pytest.raises(urllib.error.HTTPError) as caught:
+            urllib.request.urlopen(cross_site)
+        assert caught.value.code == 403
+        with pytest.raises(urllib.error.HTTPError) as missing:
+            urllib.request.urlopen(origin + "/api/media/not-a-token")
+        assert missing.value.code == 404
+        database = (
+            store_root / "elder_a" / "longitudinal.sqlite"
+        ).read_bytes()
+        assert playback["url"].encode() not in database
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
 def test_continuous_runtime_does_not_block_on_missing_stream_endpoint(
     tmp_path, monkeypatch
 ):
@@ -466,7 +583,7 @@ def test_continuous_runtime_does_not_block_on_missing_stream_endpoint(
 
 def test_public_export_is_redacted_and_owner_export_keeps_audit(tmp_path):
     store_root = tmp_path / "store"
-    _seed(store_root)
+    _seed_local_archive(store_root)
     with LongitudinalStore("elder_a", root=store_root) as store:
         store.review_candidate(
             candidate_id="fall-1",
@@ -509,14 +626,16 @@ def test_public_export_is_redacted_and_owner_export_keeps_audit(tmp_path):
         "owner-secret",
         "private.mkv",
         "evidence_refs",
-            "occurred_at",
-            "owner_note",
-            "transcript_excerpt",
-            "请立即转账到安全账户 private transcript",
-            "answers_json",
-            "percentage_score",
-            "wellbeing_checkins",
-        ):
+        "occurred_at",
+        "owner_note",
+        "transcript_excerpt",
+        "请立即转账到安全账户 private transcript",
+        "answers_json",
+        "percentage_score",
+        "wellbeing_checkins",
+        "anomaly_clips",
+        "c" * 64,
+    ):
         assert forbidden not in serialized
     payload = json.loads(public_json.read_text())
     assert payload["global_score"] is None

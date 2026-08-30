@@ -20,6 +20,7 @@ exec .venv/bin/kangshield-info serve-product \
   --host 127.0.0.1 \
   --port 8765 \
   --continuous \
+  --local-anomaly-archive \
   --edge-provider ezviz \
   --edge-device-serial-env KANG_DEVICE_SERIAL \
   --cloud-playback-provider ezviz \

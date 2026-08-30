@@ -23,7 +23,7 @@ def test_cli_exposes_only_final_product_commands():
     }
 
 
-def test_edge_monitor_defaults_to_no_local_media_policy():
+def test_edge_monitor_defaults_to_policy_controlled_anomaly_archive():
     args = build_parser().parse_args(
         ["run-edge-monitor", "--elder-ref", "elder-a", "--device-ref", "c6c-a"]
     )
@@ -31,6 +31,7 @@ def test_edge_monitor_defaults_to_no_local_media_policy():
     assert args.max_segments == 0
     assert args.edge_policy.name == "v2-edge-segment-policy.json"
     assert args.evidence_level.value == "E2"
+    assert args.local_anomaly_archive is None
 
 
 def test_product_parser_enables_cloud_playback_automatically_for_ezviz():
@@ -40,6 +41,21 @@ def test_product_parser_enables_cloud_playback_automatically_for_ezviz():
     assert args.host == "127.0.0.1"
     assert args.cloud_playback_provider == "auto"
     assert args.continuous is False
+    assert args.local_anomaly_archive is None
+
+
+def test_local_anomaly_archive_can_be_disabled_from_cli():
+    args = build_parser().parse_args(
+        [
+            "serve-product",
+            "--elder-ref",
+            "elder-a",
+            "--device-ref",
+            "c6c-a",
+            "--no-local-anomaly-archive",
+        ]
+    )
+    assert args.local_anomaly_archive is False
 
 
 def test_delete_product_data_requires_exact_confirmation(tmp_path, capsys):

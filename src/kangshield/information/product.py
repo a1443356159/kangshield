@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
 import secrets
+import stat
 import tempfile
 import threading
 from datetime import date, datetime, timedelta, timezone
@@ -11,6 +13,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from statistics import median
+from time import monotonic
 from typing import Any, Callable
 from urllib.parse import urlsplit
 
@@ -24,7 +27,7 @@ from .multidomain import (
 )
 from .product_ui import dashboard_html, documentation_html, offline_report_html
 
-PRODUCT_VERSION = "multidomain-product-v0.5.0"
+PRODUCT_VERSION = "multidomain-product-v0.6.0"
 WHO5_QUESTIONS = [
     "我感觉快乐、心情舒畅",
     "我感觉宁静和放松",
@@ -71,6 +74,7 @@ class ProductRuntime:
         edge_endpoint_refresh_seconds: float = 1800.0,
         edge_policy_path: Path = Path("configs/v2-edge-segment-policy.json"),
         edge_failure_backoff_s: float = 2.0,
+        archive_anomaly_clips: bool | None = None,
         cloud_playback_provider: str = "auto",
         playback_provider: Callable[[datetime, datetime], str] | None = None,
     ) -> None:
@@ -81,11 +85,37 @@ class ProductRuntime:
         self.csrf_token = secrets.token_urlsafe(32)
         self.stop_event = threading.Event()
         self.mutation_lock = threading.RLock()
+        self.media_token_lock = threading.Lock()
+        self.media_tokens: dict[str, tuple[str, float]] = {}
         self.edge_worker: threading.Thread | None = None
         self.last_edge_segment: dict[str, object] = {
             "status": "disabled" if not continuous else "not_started"
         }
         self.edge_monitor: Any | None = None
+        from .edge_monitor import EdgeSelectionPolicy
+
+        self.local_archive_policy = EdgeSelectionPolicy.load(edge_policy_path)
+        self.archive_anomaly_clips = (
+            self.local_archive_policy.archive_enabled
+            if archive_anomaly_clips is None
+            else bool(archive_anomaly_clips)
+        )
+        try:
+            from .media_archive import prune_candidate_archives
+
+            with LongitudinalStore(self.elder_ref, root=self.store_root) as store:
+                prune_candidate_archives(
+                    store,
+                    now=datetime.now(timezone.utc),
+                    maximum_total_bytes=(
+                        self.local_archive_policy.archive_maximum_total_bytes
+                    ),
+                )
+        except Exception:
+            self.last_edge_segment = {
+                **self.last_edge_segment,
+                "archive_maintenance": "failed",
+            }
         if cloud_playback_provider not in {"auto", "none", "ezviz"}:
             raise ValueError("cloud_playback_provider must be auto, none, or ezviz")
         self.playback_provider = playback_provider
@@ -115,6 +145,7 @@ class ProductRuntime:
                 selection_policy_path=edge_policy_path,
                 failure_backoff_s=edge_failure_backoff_s,
                 stop_event=self.stop_event,
+                archive_anomaly_clips=self.archive_anomaly_clips,
             )
         should_enable_ezviz_playback = cloud_playback_provider == "ezviz" or (
             cloud_playback_provider == "auto"
@@ -140,6 +171,8 @@ class ProductRuntime:
 
     def stop(self) -> None:
         self.stop_event.set()
+        with self.media_token_lock:
+            self.media_tokens.clear()
         if self.edge_worker is not None:
             self.edge_worker.join(timeout=5)
 
@@ -157,6 +190,11 @@ class ProductRuntime:
             "selected_pose_seconds": audit.selected_pose_seconds,
             "selected_asr_seconds": audit.selected_asr_seconds,
             "raw_media_persisted": False,
+            "archived_candidate_count": audit.archived_candidate_count,
+            "archive_failure_count": audit.archive_failure_count,
+            "derived_anomaly_media_persisted": (
+                audit.derived_anomaly_media_persisted
+            ),
         }
 
     def snapshot(self):
@@ -180,6 +218,11 @@ class ProductRuntime:
                 dict(review)
             )
         result: list[dict[str, object]] = []
+        archive_rows = {
+            str(row["candidate_id"]): row for row in store.fetch_media_archives()
+        }
+        from .media_archive import candidate_archive_available
+
         for row in store.fetch_domain_candidates():
             candidate_id = str(row["candidate_id"])
             item = candidate_from_row(row).model_dump(mode="json")
@@ -187,26 +230,54 @@ class ProductRuntime:
             transcript_excerpt = payload.get("transcript_excerpt")
             if isinstance(transcript_excerpt, str) and transcript_excerpt.strip():
                 item["transcript_excerpt"] = transcript_excerpt.strip()[:120]
-            item["playback_available"] = bool(
+            archive = archive_rows.get(candidate_id)
+            local_available = bool(
+                archive is not None
+                and archive["device_ref"] == self.device_ref
+                and candidate_archive_available(store, archive)
+            )
+            cloud_available = bool(
                 self.playback_provider is not None and payload.get("segment_id")
             )
+            item["playback_available"] = local_available or cloud_available
+            item["playback_source"] = (
+                "local_archive"
+                if local_available
+                else "cloud"
+                if cloud_available
+                else None
+            )
+            item["archived_locally"] = local_available
             item["reviews"] = reviews_by_candidate.get(candidate_id, [])
             result.append(item)
         return result
 
-    def cloud_playback(self, candidate_id: str) -> dict[str, object]:
-        """Resolve a short event window to an ephemeral cloud URL on owner request."""
+    def event_playback(self, candidate_id: str) -> dict[str, object]:
+        """Prefer a local owner archive, then fall back to ephemeral cloud media."""
 
-        if self.playback_provider is None:
-            raise LookupError("cloud playback is not configured")
         with LongitudinalStore(self.elder_ref, root=self.store_root) as store:
             candidate = store.fetch_domain_candidate(candidate_id)
             if candidate is None or candidate["device_ref"] != self.device_ref:
                 raise KeyError(candidate_id)
+            archive = store.fetch_candidate_media_archive(candidate_id)
+            if archive is not None and archive["device_ref"] == self.device_ref:
+                from .media_archive import candidate_archive_verified
+
+                if candidate_archive_verified(store, archive):
+                    token = self._issue_media_token(str(archive["archive_id"]))
+                    return {
+                        "candidate_id": candidate_id,
+                        "started_at": str(archive["started_at"]),
+                        "ended_at": str(archive["ended_at"]),
+                        "url": f"/api/media/{token}",
+                        "source": "local_archive",
+                        "ephemeral": True,
+                        "locally_persisted": True,
+                    }
             payload = json.loads(candidate["payload_json"])
             segment_id = payload.get("segment_id")
             if not isinstance(segment_id, str) or not segment_id:
-                raise LookupError("candidate has no cloud segment")
+                raise LookupError("candidate has no playable segment")
             segment = store.fetch_edge_segment(segment_id)
             if segment is None or segment["device_ref"] != self.device_ref:
                 raise LookupError("candidate cloud segment is unavailable")
@@ -224,6 +295,8 @@ class ProductRuntime:
         ended_at = min(segment_end, occurred_at + timedelta(seconds=20))
         if ended_at <= started_at:
             raise LookupError("candidate cloud window is unavailable")
+        if self.playback_provider is None:
+            raise LookupError("cloud playback is not configured")
         try:
             url = self.playback_provider(started_at, ended_at)
         except Exception as error:
@@ -242,9 +315,51 @@ class ProductRuntime:
             "started_at": started_at.isoformat(),
             "ended_at": ended_at.isoformat(),
             "url": url,
+            "source": "cloud",
             "ephemeral": True,
             "locally_persisted": False,
         }
+
+    def cloud_playback(self, candidate_id: str) -> dict[str, object]:
+        """Compatibility wrapper for the event playback API."""
+
+        return self.event_playback(candidate_id)
+
+    def _issue_media_token(self, archive_id: str) -> str:
+        token = secrets.token_urlsafe(32)
+        with self.media_token_lock:
+            now = monotonic()
+            self.media_tokens = {
+                key: value for key, value in self.media_tokens.items() if value[1] > now
+            }
+            self.media_tokens[token] = (archive_id, now + 600)
+        return token
+
+    def resolve_media_token(self, token: str) -> dict[str, object]:
+        with self.media_token_lock:
+            now = monotonic()
+            record = self.media_tokens.get(token)
+            if record is None or record[1] <= now:
+                self.media_tokens.pop(token, None)
+                raise KeyError(token)
+            archive_id = record[0]
+        with LongitudinalStore(self.elder_ref, root=self.store_root) as store:
+            row = store.fetch_media_archive(archive_id)
+            if row is None or row["device_ref"] != self.device_ref:
+                raise KeyError(token)
+            from .media_archive import (
+                candidate_archive_path,
+                candidate_archive_verified,
+            )
+
+            if not candidate_archive_verified(store, row):
+                raise KeyError(token)
+            path = candidate_archive_path(store, row)
+            return {
+                "path": path,
+                "mime_type": str(row["mime_type"]),
+                "byte_size": int(row["byte_size"]),
+            }
 
     def trends(self) -> list[dict[str, object]]:
         with LongitudinalStore(self.elder_ref, root=self.store_root) as store:
@@ -457,7 +572,7 @@ class ProductRuntime:
                 now=now_utc,
             )
             return {
-                "schema_version": "1.0",
+                "schema_version": "2.0",
                 "generated_at": now_utc.isoformat(),
                 "snapshot": snapshot.model_dump(mode="json"),
                 "candidates": self._candidates_from_store(store),
@@ -476,8 +591,11 @@ class ProductRuntime:
                     ),
                     "last_segment": self.last_edge_segment,
                     "raw_media_persisted": False,
-                    "cloud_recording_is_source_of_truth": (
-                        self.edge_monitor is not None
+                    "local_anomaly_archive_count": len(
+                        store.fetch_media_archives()
+                    ),
+                    "local_anomaly_archive_enabled": (
+                        self.archive_anomaly_clips
                     ),
                 },
             }
@@ -555,14 +673,18 @@ def make_product_handler(runtime: ProductRuntime, *, host: str, port: int):
     expected_origin = f"http://{host}:{port}"
 
     class ProductHandler(BaseHTTPRequestHandler):
-        server_version = "KangShieldLocal/0.5"
+        server_version = "KangShieldLocal/0.6"
 
         def log_message(self, format: str, *args: object) -> None:
             return None
 
         def do_GET(self) -> None:
             path = urlsplit(self.path).path
-            if path == "/":
+            parts = path.strip("/").split("/")
+            is_media = len(parts) == 3 and parts[:2] == ["api", "media"]
+            if is_media:
+                self._send_media(parts[2])
+            elif path == "/":
                 self._send_html(_dashboard_html(runtime.csrf_token))
             elif path == "/docs":
                 self._send_html(_documentation_html())
@@ -617,7 +739,7 @@ def make_product_handler(runtime: ProductRuntime, *, host: str, port: int):
                     decision = CandidateReviewDecision.model_validate(payload)
                     result = {"snapshot": runtime.review(decision)}
                 elif is_playback:
-                    result = runtime.cloud_playback(parts[2])
+                    result = runtime.event_playback(parts[2])
                 else:
                     submission = WellbeingCheckinSubmission.model_validate(payload)
                     result = runtime.save_wellbeing_checkin(submission)
@@ -701,6 +823,91 @@ def make_product_handler(runtime: ProductRuntime, *, host: str, port: int):
             self.end_headers()
             self.wfile.write(body)
 
+        def _send_media(self, token: str) -> None:
+            fetch_site = self.headers.get("Sec-Fetch-Site")
+            if fetch_site not in (None, "same-origin"):
+                self.send_error(HTTPStatus.FORBIDDEN)
+                return
+            try:
+                media = runtime.resolve_media_token(token)
+            except (KeyError, LookupError):
+                self.send_error(HTTPStatus.NOT_FOUND)
+                return
+            path = media["path"]
+            size = int(media["byte_size"])
+            start = 0
+            end = size - 1
+            status = HTTPStatus.OK
+            range_header = self.headers.get("Range")
+            if range_header:
+                if not range_header.startswith("bytes=") or "," in range_header:
+                    self._send_range_error(size)
+                    return
+                raw_start, separator, raw_end = range_header[6:].partition("-")
+                if not separator:
+                    self._send_range_error(size)
+                    return
+                try:
+                    if raw_start:
+                        start = int(raw_start)
+                        end = int(raw_end) if raw_end else size - 1
+                    elif raw_end:
+                        suffix = int(raw_end)
+                        if suffix <= 0:
+                            raise ValueError
+                        start = max(0, size - suffix)
+                    else:
+                        raise ValueError
+                except ValueError:
+                    self._send_range_error(size)
+                    return
+                if start < 0 or start >= size or end < start:
+                    self._send_range_error(size)
+                    return
+                end = min(end, size - 1)
+                status = HTTPStatus.PARTIAL_CONTENT
+            length = end - start + 1
+            try:
+                descriptor = os.open(
+                    Path(path),
+                    os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+                )
+                details = os.fstat(descriptor)
+                if not stat.S_ISREG(details.st_mode) or details.st_size != size:
+                    os.close(descriptor)
+                    raise OSError("candidate archive changed before playback")
+            except OSError:
+                self.send_error(HTTPStatus.NOT_FOUND)
+                return
+            self.send_response(status)
+            self.send_header("Content-Type", str(media["mime_type"]))
+            self.send_header("Content-Length", str(length))
+            self.send_header("Accept-Ranges", "bytes")
+            if status == HTTPStatus.PARTIAL_CONTENT:
+                self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+            self.send_header("Cache-Control", "private, no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Content-Disposition", "inline")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.send_header("Cross-Origin-Resource-Policy", "same-origin")
+            self.end_headers()
+            with os.fdopen(descriptor, "rb") as stream:
+                stream.seek(start)
+                remaining = length
+                while remaining:
+                    chunk = stream.read(min(64 * 1024, remaining))
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+                    remaining -= len(chunk)
+
+        def _send_range_error(self, size: int) -> None:
+            self.send_response(HTTPStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+            self.send_header("Content-Range", f"bytes */{size}")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
         def _send_html(self, body_text: str) -> None:
             body = body_text.encode("utf-8")
             self.send_response(200)
@@ -716,7 +923,7 @@ def make_product_handler(runtime: ProductRuntime, *, host: str, port: int):
                 "Content-Security-Policy",
                 "default-src 'self'; script-src 'self' 'unsafe-inline';"
                 " style-src 'self' 'unsafe-inline'; connect-src 'self';"
-                " media-src https:;"
+                " media-src 'self' https:;"
                 " frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
             )
             self.send_header("Content-Length", str(len(body)))
@@ -742,6 +949,7 @@ def serve_product(
     edge_endpoint_refresh_seconds: float = 1800.0,
     edge_policy_path: Path = Path("configs/v2-edge-segment-policy.json"),
     edge_failure_backoff_s: float = 2.0,
+    archive_anomaly_clips: bool | None = None,
     cloud_playback_provider: str = "auto",
 ) -> None:
     if host != "127.0.0.1":
@@ -758,6 +966,7 @@ def serve_product(
             device_ref=device_ref,
             store_root=store_root,
             policy_path=policy_path,
+            edge_policy_path=edge_policy_path,
         )
     runtime = ProductRuntime(
         elder_ref=elder_ref,
@@ -771,6 +980,7 @@ def serve_product(
         edge_endpoint_refresh_seconds=edge_endpoint_refresh_seconds,
         edge_policy_path=edge_policy_path,
         edge_failure_backoff_s=edge_failure_backoff_s,
+        archive_anomaly_clips=archive_anomaly_clips,
         cloud_playback_provider=cloud_playback_provider,
     )
     server = ThreadingHTTPServer((host, port), make_product_handler(runtime, host=host, port=port))

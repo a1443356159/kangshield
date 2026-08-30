@@ -334,7 +334,7 @@ class EdgeKeyWindow(ContractModel):
 class EdgeSegmentAudit(ContractModel):
     """Path-free receipt for one in-memory segment."""
 
-    schema_version: str = "1.0"
+    schema_version: str = "2.0"
     segment_id: str = Field(min_length=1, max_length=96)
     device_ref: str = Field(min_length=1, max_length=64)
     segment_started_at: datetime
@@ -356,6 +356,10 @@ class EdgeSegmentAudit(ContractModel):
     screened_frame_count: int = Field(default=0, ge=0)
     selected_frame_count: int = Field(default=0, ge=0)
     candidate_count: int = Field(default=0, ge=0)
+    anomaly_archive_enabled: bool = False
+    archived_candidate_count: int = Field(default=0, ge=0)
+    archive_failure_count: int = Field(default=0, ge=0)
+    derived_anomaly_media_persisted: bool = False
     key_windows: list[EdgeKeyWindow] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
 
@@ -375,6 +379,16 @@ class EdgeSegmentAudit(ContractModel):
             raise ValueError("selected ASR exceeds screened audio")
         if self.selected_frame_count > self.screened_frame_count:
             raise ValueError("selected frame count exceeds screened frame count")
+        if self.archived_candidate_count > self.candidate_count:
+            raise ValueError("archived candidate count exceeds candidate count")
+        if self.archive_failure_count > self.candidate_count:
+            raise ValueError("archive failure count exceeds candidate count")
+        if self.archived_candidate_count and not self.anomaly_archive_enabled:
+            raise ValueError("disabled anomaly archive cannot persist candidates")
+        if self.derived_anomaly_media_persisted != bool(
+            self.archived_candidate_count
+        ):
+            raise ValueError("derived media flag must match archived candidate count")
         if self.status == "completed" and self.failure_code is not None:
             raise ValueError("completed edge segment cannot carry a failure code")
         if self.status != "completed" and not self.failure_code:
@@ -382,6 +396,48 @@ class EdgeSegmentAudit(ContractModel):
         segment_ms = round(duration * 1000)
         if any(window.end_ms > segment_ms + 1000 for window in self.key_windows):
             raise ValueError("edge key window exceeds segment bounds")
+        return self
+
+
+class CandidateMediaArchive(ContractModel):
+    """Owner-only playable media derived from one in-memory anomaly window."""
+
+    schema_version: str = "1.0"
+    archive_id: str = Field(pattern=r"^[0-9a-f]{64}$")
+    candidate_id: str = Field(min_length=1)
+    segment_id: str = Field(min_length=1, max_length=96)
+    device_ref: str = Field(min_length=1, max_length=64)
+    relative_path: str = Field(
+        pattern=r"^anomaly_clips/[0-9a-f]{64}\.mp4$"
+    )
+    mime_type: Literal["video/mp4"] = "video/mp4"
+    started_at: datetime
+    ended_at: datetime
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    byte_size: int = Field(gt=0)
+    has_video: Literal[True] = True
+    has_audio: Literal[True] = True
+    owner_only: Literal[True] = True
+    raw_stream_persisted: Literal[False] = False
+    created_at: datetime = Field(default_factory=utc_now)
+    retention_until: datetime
+
+    @model_validator(mode="after")
+    def _valid_archive_window(self) -> "CandidateMediaArchive":
+        if any(
+            value.tzinfo is None
+            for value in (
+                self.started_at,
+                self.ended_at,
+                self.created_at,
+                self.retention_until,
+            )
+        ):
+            raise ValueError("archive timestamps must be timezone-aware")
+        if self.ended_at <= self.started_at:
+            raise ValueError("archive end must follow start")
+        if self.retention_until <= self.created_at:
+            raise ValueError("archive retention must follow creation")
         return self
 
 

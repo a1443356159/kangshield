@@ -1,4 +1,4 @@
-"""Synthetic, privacy-safe records for the local product demonstration."""
+"""Synthetic, privacy-safe records and media for the local demonstration."""
 
 from __future__ import annotations
 
@@ -18,16 +18,23 @@ def seed_product_demo(
     device_ref: str,
     store_root: Path = DEFAULT_STORE_ROOT,
     policy_path: Path = DEFAULT_POLICY_PATH,
+    edge_policy_path: Path = Path("configs/v2-edge-segment-policy.json"),
     now: datetime | None = None,
 ) -> dict[str, int]:
-    """Seed an idempotent demo without raw media or real-person data."""
+    """Seed an idempotent demo without real-person, device, or raw-stream data."""
 
     if not elder_ref.startswith("demo-") or not device_ref.startswith("demo-"):
         raise ValueError("demo mode requires demo-* elder and device references")
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     local_day = now.astimezone().date()
     bucket = now.strftime("%Y%m%d%H")
-    created = {"captures": 0, "daily_features": 0, "candidates": 0, "history": 0}
+    created = {
+        "captures": 0,
+        "daily_features": 0,
+        "candidates": 0,
+        "archives": 0,
+        "history": 0,
+    }
     policy, digest = load_policy(policy_path)
 
     with LongitudinalStore(elder_ref, root=store_root) as store:
@@ -126,6 +133,12 @@ def seed_product_demo(
                         ),
                     )
 
+        created["archives"] = _seed_demo_archives(
+            store,
+            device_ref=device_ref,
+            edge_policy_path=edge_policy_path,
+        )
+
         history_count = int(
             store._connection.execute(
                 "SELECT COUNT(*) FROM domain_assessments"
@@ -166,6 +179,183 @@ def seed_product_demo(
             persist=True,
         )
     return created
+
+
+def _seed_demo_archives(
+    store: LongitudinalStore,
+    *,
+    device_ref: str,
+    edge_policy_path: Path,
+) -> int:
+    """Generate visibly synthetic audiovisual clips through the real archive path."""
+
+    try:
+        import cv2
+        import numpy as np
+    except ImportError as error:
+        raise RuntimeError(
+            "demo media requires the 'demo' or 'edge' optional dependencies"
+        ) from error
+
+    from .edge_monitor import (
+        BufferedVideoFrame,
+        EdgeSelectionPolicy,
+        InMemoryEdgeSegment,
+    )
+    from .media_archive import archive_candidate_clip
+    from .multidomain import candidate_from_row
+    from .speech_backend import AudioBuffer
+
+    policy = EdgeSelectionPolicy.load(edge_policy_path)
+    before = len(store.fetch_media_archives())
+    width, height = 384, 216
+    duration_ms = round(
+        (policy.archive_event_pre_seconds + policy.archive_event_post_seconds)
+        * 1000
+    )
+    frame_interval_ms = round(1000 / policy.video_sample_fps)
+    frame_count = max(1, duration_ms // frame_interval_ms)
+    sample_count = round(duration_ms * policy.audio_sample_rate_hz / 1000)
+    timeline = np.arange(sample_count, dtype=np.float32) / policy.audio_sample_rate_hz
+
+    for clip_index, row in enumerate(store.fetch_domain_candidates()):
+        candidate = candidate_from_row(row)
+        frames: list[BufferedVideoFrame] = []
+        accent = ((45, 113, 232), (132, 74, 244), (36, 160, 122))[
+            clip_index % 3
+        ]
+        for frame_index in range(frame_count):
+            progress = frame_index / max(1, frame_count - 1)
+            canvas = np.full((height, width, 3), (248, 246, 240), dtype=np.uint8)
+            cv2.rectangle(canvas, (0, 0), (width, 42), (24, 34, 48), -1)
+            cv2.putText(
+                canvas,
+                "KANGSHIELD  SYNTHETIC DEMO",
+                (14, 27),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.52,
+                (255, 255, 255),
+                1,
+                cv2.LINE_AA,
+            )
+            cv2.putText(
+                canvas,
+                candidate.domain.value.upper(),
+                (18, 74),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.62,
+                accent,
+                2,
+                cv2.LINE_AA,
+            )
+            cv2.putText(
+                canvas,
+                "Owner-only event clip",
+                (18, 99),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.44,
+                (76, 85, 99),
+                1,
+                cv2.LINE_AA,
+            )
+            if candidate.domain.value == "fall":
+                fall_phase = min(1.0, max(0.0, (progress - 0.25) / 0.22))
+                center_x = round(255 + 45 * fall_phase)
+                center_y = round(102 + 72 * fall_phase)
+                angle = round(82 * fall_phase)
+                cv2.ellipse(
+                    canvas,
+                    (center_x, center_y),
+                    (13, 30),
+                    angle,
+                    0,
+                    360,
+                    accent,
+                    -1,
+                )
+                cv2.circle(
+                    canvas,
+                    (center_x, center_y - round(40 * (1 - fall_phase))),
+                    10,
+                    accent,
+                    -1,
+                )
+                cv2.line(canvas, (165, 188), (355, 188), (157, 164, 174), 2)
+            else:
+                pulse = 7 + round(4 * np.sin(progress * 18 * np.pi))
+                cv2.rectangle(canvas, (238, 104), (322, 184), accent, -1)
+                cv2.circle(canvas, (280, 144), pulse, (255, 255, 255), 2)
+                cv2.putText(
+                    canvas,
+                    "VOICE",
+                    (250, 204),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.42,
+                    (76, 85, 99),
+                    1,
+                    cv2.LINE_AA,
+                )
+            cv2.putText(
+                canvas,
+                f"{frame_index / policy.video_sample_fps:04.1f}s",
+                (18, 194),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (76, 85, 99),
+                1,
+                cv2.LINE_AA,
+            )
+            encoded, jpeg = cv2.imencode(
+                ".jpg", canvas, [cv2.IMWRITE_JPEG_QUALITY, 78]
+            )
+            if not encoded:
+                raise RuntimeError("synthetic demo frame encoding failed")
+            frames.append(
+                BufferedVideoFrame(
+                    timestamp_ms=frame_index * frame_interval_ms,
+                    jpeg_bytes=jpeg.tobytes(),
+                )
+            )
+
+        marker_start = policy.archive_event_pre_seconds - 1
+        marker_end = policy.archive_event_pre_seconds + 3
+        envelope = ((timeline > marker_start) & (timeline < marker_end)).astype(
+            np.float32
+        )
+        carrier = np.sin(
+            2 * np.pi * (360 + clip_index * 100) * timeline
+        ).astype(np.float32)
+        audio = (0.10 * carrier * envelope).astype(np.float32)
+        segment_started_at = candidate.occurred_at - timedelta(
+            seconds=policy.archive_event_pre_seconds
+        )
+        segment = InMemoryEdgeSegment(
+            segment_id=f"demo-archive-{clip_index}-{candidate.candidate_id}",
+            device_ref=device_ref,
+            started_at=segment_started_at,
+            ended_at=segment_started_at + timedelta(milliseconds=duration_ms),
+            duration_ms=duration_ms,
+            frames=tuple(frames),
+            audio=AudioBuffer(
+                samples=audio,
+                sample_rate_hz=policy.audio_sample_rate_hz,
+                duration_ms=duration_ms,
+            ),
+            frame_width=width,
+            frame_height=height,
+            cloud_recording_ref=f"cloud-recording:synthetic-demo-{clip_index}",
+        )
+        archive_candidate_clip(
+            store,
+            segment=segment,
+            candidate=candidate,
+            pre_seconds=policy.archive_event_pre_seconds,
+            post_seconds=policy.archive_event_post_seconds,
+            retention_days=policy.archive_retention_days,
+            maximum_total_bytes=policy.archive_maximum_total_bytes,
+            video_fps=policy.video_sample_fps,
+        )
+    return len(store.fetch_media_archives()) - before
 
 
 def _daily_row(

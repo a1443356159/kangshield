@@ -1,6 +1,7 @@
 """KangShield continuous, per-person multidomain risk product."""
 
 from .contracts import (
+    CandidateMediaArchive,
     DomainCandidate,
     DomainRiskAssessment,
     MultidomainSnapshotReport,
@@ -8,6 +9,7 @@ from .contracts import (
 )
 
 __all__ = [
+    "CandidateMediaArchive",
     "DomainCandidate",
     "DomainRiskAssessment",
     "MultidomainSnapshotReport",

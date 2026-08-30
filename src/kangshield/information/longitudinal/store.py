@@ -1,9 +1,9 @@
 """Owner-only, per-person SQLite store for risk facts and audit history.
 
-One database lives under ``<root>/<elder_ref>/``. It never stores raw media,
-stream endpoints, playback URLs, credentials, or complete transcripts. A
-risk-triggered candidate may carry one normalized transcript excerpt capped by
-the analysis layer at 120 characters.
+One database lives under ``<root>/<elder_ref>/``. It never stores the continuous
+raw stream, stream endpoints, playback URLs, credentials, or complete
+transcripts. Owner-only anomaly windows may be stored as derived MP4 files
+under the same elder directory; SQLite keeps only their bounded archive index.
 """
 
 from __future__ import annotations
@@ -15,10 +15,13 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Iterator
 
-SCHEMA_VERSION = "4"
+SCHEMA_VERSION = "5"
 DEFAULT_STORE_ROOT = Path("data/processed/longitudinal")
 
 _ELDER_REF_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+_ARCHIVE_RELATIVE_PATTERN = re.compile(
+    r"^anomaly_clips/[0-9a-f]{64}\.mp4$"
+)
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (
@@ -140,6 +143,10 @@ CREATE TABLE IF NOT EXISTS edge_segment_audits (
     screened_frame_count INTEGER NOT NULL DEFAULT 0,
     selected_frame_count INTEGER NOT NULL DEFAULT 0,
     candidate_count INTEGER NOT NULL DEFAULT 0,
+    anomaly_archive_enabled INTEGER NOT NULL DEFAULT 0,
+    archived_candidate_count INTEGER NOT NULL DEFAULT 0,
+    archive_failure_count INTEGER NOT NULL DEFAULT 0,
+    derived_anomaly_media_persisted INTEGER NOT NULL DEFAULT 0,
     key_windows_json TEXT NOT NULL DEFAULT '[]',
     limitations_json TEXT NOT NULL DEFAULT '[]',
     created_at TEXT NOT NULL
@@ -173,6 +180,27 @@ CREATE TABLE IF NOT EXISTS domain_candidates (
 );
 CREATE INDEX IF NOT EXISTS idx_domain_candidates_domain_time
     ON domain_candidates (domain, occurred_at);
+CREATE TABLE IF NOT EXISTS candidate_media_archives (
+    archive_id TEXT PRIMARY KEY CHECK(length(archive_id) = 64),
+    candidate_id TEXT NOT NULL UNIQUE,
+    segment_id TEXT NOT NULL,
+    device_ref TEXT NOT NULL,
+    relative_path TEXT NOT NULL UNIQUE,
+    mime_type TEXT NOT NULL CHECK(mime_type = 'video/mp4'),
+    started_at TEXT NOT NULL,
+    ended_at TEXT NOT NULL,
+    sha256 TEXT NOT NULL CHECK(length(sha256) = 64),
+    byte_size INTEGER NOT NULL CHECK(byte_size > 0),
+    has_video INTEGER NOT NULL CHECK(has_video = 1),
+    has_audio INTEGER NOT NULL CHECK(has_audio = 1),
+    owner_only INTEGER NOT NULL CHECK(owner_only = 1),
+    raw_stream_persisted INTEGER NOT NULL CHECK(raw_stream_persisted = 0),
+    created_at TEXT NOT NULL,
+    retention_until TEXT NOT NULL,
+    FOREIGN KEY(candidate_id) REFERENCES domain_candidates(candidate_id)
+);
+CREATE INDEX IF NOT EXISTS idx_candidate_media_retention
+    ON candidate_media_archives (retention_until, created_at);
 CREATE TABLE IF NOT EXISTS domain_assessments (
     assessment_id TEXT PRIMARY KEY,
     domain TEXT NOT NULL,
@@ -221,10 +249,22 @@ def validate_elder_ref(elder_ref: str) -> str:
 class LongitudinalStore:
     def __init__(self, elder_ref: str, root: Path = DEFAULT_STORE_ROOT) -> None:
         self.elder_ref = validate_elder_ref(elder_ref)
-        self.elder_dir = Path(root) / self.elder_ref
+        self.root = Path(root)
+        self.root.mkdir(parents=True, exist_ok=True)
+        root_resolved = self.root.resolve()
+        self.elder_dir = self.root / self.elder_ref
+        if self.elder_dir.is_symlink():
+            raise ValueError("elder store directory cannot be a symbolic link")
         self.elder_dir.mkdir(parents=True, exist_ok=True)
+        if (
+            self.elder_dir.is_symlink()
+            or self.elder_dir.resolve().parent != root_resolved
+        ):
+            raise ValueError("elder store directory escapes the configured root")
         self.elder_dir.chmod(0o700)
         self.db_path = self.elder_dir / "longitudinal.sqlite"
+        if self.db_path.is_symlink():
+            raise ValueError("elder database cannot be a symbolic link")
         self._connection = sqlite3.connect(self.db_path, timeout=30)
         self._connection.row_factory = sqlite3.Row
         self._connection.execute("PRAGMA journal_mode=WAL")
@@ -232,6 +272,20 @@ class LongitudinalStore:
         self._connection.executescript(_SCHEMA)
         self._add_column_if_missing("observations", "device_ref", "TEXT")
         self._add_column_if_missing("episodes", "device_ref", "TEXT")
+        self._add_column_if_missing(
+            "edge_segment_audits", "anomaly_archive_enabled", "INTEGER NOT NULL DEFAULT 0"
+        )
+        self._add_column_if_missing(
+            "edge_segment_audits", "archived_candidate_count", "INTEGER NOT NULL DEFAULT 0"
+        )
+        self._add_column_if_missing(
+            "edge_segment_audits", "archive_failure_count", "INTEGER NOT NULL DEFAULT 0"
+        )
+        self._add_column_if_missing(
+            "edge_segment_audits",
+            "derived_anomaly_media_persisted",
+            "INTEGER NOT NULL DEFAULT 0",
+        )
         self._connection.execute(
             "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)",
             (SCHEMA_VERSION,),
@@ -264,9 +318,14 @@ class LongitudinalStore:
     def delete_elder(cls, elder_ref: str, root: Path = DEFAULT_STORE_ROOT) -> bool:
         """Erase one elder's entire store. Returns True when a directory was removed."""
         safe_ref = validate_elder_ref(elder_ref)
-        elder_dir = Path(root) / safe_ref
+        root_path = Path(root)
+        elder_dir = root_path / safe_ref
+        if elder_dir.is_symlink():
+            raise ValueError("elder store directory cannot be a symbolic link")
         if not elder_dir.is_dir():
             return False
+        if elder_dir.resolve().parent != root_path.resolve():
+            raise ValueError("elder store directory escapes the configured root")
         shutil.rmtree(elder_dir)
         return True
 
@@ -519,6 +578,9 @@ class LongitudinalStore:
             "edge_segments": scalar("SELECT COUNT(*) FROM edge_segment_audits"),
             "daily_features": scalar("SELECT COUNT(*) FROM daily_features"),
             "domain_candidates": scalar("SELECT COUNT(*) FROM domain_candidates"),
+            "candidate_media_archives": scalar(
+                "SELECT COUNT(*) FROM candidate_media_archives"
+            ),
             "domain_assessments": scalar("SELECT COUNT(*) FROM domain_assessments"),
             "candidate_reviews": scalar("SELECT COUNT(*) FROM candidate_reviews"),
             "wellbeing_checkins": scalar("SELECT COUNT(*) FROM wellbeing_checkins"),
@@ -646,6 +708,10 @@ class LongitudinalStore:
             "screened_frame_count",
             "selected_frame_count",
             "candidate_count",
+            "anomaly_archive_enabled",
+            "archived_candidate_count",
+            "archive_failure_count",
+            "derived_anomaly_media_persisted",
             "key_windows_json",
             "limitations_json",
             "created_at",
@@ -655,7 +721,18 @@ class LongitudinalStore:
             self._connection.execute(
                 f"INSERT OR IGNORE INTO edge_segment_audits ({', '.join(columns)})"
                 f" VALUES ({placeholders})",
-                tuple(row[column] for column in columns),
+                tuple(
+                    row.get(column, 0)
+                    if column
+                    in {
+                        "anomaly_archive_enabled",
+                        "archived_candidate_count",
+                        "archive_failure_count",
+                        "derived_anomaly_media_persisted",
+                    }
+                    else row[column]
+                    for column in columns
+                ),
             )
 
     def fetch_edge_segments(
@@ -764,6 +841,81 @@ class LongitudinalStore:
             "SELECT * FROM domain_candidates WHERE candidate_id = ?",
             (candidate_id,),
         ).fetchone()
+
+    def record_candidate_media_archive(self, row: dict[str, Any]) -> None:
+        relative_path = str(row.get("relative_path", ""))
+        if not _ARCHIVE_RELATIVE_PATTERN.fullmatch(relative_path):
+            raise ValueError("candidate archive path is not a safe relative MP4 path")
+        if not re.fullmatch(r"[0-9a-f]{64}", str(row.get("archive_id", ""))):
+            raise ValueError("candidate archive id must be SHA-256")
+        if Path(relative_path).stem != str(row["archive_id"]):
+            raise ValueError("candidate archive filename must match its archive id")
+        if not re.fullmatch(r"[0-9a-f]{64}", str(row.get("sha256", ""))):
+            raise ValueError("candidate archive digest must be SHA-256")
+        columns = [
+            "archive_id",
+            "candidate_id",
+            "segment_id",
+            "device_ref",
+            "relative_path",
+            "mime_type",
+            "started_at",
+            "ended_at",
+            "sha256",
+            "byte_size",
+            "has_video",
+            "has_audio",
+            "owner_only",
+            "raw_stream_persisted",
+            "created_at",
+            "retention_until",
+        ]
+        with self._connection:
+            self._connection.execute(
+                f"INSERT INTO candidate_media_archives ({', '.join(columns)})"
+                f" VALUES ({', '.join('?' for _ in columns)})"
+                " ON CONFLICT(candidate_id) DO UPDATE SET"
+                " archive_id=excluded.archive_id, segment_id=excluded.segment_id,"
+                " device_ref=excluded.device_ref, relative_path=excluded.relative_path,"
+                " mime_type=excluded.mime_type, started_at=excluded.started_at,"
+                " ended_at=excluded.ended_at, sha256=excluded.sha256,"
+                " byte_size=excluded.byte_size, has_video=excluded.has_video,"
+                " has_audio=excluded.has_audio, owner_only=excluded.owner_only,"
+                " raw_stream_persisted=excluded.raw_stream_persisted,"
+                " created_at=excluded.created_at,"
+                " retention_until=excluded.retention_until",
+                tuple(row[column] for column in columns),
+            )
+
+    def fetch_candidate_media_archive(
+        self, candidate_id: str
+    ) -> sqlite3.Row | None:
+        return self._connection.execute(
+            "SELECT * FROM candidate_media_archives WHERE candidate_id = ?",
+            (candidate_id,),
+        ).fetchone()
+
+    def fetch_media_archive(self, archive_id: str) -> sqlite3.Row | None:
+        return self._connection.execute(
+            "SELECT * FROM candidate_media_archives WHERE archive_id = ?",
+            (archive_id,),
+        ).fetchone()
+
+    def fetch_media_archives(self) -> list[sqlite3.Row]:
+        return list(
+            self._connection.execute(
+                "SELECT * FROM candidate_media_archives"
+                " ORDER BY created_at, archive_id"
+            )
+        )
+
+    def delete_media_archive(self, archive_id: str) -> bool:
+        with self._connection:
+            cursor = self._connection.execute(
+                "DELETE FROM candidate_media_archives WHERE archive_id = ?",
+                (archive_id,),
+            )
+        return cursor.rowcount > 0
 
     def review_candidate(
         self,

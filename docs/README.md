@@ -9,7 +9,7 @@
 
 1. [三域风险产品 MVP](design/multidomain-risk-mvp.md)：产品边界、评分规则、问卷、前端、复核和导出。
 2. [系统架构](design/system-architecture.md)：连续处理、轻量门、模型、存储和展示的职责。
-3. [连续取流与云端回看](device-data/streaming-and-media.md)：无本地媒体、分段审计、播放与运维。
+3. [连续取流与异常回看](device-data/streaming-and-media.md)：连续流不落盘、异常归档、云端回退与运维。
 4. [当前状态](governance/current-status.md)：已完成能力、验证结果和仍待关闭事项。
 5. [有效决策](governance/decisions.md)：当前设计不可随意漂移的决定。
 6. [发布门](governance/release-readiness.md)：许可证、模型、锁文件和真实校准要求。
@@ -23,5 +23,5 @@
 - 设计只描述当前产品，不恢复历史实验手册或运行证据副本。
 - 所有等级必须保持 `pilot_unvalidated`，三个域独立，`global_score=null`。
 - public 导出不得包含身份、设备、原始覆盖、转写、备注、路径或精确事件时间。
-- 原始音视频不在本机落盘；云端录像与本机派生数据库分别管理与删除。
+- 连续原始音视频不在本机落盘；owner-only 异常窗口按留存策略归档，并与个人数据库一起删除。
 - 需求、实现、页面 `/docs` 和本目录口径必须同步。

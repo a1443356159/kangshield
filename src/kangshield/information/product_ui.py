@@ -99,11 +99,11 @@ def dashboard_html(csrf_token: str) -> str:
       <section class="principles" aria-label="产品边界">
         <div><span>01</span><strong>不知道，就明确说不知道</strong><p>记录不足或设备暂时不可用时显示“暂无判断”，不会凭空猜测。</p></div>
         <div><span>02</span><strong>每条提醒都由家人确认</strong><p>您可以确认或忽略提醒，并留下只有照护者能够看到的记录。</p></div>
-        <div><span>03</span><strong>需要时才回看</strong><p>页面默认不加载画面和录音；只有您主动查看异常片段时才从云端临时播放。</p></div>
+        <div><span>03</span><strong>异常片段安全归档</strong><p>连续录像不落本机；只有风险候选前后的短片段按期限归档，供照护者主动回看。</p></div>
       </section>
     </main>
 
-    <footer><span>康盾</span><p>风险记录保存在本机 · 原始录像由云端账户管理 · <a href="/docs">使用说明与服务条款</a></p></footer>
+    <footer><span>康盾</span><p>风险记录与异常短片段保存在本机 · 连续原始录像由云端账户管理 · <a href="/docs">使用说明与服务条款</a></p></footer>
   </div>
 
   <dialog id="review-dialog" class="review-dialog">
@@ -138,12 +138,12 @@ def dashboard_html(csrf_token: str) -> str:
   <dialog id="playback-dialog" class="review-dialog playback-dialog">
     <form method="dialog">
       <button class="dialog-close" value="cancel" aria-label="关闭">×</button>
-      <p class="eyebrow">云端事件回看</p>
+      <p class="eyebrow">安全事件回看</p>
       <h2 id="playback-title">查看异常片段</h2>
-      <p id="playback-status" class="dialog-summary">正在准备临时播放地址…</p>
+      <p id="playback-status" class="dialog-summary">正在准备异常片段…</p>
       <video id="cloud-playback" controls playsinline preload="metadata"></video>
-      <p class="playback-privacy">画面和声音直接来自摄像头云服务，只在您主动回看时加载，不保存到这台电脑。</p>
-      <a id="playback-fallback" class="playback-fallback" target="_blank" rel="noreferrer" hidden>在新窗口打开云端片段</a>
+      <p class="playback-privacy">优先播放本机按期限保存的异常短片段；本机归档缺失时才临时读取摄像头云录像。</p>
+      <a id="playback-fallback" class="playback-fallback" target="_blank" rel="noreferrer" hidden>在新窗口打开片段</a>
       <div class="dialog-actions"><button class="secondary" value="cancel">关闭回看</button></div>
     </form>
   </dialog>
@@ -220,9 +220,9 @@ def documentation_html(product_version: str) -> str:
             <h2>尽量少保存，也让分享有边界</h2>
             <div class="doc-grid">
               <div><strong>本机长程记录</strong><p>按个人分库存放日级特征、风险历史、候选事件、复核审计和 WHO-5 月度答案，默认不会上传到远程平台。</p></div>
-              <div><strong>媒体最小化</strong><p>原始录像由摄像头云服务按用户配置保存，本机只在内存中处理当前分段，不保存原始画面或录音。语音命中事件最多保留 120 字规范化片段，供本机照护者理解原因。</p></div>
+              <div><strong>媒体最小化</strong><p>连续原始录像由摄像头云服务按用户配置保存，本机只把产生风险候选的事件前后短片段归档为带声音 MP4。语音命中事件最多保留 120 字规范化转写，供本机照护者理解原因。</p></div>
               <div><strong>两种导出</strong><p>家庭照护版可包含原因和复核记录；安心分享版移除身份、原始指标、问卷答案、对话文字、备注、路径和精确事件时间。</p></div>
-              <div><strong>保留与删除</strong><p>派生记录会保留到本机管理员按个人删除；云端原始录像的周期与删除由云服务账户配置决定，两处数据需分别管理。</p></div>
+              <div><strong>保留与删除</strong><p>异常片段默认保留 30 天，并受每人 2 GiB 上限约束；删除个人数据会一并删除本机片段。云端原始录像仍由云服务账户另行管理。</p></div>
             </div>
           </section>
 
@@ -248,7 +248,7 @@ def documentation_html(product_version: str) -> str:
             <p class="section-number">04 / 技术路线</p>
             <h2>从家庭记录到可解释提醒</h2>
             <div class="route-flow" aria-label="技术处理流程">
-              <div><span>1</span><strong>连续内存守护</strong><p>目标单机位按段取流；原始录像留在云端，本机不生成媒体文件。</p></div>
+              <div><span>1</span><strong>连续内存守护</strong><p>目标单机位按段取流；连续原始流不落盘，仅异常事件窗口生成本机归档。</p></div>
               <div><span>2</span><strong>关键窗口分析</strong><p>轻量运动与声音活动先筛选，姿态和普通话转写只处理选中内容。</p></div>
               <div><span>3</span><strong>个人建模</strong><p>日级特征建立 28 天个人基线，问卷补充本人主动感受。</p></div>
               <div><span>4</span><strong>规则评分</strong><p>三域使用版本化 0–3/null 规则，并保存证据摘要。</p></div>
@@ -264,8 +264,8 @@ def documentation_html(product_version: str) -> str:
               <li>HTTP 服务只绑定 <code>127.0.0.1</code>，不默认开放局域网或公网访问。</li>
               <li>填写问卷、复核事件和删除记录要求同源请求及随机 CSRF 令牌；JSON 请求设有大小限制。</li>
               <li>页面启用内容安全、禁止嵌入和浏览器权限限制，不申请摄像头、麦克风或定位权限。</li>
-              <li>当前分段、候选片段和模型输入均不在本机落盘；数据库只保留派生结果与云端时间引用。</li>
-              <li>服务没有任意文件、本地原始媒体或完整逐字稿读取路由；云端异常片段仅在照护者点击后临时加载。</li>
+              <li>当前完整分段和模型输入不落盘；候选事件前 10 秒至后 20 秒可保存为 owner-only MP4，并记录摘要、大小和到期时间。</li>
+              <li>服务没有任意文件或完整逐字稿读取路由；本机片段只能通过同源复核后的短期随机播放令牌访问。</li>
               <li>首页使用聚合读取，一次刷新只构建一次风险快照；写操作串行化，减少并发复核造成的状态竞争。</li>
             </ul>
           </section>
@@ -361,14 +361,14 @@ function openWellbeing(){const w=state.checkin||{},instrument=w.instrument||{},t
 async function saveWellbeing(){const selects=[...document.querySelectorAll('#wellbeing-questions select')],answers=selects.map(x=>x.value===''?null:Number(x.value));if(answers.length!==5||answers.some(x=>x===null)){toast('请完成全部 5 项后再保存');return}try{await json('/api/wellbeing-checkin',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':window.KS_CSRF},body:JSON.stringify({answers})});wellbeingDialog.close();toast('本月自评已保存，风险结果已更新');await load()}catch(error){toast('暂时无法保存，请稍后重试')}}
 async function deleteWellbeing(){if(!window.confirm('删除本月自评记录并重新计算心理健康风险？'))return;try{await json('/api/wellbeing-checkin',{method:'DELETE',headers:{'X-CSRF-Token':window.KS_CSRF}});toast('本月自评记录已删除');await load()}catch(error){toast('暂时无法删除，请稍后重试')}}
 function reviewStatus(x){return {pending:'待确认',confirmed:'已确认',rejected:'已忽略'}[x.review_status]||x.review_status}
-function renderTimeline(){const target=document.getElementById('timeline');target.textContent='';const values=state.candidates.filter(x=>state.filter==='all'||x.domain===state.filter);if(!values.length){target.append(node('div','empty',state.filter==='all'?'最近没有需要特别确认的事情。':'这一项最近没有需要确认的提醒。'));return}for(const x of values){const e=node('article',`event risk-${x.domain}`),dot=node('div','event-dot',KS_ICONS[x.domain]||'•'),body=node('div'),title=node('div','event-title');title.append(node('strong','',`${KS_NAMES[x.domain]} · ${KS_CATEGORIES[x.category]||x.category}`));const pill=node('span',`status-pill ${x.review_status==='pending'?'':x.review_status==='rejected'?'stale':'good'}`,reviewStatus(x));title.append(pill);const summary=(x.evidence_summary||[]).map(v=>KS_REASONS[v]||v).join('；')||'这条提醒需要家人看一眼';body.append(title,node('p','event-copy',`${fmtTime(x.occurred_at)} · ${summary}`));if(x.transcript_excerpt){body.append(node('div','voice-quote',x.transcript_excerpt),node('span','event-basis','由环境语音转写识别'))}if((x.reviews||[]).length){body.append(node('p','event-audit',(x.reviews||[]).map(r=>`${fmtTime(r.decided_at)} ${r.decision==='confirmed'?'已确认':'已忽略'}${r.owner_note?' · '+r.owner_note:''}`).join('；')))}e.append(dot,body);const actions=node('div','event-actions'),play=node('button','playback-button',x.playback_available?'播放异常片段':'云端片段暂不可用');play.type='button';play.disabled=!x.playback_available;play.title=x.playback_available?'播放事件前后的云端画面和声音':'连接对应云录像后即可回看';if(x.playback_available)play.onclick=()=>openPlayback(x);actions.append(play);if(x.review_status==='pending'){const b=node('button','review-button','查看并确认');b.type='button';b.onclick=()=>openReview(x);actions.append(b)}e.append(actions);target.append(e)}}
+function renderTimeline(){const target=document.getElementById('timeline');target.textContent='';const values=state.candidates.filter(x=>state.filter==='all'||x.domain===state.filter);if(!values.length){target.append(node('div','empty',state.filter==='all'?'最近没有需要特别确认的事情。':'这一项最近没有需要确认的提醒。'));return}for(const x of values){const e=node('article',`event risk-${x.domain}`),dot=node('div','event-dot',KS_ICONS[x.domain]||'•'),body=node('div'),title=node('div','event-title');title.append(node('strong','',`${KS_NAMES[x.domain]} · ${KS_CATEGORIES[x.category]||x.category}`));const pill=node('span',`status-pill ${x.review_status==='pending'?'':x.review_status==='rejected'?'stale':'good'}`,reviewStatus(x));title.append(pill);const summary=(x.evidence_summary||[]).map(v=>KS_REASONS[v]||v).join('；')||'这条提醒需要家人看一眼';body.append(title,node('p','event-copy',`${fmtTime(x.occurred_at)} · ${summary}`));if(x.transcript_excerpt){body.append(node('div','voice-quote',x.transcript_excerpt),node('span','event-basis','由环境语音转写识别'))}if(x.archived_locally)body.append(node('span','event-basis','本机异常片段已安全归档'));if((x.reviews||[]).length){body.append(node('p','event-audit',(x.reviews||[]).map(r=>`${fmtTime(r.decided_at)} ${r.decision==='confirmed'?'已确认':'已忽略'}${r.owner_note?' · '+r.owner_note:''}`).join('；')))}e.append(dot,body);const actions=node('div','event-actions'),play=node('button','playback-button',x.playback_available?'播放异常片段':'片段暂不可用');play.type='button';play.disabled=!x.playback_available;play.title=x.playback_available?(x.playback_source==='local_archive'?'播放本机归档的事件画面和声音':'播放事件前后的云端画面和声音'):'尚无可用的本机归档或云录像';if(x.playback_available)play.onclick=()=>openPlayback(x);actions.append(play);if(x.review_status==='pending'){const b=node('button','review-button','查看并确认');b.type='button';b.onclick=()=>openReview(x);actions.append(b)}e.append(actions);target.append(e)}}
 function openReview(item){state.reviewId=item.candidate_id;document.getElementById('review-title').textContent=`确认：${KS_CATEGORIES[item.category]||item.category}`;document.getElementById('review-summary').textContent=item.transcript_excerpt?`听到的内容：“${item.transcript_excerpt}”`:(item.evidence_summary||[]).map(v=>KS_REASONS[v]||v).join('；')||'请结合现场情况确认这条提醒。';note.value='';dialog.showModal();note.focus()}
-async function openPlayback(item){const status=document.getElementById('playback-status'),fallback=document.getElementById('playback-fallback');document.getElementById('playback-title').textContent=`回看：${KS_CATEGORIES[item.category]||item.category}`;status.textContent='正在从云端准备事件前后的短片段…';fallback.hidden=true;fallback.removeAttribute('href');cloudVideo.removeAttribute('src');cloudVideo.load();playbackDialog.showModal();try{const payload=await json(`/api/candidates/${encodeURIComponent(item.candidate_id)}/playback`,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':window.KS_CSRF},body:'{}'});cloudVideo.src=payload.url;fallback.href=payload.url;fallback.hidden=false;status.textContent=`${fmtTime(payload.started_at)} 至 ${fmtTime(payload.ended_at)} · 临时云端地址`;cloudVideo.load();cloudVideo.play().catch(()=>{})}catch(error){status.textContent='暂时无法取得云端片段，请确认云录像套餐、设备在线状态和回放权限。'}}
+async function openPlayback(item){const status=document.getElementById('playback-status'),fallback=document.getElementById('playback-fallback');document.getElementById('playback-title').textContent=`回看：${KS_CATEGORIES[item.category]||item.category}`;status.textContent=item.playback_source==='local_archive'?'正在打开本机安全归档…':'正在从云端准备事件前后的短片段…';fallback.hidden=true;fallback.removeAttribute('href');cloudVideo.removeAttribute('src');cloudVideo.load();playbackDialog.showModal();try{const payload=await json(`/api/candidates/${encodeURIComponent(item.candidate_id)}/playback`,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':window.KS_CSRF},body:'{}'});cloudVideo.src=payload.url;fallback.href=payload.url;fallback.hidden=false;status.textContent=`${fmtTime(payload.started_at)} 至 ${fmtTime(payload.ended_at)} · ${payload.source==='local_archive'?'本机安全归档':'临时云端地址'}`;cloudVideo.load();cloudVideo.play().catch(()=>{})}catch(error){status.textContent='暂时无法取得异常片段，请检查本机归档或云录像回放状态。'}}
 async function submitReview(decision){if(!state.reviewId)return;try{await json(`/api/candidates/${encodeURIComponent(state.reviewId)}/review`,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':window.KS_CSRF},body:JSON.stringify({decision,operator:'local_owner',owner_note:note.value.trim()||null})});dialog.close();toast(decision==='confirmed'?'已保存您的确认':'已忽略这条提醒');await load()}catch(error){toast('暂时无法保存，请稍后重试')}}
 async function load(){document.getElementById('refresh-button').disabled=true;try{const payload=await json('/api/dashboard'),s=payload.snapshot||{};state.snapshot=s;state.candidates=payload.candidates||[];state.trends=payload.trends||[];state.profile=payload.profile||{};state.checkin=payload.wellbeing_checkin||{};renderCards(s.assessments||[],document.getElementById('cards'));renderTrends(state.trends,document.getElementById('trends'));renderProfile();renderWellbeing();renderTimeline();document.getElementById('generated-at').textContent=`${fmtTime(s.generated_at)} 更新`;state.seconds=30}catch(error){toast('暂时无法读取最新记录，请稍后重试')}finally{document.getElementById('refresh-button').disabled=false}}
 for(const b of document.querySelectorAll('.filter'))b.onclick=()=>{state.filter=b.dataset.domain;for(const x of document.querySelectorAll('.filter'))x.classList.toggle('active',x===b);renderTimeline()};
 document.getElementById('refresh-button').onclick=load;document.getElementById('confirm-button').onclick=()=>submitReview('confirmed');document.getElementById('reject-button').onclick=()=>submitReview('rejected');document.getElementById('save-wellbeing-button').onclick=saveWellbeing;
-playbackDialog.addEventListener('close',()=>{cloudVideo.pause();cloudVideo.removeAttribute('src');cloudVideo.load();document.getElementById('playback-fallback').removeAttribute('href')});cloudVideo.addEventListener('error',()=>{document.getElementById('playback-status').textContent='当前浏览器无法直接播放该云端格式，可尝试下方的新窗口回看。'});
+playbackDialog.addEventListener('close',()=>{cloudVideo.pause();cloudVideo.removeAttribute('src');cloudVideo.load();document.getElementById('playback-fallback').removeAttribute('href')});cloudVideo.addEventListener('error',()=>{document.getElementById('playback-status').textContent='当前浏览器无法直接播放该片段，可尝试下方的新窗口回看。'});
 setInterval(()=>{state.seconds-=1;if(state.seconds<=0)load();document.getElementById('refresh-copy').textContent=`${state.seconds} 秒后自动刷新`},1000);load();
 """
 

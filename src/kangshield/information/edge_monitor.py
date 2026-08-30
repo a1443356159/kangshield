@@ -1,4 +1,4 @@
-"""Continuous, segmented edge monitoring without local raw-media persistence."""
+"""Continuous in-memory monitoring with bounded anomaly-only local archives."""
 
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ from .segment_analysis import (
 from .speech_backend import AudioBuffer
 
 
-EDGE_MONITOR_VERSION = "edge-monitor-v0.1.0"
+EDGE_MONITOR_VERSION = "edge-monitor-v0.2.0"
 DEFAULT_EDGE_POLICY_PATH = Path("configs/v2-edge-segment-policy.json")
 _PUBLIC_FAILURE_CODES = frozenset(
     {
@@ -54,6 +54,7 @@ _PUBLIC_FAILURE_CODES = frozenset(
         "pose_and_speech_models_failed",
         "analysis_backpressure",
         "store_write_failed",
+        "media_archive_failed",
     }
 )
 
@@ -91,12 +92,21 @@ class EdgeSelectionPolicy:
     audio_merge_gap_seconds: float
     maximum_asr_window_seconds: float
     maximum_selected_audio_ratio: float
+    archive_enabled: bool
+    archive_event_pre_seconds: float
+    archive_event_post_seconds: float
+    archive_retention_days: int
+    archive_maximum_total_bytes: int
+    archive_container: str
+    archive_video_codec: str
+    archive_audio_codec: str
     limitations: tuple[str, ...]
 
     @classmethod
     def load(cls, path: Path = DEFAULT_EDGE_POLICY_PATH) -> "EdgeSelectionPolicy":
         raw = Path(path).read_bytes()
         payload = json.loads(raw)
+        archive = payload.get("anomaly_archive", {})
         policy = cls(
             revision=str(payload["revision"]),
             digest=hashlib.sha256(raw).hexdigest(),
@@ -129,6 +139,16 @@ class EdgeSelectionPolicy:
             maximum_selected_audio_ratio=float(
                 payload["maximum_selected_audio_ratio"]
             ),
+            archive_enabled=bool(archive.get("enabled", False)),
+            archive_event_pre_seconds=float(archive.get("event_pre_seconds", 10)),
+            archive_event_post_seconds=float(archive.get("event_post_seconds", 20)),
+            archive_retention_days=int(archive.get("retention_days", 30)),
+            archive_maximum_total_bytes=int(
+                archive.get("maximum_total_bytes", 2_147_483_648)
+            ),
+            archive_container=str(archive.get("container", "mp4")),
+            archive_video_codec=str(archive.get("video_codec", "libx264")),
+            archive_audio_codec=str(archive.get("audio_codec", "aac")),
             limitations=tuple(str(item) for item in payload.get("limitations", [])),
         )
         policy.validate()
@@ -169,6 +189,23 @@ class EdgeSelectionPolicy:
             self.audio_gate_window_ms,
         ) <= 0:
             raise ValueError("edge selection dimensions must be positive")
+        if (
+            not isfinite(self.archive_event_pre_seconds)
+            or self.archive_event_pre_seconds < 0
+            or not isfinite(self.archive_event_post_seconds)
+            or self.archive_event_post_seconds <= 0
+        ):
+            raise ValueError("anomaly archive window is invalid")
+        if self.archive_retention_days <= 0:
+            raise ValueError("anomaly archive retention days must be positive")
+        if self.archive_maximum_total_bytes <= 0:
+            raise ValueError("anomaly archive byte limit must be positive")
+        if (
+            self.archive_container,
+            self.archive_video_codec,
+            self.archive_audio_codec,
+        ) != ("mp4", "libx264", "aac"):
+            raise ValueError("anomaly archive must use MP4 with H.264/AAC")
 
 
 @dataclass(frozen=True)
@@ -918,6 +955,7 @@ class EdgeMonitor:
         segment_source: Callable[[str], InMemoryEdgeSegment] | None = None,
         analyzer: EdgeModelAnalyzer | None = None,
         stop_event: threading.Event | None = None,
+        archive_anomaly_clips: bool | None = None,
     ) -> None:
         if failure_backoff_s < 0 or not isfinite(failure_backoff_s):
             raise ValueError("failure_backoff_s must be finite and non-negative")
@@ -927,6 +965,11 @@ class EdgeMonitor:
         self.store_root = Path(store_root)
         self.risk_policy_path = Path(risk_policy_path)
         self.selection_policy = EdgeSelectionPolicy.load(selection_policy_path)
+        self.archive_anomaly_clips = (
+            self.selection_policy.archive_enabled
+            if archive_anomaly_clips is None
+            else bool(archive_anomaly_clips)
+        )
         self.risk_policy, _ = load_policy(self.risk_policy_path)
         self.evidence_level = evidence_level
         self.source_type = source_type
@@ -1003,27 +1046,23 @@ class EdgeMonitor:
                 == {"pose_model_failed", "speech_model_failed"}
                 else outcome.failure_codes[0]
             )
-        audit = EdgeSegmentAudit(
-            segment_id=segment.segment_id,
-            device_ref=self.device_ref,
-            segment_started_at=segment.started_at,
-            segment_ended_at=segment.ended_at,
-            status=status,
-            failure_code=failure_code,
-            cloud_recording_ref=segment.cloud_recording_ref,
-            selector_revision=self.selection_policy.revision,
-            selector_digest=self.selection_policy.digest,
-            screened_video_seconds=round(segment.duration_ms / 1000, 3),
-            screened_audio_seconds=round(segment.audio.duration_ms / 1000, 3),
-            selected_pose_seconds=round(outcome.result.pose_quality_seconds, 3),
-            selected_asr_seconds=round(outcome.result.audio_valid_seconds, 3),
-            screened_frame_count=len(segment.frames),
-            selected_frame_count=len(outcome.selection.video_frames),
-            candidate_count=len(outcome.result.candidates),
-            key_windows=list(outcome.selection.key_windows),
-            limitations=list(self.selection_policy.limitations),
-        )
+        archived_candidate_count = 0
+        archive_failure_count = 0
+        archive_maintenance_failed = False
         with LongitudinalStore(self.elder_ref, root=self.store_root) as store:
+            if self.archive_anomaly_clips:
+                try:
+                    from .media_archive import prune_candidate_archives
+
+                    prune_candidate_archives(
+                        store,
+                        now=segment.ended_at,
+                        maximum_total_bytes=(
+                            self.selection_policy.archive_maximum_total_bytes
+                        ),
+                    )
+                except Exception:
+                    archive_maintenance_failed = True
             for candidate, payload in outcome.result.candidates:
                 enriched = {
                     **payload,
@@ -1034,6 +1073,59 @@ class EdgeMonitor:
                 insert_candidate(
                     store, candidate, device_ref=self.device_ref, payload=enriched
                 )
+                if self.archive_anomaly_clips:
+                    try:
+                        from .media_archive import archive_candidate_clip
+
+                        archive_candidate_clip(
+                            store,
+                            segment=segment,
+                            candidate=candidate,
+                            pre_seconds=self.selection_policy.archive_event_pre_seconds,
+                            post_seconds=self.selection_policy.archive_event_post_seconds,
+                            retention_days=self.selection_policy.archive_retention_days,
+                            maximum_total_bytes=(
+                                self.selection_policy.archive_maximum_total_bytes
+                            ),
+                            video_fps=self.selection_policy.video_sample_fps,
+                        )
+                        archived_candidate_count += 1
+                    except Exception:
+                        archive_failure_count += 1
+            if (
+                archive_failure_count or archive_maintenance_failed
+            ) and status == "completed":
+                status = "partial"
+                failure_code = "media_archive_failed"
+            limitations = list(self.selection_policy.limitations)
+            if archive_failure_count:
+                limitations.append("one_or_more_candidate_archives_failed")
+            if archive_maintenance_failed:
+                limitations.append("candidate_archive_retention_maintenance_failed")
+            audit = EdgeSegmentAudit(
+                segment_id=segment.segment_id,
+                device_ref=self.device_ref,
+                segment_started_at=segment.started_at,
+                segment_ended_at=segment.ended_at,
+                status=status,
+                failure_code=failure_code,
+                cloud_recording_ref=segment.cloud_recording_ref,
+                selector_revision=self.selection_policy.revision,
+                selector_digest=self.selection_policy.digest,
+                screened_video_seconds=round(segment.duration_ms / 1000, 3),
+                screened_audio_seconds=round(segment.audio.duration_ms / 1000, 3),
+                selected_pose_seconds=round(outcome.result.pose_quality_seconds, 3),
+                selected_asr_seconds=round(outcome.result.audio_valid_seconds, 3),
+                screened_frame_count=len(segment.frames),
+                selected_frame_count=len(outcome.selection.video_frames),
+                candidate_count=len(outcome.result.candidates),
+                anomaly_archive_enabled=self.archive_anomaly_clips,
+                archived_candidate_count=archived_candidate_count,
+                archive_failure_count=archive_failure_count,
+                derived_anomaly_media_persisted=bool(archived_candidate_count),
+                key_windows=list(outcome.selection.key_windows),
+                limitations=limitations,
+            )
             merge_daily_feature(
                 store,
                 started=segment.started_at,
@@ -1161,12 +1253,26 @@ class EdgeMonitor:
             screened_video_seconds=screened_video_seconds,
             screened_audio_seconds=screened_audio_seconds,
             screened_frame_count=screened_frame_count,
+            anomaly_archive_enabled=self.archive_anomaly_clips,
             limitations=list(self.selection_policy.limitations),
         )
 
     def _persist_audit(self, audit: EdgeSegmentAudit) -> None:
         with LongitudinalStore(self.elder_ref, root=self.store_root) as store:
             store.record_edge_segment(_audit_row(audit))
+            if self.archive_anomaly_clips:
+                try:
+                    from .media_archive import prune_candidate_archives
+
+                    prune_candidate_archives(
+                        store,
+                        now=audit.segment_ended_at,
+                        maximum_total_bytes=(
+                            self.selection_policy.archive_maximum_total_bytes
+                        ),
+                    )
+                except Exception:
+                    pass
 
 
 def endpoint_provider_from_environment(variable_name: str) -> Callable[[], str]:
@@ -1215,6 +1321,12 @@ def _audit_row(audit: EdgeSegmentAudit) -> dict[str, Any]:
         "screened_frame_count": audit.screened_frame_count,
         "selected_frame_count": audit.selected_frame_count,
         "candidate_count": audit.candidate_count,
+        "anomaly_archive_enabled": int(audit.anomaly_archive_enabled),
+        "archived_candidate_count": audit.archived_candidate_count,
+        "archive_failure_count": audit.archive_failure_count,
+        "derived_anomaly_media_persisted": int(
+            audit.derived_anomaly_media_persisted
+        ),
         "key_windows_json": dumps_compact(payload["key_windows"]),
         "limitations_json": dumps_compact(audit.limitations),
         "created_at": datetime.now(timezone.utc).isoformat(),

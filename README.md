@@ -10,7 +10,7 @@ C6c 连续直播流（内存）
   → 跌倒、心理健康、诈骗三域规则等级
   → 每人 SQLite → 本地看板 → 人工复核 → owner/public 导出
 
-原始录像：摄像头云服务            本机原始音视频：不落盘
+连续原始录像：摄像头云服务        本机：只归档异常事件短片段
 ```
 
 三个风险域始终分别输出 `0–3` 或 `null`，不合成总分。证据不足、数据过期或模型失败时明确返回 `null`，不会补猜。等级统一标记为 `pilot_unvalidated`：不是概率、临床诊断、诈骗确认或已验证预测结论，也不会自动向外告警。
@@ -31,7 +31,7 @@ kangshield-info serve-product \
   --demo
 ```
 
-浏览器打开 [http://127.0.0.1:8765](http://127.0.0.1:8765)。演示数据随启动时间生成，走真实 SQLite、评分器、复核 API、问卷和导出链，不读取真实老人或设备资产。
+浏览器打开 [http://127.0.0.1:8765](http://127.0.0.1:8765)。演示数据随启动时间生成，走真实 SQLite、评分器、复核 API、问卷、异常归档和导出链；页面可播放明确标注为合成演示的带声音 MP4，不读取真实老人或设备资产。
 
 ## 面向用户的能力
 
@@ -40,7 +40,7 @@ kangshield-info serve-product \
 - 每自然月提醒填写一次 WHO-5 幸福感自评，保存后即时重算心理健康域。
 - 语音触发事件显示最多 120 字的风险相关转写片段；完整逐字稿不入库。
 - 照护者可确认或忽略候选，并记录 owner-only 备注；操作后即时重算且保留审计。
-- 连接萤石云录像后，异常事件可在前端按需回看含声音的短片段。播放地址只在点击时临时获取，关闭弹窗即从页面移除，不写入 SQLite 或报告。
+- 风险候选默认归档事件前 10 秒至后 20 秒的带声音 MP4，前端优先播放本机归档；归档缺失时可回退萤石云录像。
 - owner 离线报告保留事件与审计；public 报告移除身份、设备、原始指标、转写、备注、路径和精确事件时间。
 - 页面底部提供服务条款、技术路线、风险规则、隐私和删除说明。
 
@@ -62,7 +62,7 @@ KANG_ELDER_REF=elder_pseudonym
 KANG_DEVICE_REF=c6c_target
 ```
 
-加载环境后，一条命令启动连续分析、看板、问卷、复核和云端异常片段回看：
+加载环境后，一条命令启动连续分析、看板、问卷、复核、本机异常归档和云端回退：
 
 ```bash
 set -a
@@ -89,6 +89,8 @@ kangshield-info run-edge-monitor \
 
 不要对同一设备同时运行这两个连续入口。systemd 示例见 [`deploy/kangshield-product.service`](deploy/kangshield-product.service)，启动脚本见 [`scripts/run_product.sh`](scripts/run_product.sh)。
 
+异常归档由 [`configs/v2-edge-segment-policy.json`](configs/v2-edge-segment-policy.json) 控制，默认每条 30 秒以内、保留 30 天、每人总量最多 2 GiB。若现场策略禁止本机媒体，可在两个连续入口增加 `--no-local-anomaly-archive`。
+
 ## 导出与删除
 
 ```bash
@@ -109,16 +111,16 @@ kangshield-info delete-product-data \
   --confirm-ref "$KANG_ELDER_REF"
 ```
 
-删除命令只删除指定假名对应的本机派生数据库；云录像需在云服务账户中另行管理。
+删除命令会删除指定假名对应的本机数据库和异常片段归档；云录像仍需在云服务账户中另行管理。
 
 ## 实现与安全边界
 
 - Python 3.11+、Pydantic、SQLite、标准库 HTTP 和内嵌 HTML/CSS/JS；无前端构建链或 CDN。
 - HTTP 服务只接受 `127.0.0.1`，写操作要求精确同源、随机 CSRF token 和 JSON content type。
-- 不提供本地媒体、任意文件或完整逐字稿读取路由。
+- 本机媒体只能通过候选播放 POST 换取的 10 分钟随机令牌读取；没有任意文件路由或完整逐字稿路由。
 - 直播流按 60 秒在内存中分段；5 fps 灰度帧差和 500 ms 音频 RMS 先筛选，重模型只处理关键窗口。
 - 只有重模型成功处理的覆盖可支持“0 分”；背压、断流和模型失败均写固定失败码并 fail closed。
-- 每人 SQLite schema v4 保存无媒体分段审计、分析 ledger、日级个人特征、三域候选/assessment、复核历史和月度问卷。
+- 每人 SQLite schema v5 保存分段审计、异常归档索引、分析 ledger、日级个人特征、三域候选/assessment、复核历史和月度问卷；MP4 位于同一人的 `anomaly_clips/` 私有目录，文件权限为 `0600`。
 - 风险策略和轻量选择策略分别由 [`configs/v2-multidomain-risk-policy.json`](configs/v2-multidomain-risk-policy.json) 与 [`configs/v2-edge-segment-policy.json`](configs/v2-edge-segment-policy.json) 版本化并绑定 SHA-256。
 
 界面信息组织借鉴了实时守护产品的首屏导览、状态分区和事件队列思路，并参考了 [`leoCHENG100/fall-detection`](https://github.com/leoCHENG100/fall-detection) 的实时检测方向；最终提交未复制其前端或同步算法代码。
@@ -138,6 +140,6 @@ git diff --check
 
 - [三域产品设计](docs/design/multidomain-risk-mvp.md)
 - [系统架构](docs/design/system-architecture.md)
-- [连续取流与云端回看](docs/device-data/streaming-and-media.md)
+- [连续取流与异常回看](docs/device-data/streaming-and-media.md)
 - [当前状态](docs/governance/current-status.md)
 - [发布门](docs/governance/release-readiness.md)

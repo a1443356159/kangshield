@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from fractions import Fraction
+import stat
 import threading
 
 import pytest
@@ -125,6 +126,9 @@ class _SpeechBackend:
 def test_lightweight_selector_caps_heavy_inputs_and_keeps_key_windows():
     segment = _segment()
     policy = EdgeSelectionPolicy.load()
+    assert policy.archive_enabled is True
+    assert policy.archive_retention_days == 30
+    assert policy.archive_maximum_total_bytes == 2 * 1024**3
     selection = LightweightSegmentSelector(policy).select(segment)
 
     assert 0 < len(selection.video_frames) <= len(segment.frames) / 2
@@ -172,6 +176,23 @@ def test_edge_audit_contract_forbids_local_raw_media():
     assert audit.raw_audio_persisted is False
     with pytest.raises(Exception):
         EdgeSegmentAudit(**common, raw_video_persisted=True)
+    archived = EdgeSegmentAudit(
+        **common,
+        candidate_count=1,
+        anomaly_archive_enabled=True,
+        archived_candidate_count=1,
+        derived_anomaly_media_persisted=True,
+    )
+    assert archived.raw_video_persisted is False
+    assert archived.derived_anomaly_media_persisted is True
+    with pytest.raises(Exception):
+        EdgeSegmentAudit(
+            **common,
+            candidate_count=1,
+            anomaly_archive_enabled=True,
+            archived_candidate_count=1,
+            derived_anomaly_media_persisted=False,
+        )
 
 
 def test_monitor_persists_path_free_audit_candidate_and_model_coverage(tmp_path):
@@ -205,10 +226,79 @@ def test_monitor_persists_path_free_audit_candidate_and_model_coverage(tmp_path)
         assert row["selected_asr_seconds"] < row["screened_audio_seconds"]
         candidate = store.fetch_domain_candidates()[0]
         assert "cloud-recording:test" in candidate["payload_json"]
+        archive = store.fetch_candidate_media_archive(candidate["candidate_id"])
+        assert archive is not None
+        archive_path = store.elder_dir / archive["relative_path"]
+        assert archive_path.is_file()
+        assert stat.S_IMODE(archive_path.stat().st_mode) == 0o600
+        assert audit.archived_candidate_count == 1
+        assert audit.derived_anomaly_media_persisted is True
+        av = pytest.importorskip("av")
+        with av.open(str(archive_path)) as container:
+            assert len(container.streams.video) == 1
+            assert len(container.streams.audio) == 1
         coverage = store.coverage_since(
             "2026-08-30T00:00:00+00:00", "target"
         )
         assert coverage["audio_seconds"] == row["selected_asr_seconds"]
+
+
+def test_anomaly_archive_can_be_explicitly_disabled(tmp_path):
+    analyzer = EdgeModelAnalyzer(
+        selection_policy=EdgeSelectionPolicy.load(),
+        pose_backend=_PoseBackend(),
+        speech_backend=_SpeechBackend(),
+    )
+    monitor = EdgeMonitor(
+        elder_ref="elder_a",
+        device_ref="target",
+        endpoint_provider=lambda: "memory://stream",
+        store_root=tmp_path / "store",
+        segment_source=lambda endpoint: _segment(),
+        analyzer=analyzer,
+        archive_anomaly_clips=False,
+    )
+
+    audit = monitor.process_once()
+
+    assert audit.status == "completed"
+    assert audit.anomaly_archive_enabled is False
+    assert audit.archived_candidate_count == 0
+    with LongitudinalStore("elder_a", root=tmp_path / "store") as store:
+        assert len(store.fetch_domain_candidates()) == 1
+        assert store.fetch_media_archives() == []
+
+
+def test_archive_failure_is_audited_without_losing_risk_candidate(
+    tmp_path, monkeypatch
+):
+    from kangshield.information import media_archive
+
+    def fail_archive(*args, **kwargs):
+        raise media_archive.MediaArchiveError("synthetic encoder failure")
+
+    monkeypatch.setattr(media_archive, "archive_candidate_clip", fail_archive)
+    monitor = EdgeMonitor(
+        elder_ref="elder_a",
+        device_ref="target",
+        endpoint_provider=lambda: "memory://stream",
+        store_root=tmp_path / "store",
+        segment_source=lambda endpoint: _segment(),
+        analyzer=EdgeModelAnalyzer(
+            selection_policy=EdgeSelectionPolicy.load(),
+            pose_backend=_PoseBackend(),
+            speech_backend=_SpeechBackend(),
+        ),
+    )
+
+    audit = monitor.process_once()
+
+    assert audit.status == "partial"
+    assert audit.failure_code == "media_archive_failed"
+    assert audit.archive_failure_count == 1
+    with LongitudinalStore("elder_a", root=tmp_path / "store") as store:
+        assert len(store.fetch_domain_candidates()) == 1
+        assert store.fetch_media_archives() == []
 
 
 def test_monitor_failure_is_sanitized_and_does_not_persist_endpoint(tmp_path):
