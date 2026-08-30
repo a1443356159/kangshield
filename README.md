@@ -135,9 +135,11 @@ make test PYTHON=.venv/bin/python
 git diff --check
 ```
 
-`data/`、`models/`、`runs/`、`logs/`、`secrets/` 和 `.env*` 均被 Git 忽略。历史本机资产不会因仓库裁剪而自动删除。
+`data/`、`models/`、`runs/`、`logs/`、`secrets/` 和 `.env*` 均被 Git 忽略。最终提交只保留产品运行所需的 `data/processed/` 私有状态；旧模型、历史采集、旧原始数据与日志已可恢复地迁到 `/cache/.../kangshield-legacy-archive/20260831/`，不进入仓库。
 
 当前作品可直接本地演示，但仍是未验证试点。项目 LICENSE、第三方 NOTICE、依赖锁、模型许可证和真实目标域 held-out 校准关闭前，不应宣传为公开发布或临床级产品。月度自评采用[世界卫生组织 WHO-5（2024）](https://www.who.int/publications/m/item/WHO-UCN-MSD-MHE-2024.01)，当前按 CC BY-NC-SA 3.0 IGO 用于带署名的本地非商业试点。
+
+冻结版在 CAUCAFall 开发重放上通过预注册工程门，但唯一一次 Subject 6–10 留出评估未通过（轻量跌倒召回 0.68、ADL 片段误报率 0.16）。结果、门槛与未通过项完整记录在[公开数据集交付验证报告](docs/governance/delivery-validation-report.md)，未使用留出集继续调参。
 
 ## 文档
 
