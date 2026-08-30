@@ -17,7 +17,8 @@
 - PoseC3D SlowOnly-R50 NTU60-XSub checkpoint：实现 Apache-2.0，NTU RGB+D 训练数据仅研究用途，`configs/v1-g4-posec3d-model.json` 记为 `blocked_pending_review`，权重 sha256 待 prepare 时钉入；
 - RetinaFace-R50 / ArcFace IR-SE50：facexlib 分发，ArcFace 血缘 InsightFace 非商业限制，`configs/v1-g4-face-models.json` 记为 `blocked_pending_review`，权重 sha256 待钉入；
 - 人脸白名单库 `data/face/gallery.npz` 属敏感个人信息，不进 Git，需要最小权限、留存期限和删除机制；
-- 同步代码 `src/kangshield/information/prediction_sync/` 以 fall-detection 仓（commit `b263b3f`）为算法权威来源，再分发前需确认该仓许可证口径。
+- 同步代码 `src/kangshield/information/prediction_sync/` 以 fall-detection 仓（commit `b263b3f`）为算法权威来源；2026-08-30 核查上游已到 `711e2c0`，共享算法存在漂移且仓库根目录仍无项目 LICENSE。再同步或分发前必须先完成逐文件差异与许可证 owner 决定，不能因公开可读而推定可复制。
+- WHO-5 题目与计分说明来源为世界卫生组织 2024 开放版本，许可为 CC BY-NC-SA 3.0 IGO；当前只用于带显式署名的本地非商业试点。若提交渠道允许商业使用或重新许可，必须先单独关闭该内容资产的许可证门。
 
 ## Runtime 必须冻结
 

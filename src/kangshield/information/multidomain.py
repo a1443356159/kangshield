@@ -121,6 +121,9 @@ def build_snapshot(
     }
     deviations = [dict(row) for row in store.fetch_deviation_candidates()]
     daily = [dict(row) for row in store.fetch_daily_features(limit=60)]
+    wellbeing_checkins = [
+        dict(row) for row in store.fetch_wellbeing_checkins(limit=12)
+    ]
 
     fall = score_fall(
         candidates,
@@ -133,6 +136,7 @@ def build_snapshot(
     )
     mental = score_mental_wellbeing(
         daily,
+        checkins=wellbeing_checkins,
         now=now,
         stale=stale,
         policy=policy,
@@ -271,6 +275,7 @@ def score_fall(
 def score_mental_wellbeing(
     daily_rows: Iterable[dict[str, Any]],
     *,
+    checkins: Iterable[dict[str, Any]] = (),
     now: datetime,
     stale: bool,
     policy: dict[str, Any],
@@ -325,20 +330,48 @@ def score_mental_wellbeing(
                 )
                 if score == 3 and current_level < 3:
                     evidence.append("level_2_or_higher_for_three_days")
+    checkin_spec = spec["monthly_wellbeing_checkin"]
+    current_month = now.astimezone().strftime("%Y-%m")
+    current_checkin = next(
+        (
+            item
+            for item in checkins
+            if str(item.get("checkin_month")) == current_month
+        ),
+        None,
+    )
+    extra_limitations = ["who5_self_report_is_not_a_clinical_diagnosis"]
+    if current_checkin is None:
+        extra_limitations.append("monthly_wellbeing_checkin_due")
+    else:
+        raw_score = int(current_checkin["raw_score"])
+        if raw_score < int(checkin_spec["low_wellbeing_raw_score_below"]):
+            questionnaire_level = int(
+                checkin_spec["low_wellbeing_minimum_risk_level"]
+            )
+            score = max(score if score is not None else 0, questionnaire_level)
+            evidence.append("who5_below_suggested_further_assessment_cutoff")
+        else:
+            if score is None:
+                score = 0
+            evidence.append("who5_not_below_suggested_further_assessment_cutoff")
     return _assessment(
         RiskDomain.MENTAL_WELLBEING,
         score,
         now=now,
-        stale=daily_stale or (stale and score == 0),
+        stale=current_checkin is None
+        and (daily_stale or (stale and score == 0)),
         coverage={
             "eligible_distinct_days": len({item["local_date"] for item in eligible}),
             "usable_features": usable_features,
             "required_baseline_days": spec["minimum_baseline_days"],
+            "monthly_checkin_completed": current_checkin is not None,
         },
         evidence=evidence,
         insufficient_reason="personal_baseline_requires_7_days_with_3_segments_each",
         policy=policy,
         policy_digest=policy_digest,
+        extra_limitations=extra_limitations,
         stale_reason=(
             "behavioral_daily_features_out_of_date"
             if daily_stale

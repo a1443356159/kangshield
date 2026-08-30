@@ -13,6 +13,7 @@ from kangshield.information.contracts import (
     MultidomainSnapshotReport,
     RiskDomain,
     TimeRange,
+    WellbeingCheckinSubmission,
 )
 from kangshield.information.multidomain import (
     classify_fraud_text,
@@ -79,6 +80,12 @@ def test_null_score_requires_reason_and_non_assessed_status():
             policy_digest="a" * 64,
             policy_summary="summary",
         )
+
+
+@pytest.mark.parametrize("answers", [[1, 2, 3, 4], [0, 0, 0, 0, 6]])
+def test_who5_submission_requires_five_answers_from_zero_through_five(answers):
+    with pytest.raises(ValidationError):
+        WellbeingCheckinSubmission(answers=answers)
 
 
 @pytest.mark.parametrize(
@@ -163,6 +170,59 @@ def test_mental_baseline_is_fail_closed_then_scores_severe_changes():
     )
     assert result.score == 3
     assert result.data_coverage["eligible_distinct_days"] == 9
+
+
+def test_current_month_who5_checkin_contributes_to_mental_risk():
+    low = score_mental_wellbeing(
+        [],
+        checkins=[{"checkin_month": "2026-08", "raw_score": 12}],
+        now=NOW,
+        stale=True,
+        policy=POLICY,
+        policy_digest=DIGEST,
+    )
+    assert low.score == 2
+    assert "who5_below_suggested_further_assessment_cutoff" in low.evidence_summary
+    assert low.data_coverage["monthly_checkin_completed"] is True
+
+    not_low = score_mental_wellbeing(
+        [],
+        checkins=[{"checkin_month": "2026-08", "raw_score": 13}],
+        now=NOW,
+        stale=True,
+        policy=POLICY,
+        policy_digest=DIGEST,
+    )
+    assert not_low.score == 0
+    assert "who5_not_below_suggested_further_assessment_cutoff" in not_low.evidence_summary
+
+    expired = score_mental_wellbeing(
+        [],
+        checkins=[{"checkin_month": "2026-07", "raw_score": 0}],
+        now=NOW,
+        stale=False,
+        policy=POLICY,
+        policy_digest=DIGEST,
+    )
+    assert expired.score is None
+    assert expired.data_coverage["monthly_checkin_completed"] is False
+
+
+def test_who5_result_does_not_reduce_higher_behavioral_risk():
+    rows = []
+    for day in range(10, 18):
+        value = 0.9 if day % 2 else 1.1
+        rows.append(_daily(f"2026-08-{day:02d}", (value,) * 4))
+    rows.append(_daily("2026-08-19", (5, 5, 1, 1)))
+    result = score_mental_wellbeing(
+        rows,
+        checkins=[{"checkin_month": "2026-08", "raw_score": 25}],
+        now=NOW,
+        stale=False,
+        policy=POLICY,
+        policy_digest=DIGEST,
+    )
+    assert result.score == 3
 
 
 def test_fraud_hard_negative_and_score_combinations():

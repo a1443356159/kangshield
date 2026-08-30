@@ -1,4 +1,4 @@
-.PHONY: test info-fixtures assess-distribution-readiness assess-runtime-closure submit-runtime-preflight prepare-mm-models prepare-mm-smoke prepare-mm-container-smoke prepare-m2c-timing-fixture prepare-m2c-capture-fixture assess-m2c-capture-fixture prepare-g4-event-evaluation-fixture assess-g4-event-evaluation-fixture prepare-g4-candidate-export-fixture assess-g4-candidate-export-fixture submit-g4-feature-capture-smoke submit-mm-smoke submit-mm-container-smoke prepare-m2b-data submit-m2b-benchmark prepare-m3-pose-models submit-m3-pose-comparison prepare-m3-speech-models submit-m3-speech-comparison prepare-g4-caucafall submit-g4-adl-benchmark benchmark-g4-fall-candidates prepare-g4-static-home submit-g4-static-home-benchmark
+.PHONY: test demo info-fixtures assess-distribution-readiness assess-runtime-closure submit-runtime-preflight prepare-mm-models prepare-mm-smoke prepare-mm-container-smoke prepare-m2c-timing-fixture prepare-m2c-capture-fixture assess-m2c-capture-fixture prepare-g4-event-evaluation-fixture assess-g4-event-evaluation-fixture prepare-g4-candidate-export-fixture assess-g4-candidate-export-fixture submit-g4-feature-capture-smoke submit-mm-smoke submit-mm-container-smoke prepare-m2b-data submit-m2b-benchmark prepare-m3-pose-models submit-m3-pose-comparison prepare-m3-speech-models submit-m3-speech-comparison prepare-g4-caucafall submit-g4-adl-benchmark benchmark-g4-fall-candidates prepare-g4-static-home submit-g4-static-home-benchmark
 
 PYTHON ?= python3
 KANG_VIDEO_INPUT ?= $(CURDIR)/data/raw/public-smoke/ultralytics-bus-replay.avi
@@ -22,6 +22,12 @@ KANG_G4_CAUCAFALL_RUN ?=
 
 test:
 	PYTHONPATH=src $(PYTHON) -m pytest -q
+
+demo:
+	PYTHONPATH=src $(PYTHON) -m kangshield.information.cli serve-product \
+		--elder-ref demo-elder --device-ref demo-c6c --host 127.0.0.1 \
+		--port 8765 --store-root /tmp/kangshield-submission-demo \
+		--runs-dir /tmp/kangshield-submission-runs --demo
 
 info-fixtures:
 	PYTHONPATH=src $(PYTHON) -m kangshield.information.cli inspect-ezviz tests/fixtures/ezviz/device-list.synthetic.json --evidence-level E1

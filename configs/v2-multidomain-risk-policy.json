@@ -1,7 +1,7 @@
 {
   "schema_version": "2.0",
   "policy_id": "v2-multidomain-risk-policy",
-  "revision": "2026-08-19.1",
+  "revision": "2026-08-30.1",
   "pilot_unvalidated": true,
   "stale_after_hours": 6,
   "initial_lookback_days": 14,
@@ -21,6 +21,12 @@
     "mild_z": 1.5,
     "severe_z": 2.5,
     "level_two_streak_days": 3,
+    "monthly_wellbeing_checkin": {
+      "instrument_id": "WHO-5",
+      "instrument_revision": "WHO/UCN/MSD/MHE/2024.1",
+      "low_wellbeing_raw_score_below": 13,
+      "low_wellbeing_minimum_risk_level": 2
+    },
     "features": [
       "daytime_presence",
       "activity_level",
@@ -53,7 +59,7 @@
   },
   "policy_summary": {
     "fall": "候选事件、语音共现、人工复核和个人行动偏离的0至3级规则",
-    "mental_wellbeing": "日间出现、活动、语言互动和已确认睡眠规律相对个人基线的0至3级规则",
+    "mental_wellbeing": "WHO-5月度本人自评与日间出现、活动、语言互动和已确认睡眠规律个人基线合并的0至3级规则",
     "fraud": "摄像头可听环境对话中五类可疑上下文及硬负例的0至3级规则"
   },
   "limitations": [

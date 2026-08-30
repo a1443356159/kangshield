@@ -198,6 +198,7 @@ class DefaultMediaAnalyzer:
         for item in semantics:
             tags = set(item.get("value", {}).get("tags", []))
             occurred_at = _event_at(capture_started_at, item)
+            transcript_excerpt = _source_transcript_excerpt(item, transcripts)
             for tag, category in (
                 ("help_request", "help_speech"),
                 ("fall_related", "fall_speech"),
@@ -213,7 +214,14 @@ class DefaultMediaAnalyzer:
                                 item["feature_id"],
                                 [f"lexical_tag:{tag}"],
                             ),
-                            {"tag": tag},
+                            {
+                                "tag": tag,
+                                **(
+                                    {"transcript_excerpt": transcript_excerpt}
+                                    if transcript_excerpt
+                                    else {}
+                                ),
+                            },
                         )
                     )
         for item in transcripts.values():
@@ -232,7 +240,10 @@ class DefaultMediaAnalyzer:
                         item["feature_id"],
                         [f"matched_context:{category}" for category in categories],
                     ),
-                    {"categories": categories},
+                    {
+                        "categories": categories,
+                        "transcript_excerpt": _short_transcript(text),
+                    },
                 )
             )
         return result, fall_events
@@ -507,6 +518,28 @@ class IncrementalAnalyzer:
             )
         except Exception:
             return
+
+
+def _source_transcript_excerpt(
+    feature: dict[str, Any], transcripts: dict[str, dict[str, Any]]
+) -> str | None:
+    for feature_ref in feature.get("source_feature_refs", []):
+        source = transcripts.get(str(feature_ref))
+        if source is None:
+            continue
+        excerpt = _short_transcript(str(source.get("value", {}).get("text", "")))
+        if excerpt:
+            return excerpt
+    return None
+
+
+def _short_transcript(text: str, *, limit: int = 120) -> str:
+    """Return a review-sized excerpt, never a full long-form transcript."""
+
+    normalized = " ".join(text.split()).strip()
+    if len(normalized) <= limit:
+        return normalized
+    return normalized[: limit - 1].rstrip() + "…"
 
 
 def _candidate(

@@ -5,7 +5,11 @@ import json
 from datetime import datetime, timezone
 
 from kangshield.information.contracts import DomainCandidate
-from kangshield.information.incremental_analysis import AnalysisResult, IncrementalAnalyzer
+from kangshield.information.incremental_analysis import (
+    AnalysisResult,
+    IncrementalAnalyzer,
+    _short_transcript,
+)
 from kangshield.information.longitudinal.store import LongitudinalStore
 
 
@@ -33,6 +37,13 @@ def _capture_run(root, run_id, *, device_ref="target", ready=True, malformed=Fal
     (run / "manifest.json").write_text(json.dumps(manifest))
     (run / "reports" / "stream-capture.json").write_text(json.dumps(report))
     return media
+
+
+def test_transcript_excerpt_is_normalized_and_bounded():
+    assert _short_transcript("  请立即\n转账  ") == "请立即 转账"
+    value = _short_transcript("话" * 140)
+    assert len(value) == 120
+    assert value.endswith("…")
 
 
 def test_scanner_filters_target_is_idempotent_and_retries_failure(tmp_path):

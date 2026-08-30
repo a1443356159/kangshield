@@ -15,7 +15,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Iterator
 
-SCHEMA_VERSION = "2"
+SCHEMA_VERSION = "3"
 DEFAULT_STORE_ROOT = Path("data/processed/longitudinal")
 
 _ELDER_REF_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
@@ -171,6 +171,17 @@ CREATE TABLE IF NOT EXISTS candidate_reviews (
 );
 CREATE INDEX IF NOT EXISTS idx_candidate_reviews_candidate_time
     ON candidate_reviews (candidate_id, decided_at);
+CREATE TABLE IF NOT EXISTS wellbeing_checkins (
+    checkin_month TEXT PRIMARY KEY,
+    completed_at TEXT NOT NULL,
+    answers_json TEXT NOT NULL,
+    raw_score INTEGER NOT NULL CHECK(raw_score BETWEEN 0 AND 25),
+    percentage_score INTEGER NOT NULL CHECK(percentage_score BETWEEN 0 AND 100),
+    instrument_id TEXT NOT NULL,
+    instrument_revision TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_wellbeing_checkins_completed_at
+    ON wellbeing_checkins (completed_at);
 """
 
 
@@ -481,6 +492,7 @@ class LongitudinalStore:
             "domain_candidates": scalar("SELECT COUNT(*) FROM domain_candidates"),
             "domain_assessments": scalar("SELECT COUNT(*) FROM domain_assessments"),
             "candidate_reviews": scalar("SELECT COUNT(*) FROM candidate_reviews"),
+            "wellbeing_checkins": scalar("SELECT COUNT(*) FROM wellbeing_checkins"),
             "observation_span": {"start": span[0], "end": span[1]},
         }
 
@@ -666,6 +678,57 @@ class LongitudinalStore:
                 (candidate_id,),
             )
         )
+
+    def upsert_wellbeing_checkin(
+        self,
+        *,
+        checkin_month: str,
+        completed_at: str,
+        answers: list[int],
+        raw_score: int,
+        percentage_score: int,
+        instrument_id: str,
+        instrument_revision: str,
+    ) -> None:
+        with self._connection:
+            self._connection.execute(
+                "INSERT INTO wellbeing_checkins (checkin_month, completed_at,"
+                " answers_json, raw_score, percentage_score, instrument_id,"
+                " instrument_revision) VALUES (?, ?, ?, ?, ?, ?, ?)"
+                " ON CONFLICT(checkin_month) DO UPDATE SET"
+                " completed_at=excluded.completed_at,"
+                " answers_json=excluded.answers_json,"
+                " raw_score=excluded.raw_score,"
+                " percentage_score=excluded.percentage_score,"
+                " instrument_id=excluded.instrument_id,"
+                " instrument_revision=excluded.instrument_revision",
+                (
+                    checkin_month,
+                    completed_at,
+                    dumps_compact(answers),
+                    raw_score,
+                    percentage_score,
+                    instrument_id,
+                    instrument_revision,
+                ),
+            )
+
+    def fetch_wellbeing_checkins(self, *, limit: int = 12) -> list[sqlite3.Row]:
+        return list(
+            self._connection.execute(
+                "SELECT * FROM wellbeing_checkins"
+                " ORDER BY checkin_month DESC LIMIT ?",
+                (limit,),
+            )
+        )
+
+    def delete_wellbeing_checkin(self, checkin_month: str) -> bool:
+        with self._connection:
+            cursor = self._connection.execute(
+                "DELETE FROM wellbeing_checkins WHERE checkin_month = ?",
+                (checkin_month,),
+            )
+        return cursor.rowcount == 1
 
     def record_domain_assessment(self, row: dict[str, Any]) -> None:
         with self._connection:

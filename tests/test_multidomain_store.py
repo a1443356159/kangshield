@@ -6,7 +6,7 @@ import sqlite3
 from kangshield.information.longitudinal.store import LongitudinalStore
 
 
-def test_v1_database_migrates_forward_to_v2(tmp_path):
+def test_v1_database_migrates_forward_to_v3(tmp_path):
     elder_dir = tmp_path / "elder_a"
     elder_dir.mkdir()
     db = sqlite3.connect(elder_dir / "longitudinal.sqlite")
@@ -41,7 +41,7 @@ def test_v1_database_migrates_forward_to_v2(tmp_path):
         version = store._connection.execute(
             "SELECT value FROM meta WHERE key='schema_version'"
         ).fetchone()[0]
-        assert version == "2"
+        assert version == "3"
         observation_columns = {
             row[1] for row in store._connection.execute("PRAGMA table_info(observations)")
         }
@@ -49,6 +49,38 @@ def test_v1_database_migrates_forward_to_v2(tmp_path):
         assert store._connection.execute(
             "SELECT 1 FROM sqlite_master WHERE name='domain_candidates'"
         ).fetchone()
+        assert store._connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE name='wellbeing_checkins'"
+        ).fetchone()
+
+
+def test_monthly_wellbeing_checkin_is_upserted_and_persistent(tmp_path):
+    with LongitudinalStore("elder_a", root=tmp_path) as store:
+        store.upsert_wellbeing_checkin(
+            checkin_month="2026-08",
+            completed_at="2026-08-30T10:00:00+08:00",
+            answers=[2, 2, 2, 2, 2],
+            raw_score=10,
+            percentage_score=40,
+            instrument_id="WHO-5",
+            instrument_revision="WHO/UCN/MSD/MHE/2024.1",
+        )
+        store.upsert_wellbeing_checkin(
+            checkin_month="2026-08",
+            completed_at="2026-08-30T10:05:00+08:00",
+            answers=[4, 4, 4, 4, 4],
+            raw_score=20,
+            percentage_score=80,
+            instrument_id="WHO-5",
+            instrument_revision="WHO/UCN/MSD/MHE/2024.1",
+        )
+        assert store.counts()["wellbeing_checkins"] == 1
+    with LongitudinalStore("elder_a", root=tmp_path) as store:
+        row = store.fetch_wellbeing_checkins()[0]
+        assert row["raw_score"] == 20
+        assert json.loads(row["answers_json"]) == [4, 4, 4, 4, 4]
+        assert store.delete_wellbeing_checkin("2026-08") is True
+        assert store.fetch_wellbeing_checkins() == []
 
 
 def test_review_is_persistent_auditable_and_delete_elder_is_complete(tmp_path):

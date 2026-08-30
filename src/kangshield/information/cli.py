@@ -605,6 +605,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--policy", type=Path, default=Path("configs/v2-multidomain-risk-policy.json")
     )
     product.add_argument("--scan-interval-seconds", type=int, default=300)
+    product.add_argument(
+        "--demo",
+        action="store_true",
+        help="Seed wall-clock-relative synthetic records; requires demo-* references",
+    )
 
     product_export = subparsers.add_parser(
         "export-product-report",
@@ -2922,6 +2927,7 @@ def _serve_product_command(args: argparse.Namespace) -> int:
         runs_dir=args.runs_dir,
         policy_path=args.policy,
         scan_interval_seconds=args.scan_interval_seconds,
+        demo=args.demo,
     )
     return 0
 

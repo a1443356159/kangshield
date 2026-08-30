@@ -3542,6 +3542,19 @@ class CandidateReviewDecision(ContractModel):
     owner_note: str | None = Field(default=None, max_length=2000)
 
 
+class WellbeingCheckinSubmission(ContractModel):
+    """One owner-entered WHO-5 response for the current calendar month."""
+
+    schema_version: str = "1.0"
+    answers: list[int] = Field(min_length=5, max_length=5)
+
+    @model_validator(mode="after")
+    def _answers_are_who5_frequency_values(self) -> "WellbeingCheckinSubmission":
+        if any(answer < 0 or answer > 5 for answer in self.answers):
+            raise ValueError("WHO-5 answers must be integers from 0 through 5")
+        return self
+
+
 class MultidomainSnapshotReport(ContractModel):
     schema_version: str = "2.0"
     report_version: str

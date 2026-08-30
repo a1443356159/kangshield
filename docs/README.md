@@ -1,20 +1,20 @@
 # KangShield 文档中心
 
 状态：Active v2.0
-更新时间：2026-08-09
+更新时间：2026-08-30
 
 当前指标需求源为 [跌倒新指标](references/fall-risk-indicators.docx)。现行产品范围为目标 C6c 单机位的跌倒、心理健康、诈骗三域本地试点、SDHY1 睡眠、candidate 与人工复核；不做全局总分、临床诊断、诈骗确认、外部自动告警、表情或声学情绪识别。
 
 ## 推荐阅读顺序
 
-1. [跌倒指标需求](design/fall-risk-indicators.md)
+1. [三域风险产品 MVP](design/multidomain-risk-mvp.md)
 2. [系统架构](design/system-architecture.md)
 3. [当前状态](governance/current-status.md)
-4. [里程碑](governance/milestones.md)
-5. [有效决策](governance/decisions.md)
+4. [有效决策](governance/decisions.md)
+5. [跌倒指标需求](design/fall-risk-indicators.md)
 6. [指标公共契约](design/indicator-contracts.md)
 7. [指标、模型与语音实现方案](design/indicator-implementation.md)
-8. [三域风险产品 MVP](design/multidomain-risk-mvp.md)
+8. [里程碑](governance/milestones.md)
 
 ## 设计
 
