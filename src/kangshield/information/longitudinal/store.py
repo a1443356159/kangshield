@@ -1,9 +1,9 @@
-"""Owner-only per-elder longitudinal SQLite store.
+"""Owner-only, per-person SQLite store for risk facts and audit history.
 
-One database file per elder under ``data/processed/longitudinal/<elder_ref>/``;
-deleting an elder's directory is the complete erasure path. The store keeps
-indicator observations, L0 candidate episodes, L1 personal baselines and
-baseline-deviation candidates. It never stores raw media or transcript text.
+One database lives under ``<root>/<elder_ref>/``. It never stores raw media,
+stream endpoints, playback URLs, credentials, or complete transcripts. A
+risk-triggered candidate may carry one normalized transcript excerpt capped by
+the analysis layer at 120 characters.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Iterator
 
-SCHEMA_VERSION = "3"
+SCHEMA_VERSION = "4"
 DEFAULT_STORE_ROOT = Path("data/processed/longitudinal")
 
 _ELDER_REF_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
@@ -121,6 +121,31 @@ CREATE TABLE IF NOT EXISTS analysis_ledger (
 );
 CREATE INDEX IF NOT EXISTS idx_analysis_ledger_device_time
     ON analysis_ledger (device_ref, captured_start_at, status);
+CREATE TABLE IF NOT EXISTS edge_segment_audits (
+    segment_id TEXT PRIMARY KEY,
+    device_ref TEXT NOT NULL,
+    segment_started_at TEXT NOT NULL,
+    segment_ended_at TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('completed', 'partial', 'failed')),
+    failure_code TEXT,
+    cloud_recording_ref TEXT NOT NULL,
+    selector_revision TEXT NOT NULL,
+    selector_digest TEXT NOT NULL,
+    raw_media_persisted INTEGER NOT NULL DEFAULT 0 CHECK(raw_media_persisted = 0),
+    endpoint_value_persisted INTEGER NOT NULL DEFAULT 0 CHECK(endpoint_value_persisted = 0),
+    screened_video_seconds REAL NOT NULL DEFAULT 0,
+    screened_audio_seconds REAL NOT NULL DEFAULT 0,
+    selected_pose_seconds REAL NOT NULL DEFAULT 0,
+    selected_asr_seconds REAL NOT NULL DEFAULT 0,
+    screened_frame_count INTEGER NOT NULL DEFAULT 0,
+    selected_frame_count INTEGER NOT NULL DEFAULT 0,
+    candidate_count INTEGER NOT NULL DEFAULT 0,
+    key_windows_json TEXT NOT NULL DEFAULT '[]',
+    limitations_json TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_edge_segments_device_time
+    ON edge_segment_audits (device_ref, segment_ended_at, status);
 CREATE TABLE IF NOT EXISTS daily_features (
     local_date TEXT PRIMARY KEY,
     eligible_segments INTEGER NOT NULL,
@@ -487,7 +512,11 @@ class LongitudinalStore:
             "analysis_runs": scalar("SELECT COUNT(*) FROM analysis_ledger"),
             "analysis_failures": scalar(
                 "SELECT COUNT(*) FROM analysis_ledger WHERE status = 'failed'"
+            )
+            + scalar(
+                "SELECT COUNT(*) FROM edge_segment_audits WHERE status != 'completed'"
             ),
+            "edge_segments": scalar("SELECT COUNT(*) FROM edge_segment_audits"),
             "daily_features": scalar("SELECT COUNT(*) FROM daily_features"),
             "domain_candidates": scalar("SELECT COUNT(*) FROM domain_candidates"),
             "domain_assessments": scalar("SELECT COUNT(*) FROM domain_assessments"),
@@ -560,20 +589,109 @@ class LongitudinalStore:
 
     def latest_successful_capture(self, device_ref: str) -> sqlite3.Row | None:
         return self._connection.execute(
-            "SELECT * FROM analysis_ledger WHERE device_ref = ? AND status = 'completed'"
-            " ORDER BY captured_end_at DESC LIMIT 1",
-            (device_ref,),
+            "SELECT * FROM ("
+            " SELECT device_ref, captured_start_at, captured_end_at, status,"
+            " pose_quality_seconds, audio_valid_seconds, 'file_analysis' AS source,"
+            " last_error AS failure_code"
+            " FROM analysis_ledger WHERE device_ref = ? AND status = 'completed'"
+            " UNION ALL"
+            " SELECT device_ref, segment_started_at AS captured_start_at,"
+            " segment_ended_at AS captured_end_at, status,"
+            " selected_pose_seconds AS pose_quality_seconds,"
+            " selected_asr_seconds AS audio_valid_seconds, 'edge_stream' AS source,"
+            " failure_code"
+            " FROM edge_segment_audits WHERE device_ref = ?"
+            " AND status IN ('completed', 'partial')"
+            ") ORDER BY captured_end_at DESC LIMIT 1",
+            (device_ref, device_ref),
         ).fetchone()
 
     def coverage_since(self, start_at: str, device_ref: str) -> dict[str, float]:
-        row = self._connection.execute(
+        file_row = self._connection.execute(
             "SELECT COALESCE(SUM(pose_quality_seconds), 0),"
             " COALESCE(SUM(audio_valid_seconds), 0) FROM analysis_ledger"
-            " WHERE device_ref = ? AND status = 'completed'"
+            " WHERE device_ref = ? AND status IN ('completed', 'partial')"
             " AND captured_end_at >= ?",
             (device_ref, start_at),
         ).fetchone()
-        return {"pose_seconds": float(row[0]), "audio_seconds": float(row[1])}
+        edge_row = self._connection.execute(
+            "SELECT COALESCE(SUM(selected_pose_seconds), 0),"
+            " COALESCE(SUM(selected_asr_seconds), 0) FROM edge_segment_audits"
+            " WHERE device_ref = ? AND status = 'completed'"
+            " AND segment_ended_at >= ?",
+            (device_ref, start_at),
+        ).fetchone()
+        return {
+            "pose_seconds": float(file_row[0]) + float(edge_row[0]),
+            "audio_seconds": float(file_row[1]) + float(edge_row[1]),
+        }
+
+    def record_edge_segment(self, row: dict[str, Any]) -> None:
+        columns = [
+            "segment_id",
+            "device_ref",
+            "segment_started_at",
+            "segment_ended_at",
+            "status",
+            "failure_code",
+            "cloud_recording_ref",
+            "selector_revision",
+            "selector_digest",
+            "raw_media_persisted",
+            "endpoint_value_persisted",
+            "screened_video_seconds",
+            "screened_audio_seconds",
+            "selected_pose_seconds",
+            "selected_asr_seconds",
+            "screened_frame_count",
+            "selected_frame_count",
+            "candidate_count",
+            "key_windows_json",
+            "limitations_json",
+            "created_at",
+        ]
+        placeholders = ", ".join("?" for _ in columns)
+        with self._connection:
+            self._connection.execute(
+                f"INSERT OR IGNORE INTO edge_segment_audits ({', '.join(columns)})"
+                f" VALUES ({placeholders})",
+                tuple(row[column] for column in columns),
+            )
+
+    def fetch_edge_segments(
+        self, *, device_ref: str | None = None, limit: int = 100
+    ) -> list[sqlite3.Row]:
+        if limit <= 0:
+            raise ValueError("edge segment limit must be positive")
+        if device_ref is None:
+            return list(
+                self._connection.execute(
+                    "SELECT * FROM edge_segment_audits"
+                    " ORDER BY segment_ended_at DESC LIMIT ?",
+                    (limit,),
+                )
+            )
+        return list(
+            self._connection.execute(
+                "SELECT * FROM edge_segment_audits WHERE device_ref = ?"
+                " ORDER BY segment_ended_at DESC LIMIT ?",
+                (device_ref, limit),
+            )
+        )
+
+    def fetch_edge_segment(self, segment_id: str) -> sqlite3.Row | None:
+        return self._connection.execute(
+            "SELECT * FROM edge_segment_audits WHERE segment_id = ?",
+            (segment_id,),
+        ).fetchone()
+
+    def analysis_failure_count(self) -> int:
+        row = self._connection.execute(
+            "SELECT"
+            " (SELECT COUNT(*) FROM analysis_ledger WHERE status = 'failed') +"
+            " (SELECT COUNT(*) FROM edge_segment_audits WHERE status != 'completed')"
+        ).fetchone()
+        return int(row[0])
 
     def upsert_daily_feature(self, row: dict[str, Any]) -> None:
         columns = [
@@ -640,6 +758,12 @@ class LongitudinalStore:
             statement += " WHERE " + " AND ".join(clauses)
         statement += " ORDER BY occurred_at DESC, candidate_id"
         return list(self._connection.execute(statement, parameters))
+
+    def fetch_domain_candidate(self, candidate_id: str) -> sqlite3.Row | None:
+        return self._connection.execute(
+            "SELECT * FROM domain_candidates WHERE candidate_id = ?",
+            (candidate_id,),
+        ).fetchone()
 
     def review_candidate(
         self,
@@ -733,7 +857,7 @@ class LongitudinalStore:
     def record_domain_assessment(self, row: dict[str, Any]) -> None:
         with self._connection:
             self._connection.execute(
-                "INSERT INTO domain_assessments (assessment_id, domain, score, status,"
+                "INSERT OR IGNORE INTO domain_assessments (assessment_id, domain, score, status,"
                 " assessed_at, policy_revision, policy_digest, payload_json)"
                 " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (

@@ -1,2 +1,0 @@
-# Install in the existing project virtual environment used by Slurm.
-onnxruntime-gpu[cuda,cudnn]==1.27.0

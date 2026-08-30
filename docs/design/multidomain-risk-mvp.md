@@ -8,15 +8,15 @@
 
 ## 1. 产品边界
 
-本地链路为：定时采集 → 增量姿态/VAD/ASR 分析 → 跌倒、心理健康、诈骗三域规则等级 → 每老人 SQLite → localhost 看板 → 人工复核 → owner/public 离线导出。
+本地链路为：连续内存取流 → 60 秒逻辑分段 → 轻量运动/音频活动筛选 → 关键窗口姿态/VAD/ASR → 跌倒、心理健康、诈骗三域规则等级 → 每老人 SQLite → localhost 看板 → 人工复核 → owner/public 离线导出。原始录像由摄像头云服务保存，本机不创建视频或音频文件。
 
-三个域各自输出 0–3 或 `null`，`global_score` 永远为 `null`。等级不是概率、临床诊断、诈骗确认或已验证预测结论；不自动对外告警。证据不足、数据过期或模型失败时 fail closed。服务固定绑定 `127.0.0.1`，页面不提供媒体或任意文件路由。
+三个域各自输出 0–3 或 `null`，`global_score` 永远为 `null`。等级不是概率、临床诊断、诈骗确认或已验证预测结论；不自动对外告警。证据不足、数据过期或模型失败时 fail closed。服务固定绑定 `127.0.0.1`，不提供本地媒体或任意文件路由；只有 owner 主动点击候选时才临时解析受限时间窗的云端回放。
 
 ## 2. 数据与契约
 
 正式契约为 `RiskDomain`、`DomainRiskAssessment`、`DomainCandidate`、`MultidomainSnapshotReport` 和 `CandidateReviewDecision`。每项 assessment 绑定策略 revision、SHA-256、摘要、覆盖和限制；snapshot 必须恰好包含三个域。
 
-SQLite schema v3 在原 L1 库上向前迁移，保留 schema v2 的分析 ledger、日级行为特征、三域 candidate/assessment 历史和复核审计，并增加月度 WHO-5 自评。数据库不保存原始媒体或完整逐字稿；失败按媒体摘要重试，成功记录按媒体摘要幂等。删除 `data/processed/longitudinal/<elder_ref>/` 仍是单老人完整删除路径。
+SQLite schema v4 在原 L1 库上向前迁移，保留历史分析 ledger、日级行为特征、三域 candidate/assessment 历史、复核审计和月度 WHO-5 自评，并增加 `edge_segment_audits`。每段只记录起止时间、轻量扫描量、实际送模覆盖、关键窗口摘要、候选数、选择策略哈希、失败码和不可逆的云端时间引用；`raw_media_persisted=0` 与 `endpoint_value_persisted=0` 由 schema/契约共同约束。数据库不保存原始媒体或完整逐字稿。删除 `data/processed/longitudinal/<elder_ref>/` 仍是单老人完整删除路径。
 
 public 导出只保留脱敏域等级、策略绑定和按日趋势，不包含老人/设备标识、原始覆盖指标、逐字稿、备注、本地路径、candidate 时间线或精确事件时间。owner 导出可包含原因、事件、趋势与复核审计。
 
@@ -35,7 +35,10 @@ kangshield-info serve-product \
   --elder-ref elder_demo \
   --device-ref c6c_target_01 \
   --host 127.0.0.1 \
-  --port 8765
+  --port 8765 \
+  --continuous \
+  --edge-provider ezviz \
+  --edge-device-serial-env KANG_DEVICE_SERIAL
 
 kangshield-info export-product-report \
   --elder-ref elder_demo \
@@ -48,11 +51,17 @@ kangshield-info export-product-report \
   --output reports/public
 ```
 
-服务启动后立即回溯 14 天内合格 capture run，之后默认每 300 秒扫描一次；模型在单工作线程中复用。模型/权重不可用会写失败 ledger 并在后续周期重试，看板继续服务且返回 `model_unavailable/null`，不得伪造分数。
+`serve-product --continuous` 同时启动本地看板和连续边缘守护。采集生产线程不断产生内存段，单模型消费线程复用姿态和语音模型；最多排队两个段，超出时写 `analysis_backpressure` 审计而不静默丢失。模型/权重不可用写 `partial` 分段，未处理的模态覆盖保持 0，看板继续服务并返回 `model_unavailable/null`。
+
+轻量策略由 `configs/v2-edge-segment-policy.json` 版本化并绑定 SHA-256：视频以 5 fps、最大 640 px 的内存 JPEG 帧计算灰度帧差，以 median/MAD 和最小阈值选运动前 3 秒、后 7 秒，同时每 10 秒保留一个个人基线帧；音频在内存中重采样为 16 kHz mono，以 500 ms RMS、噪声底与低阈值选择可能有人声的窗口。视频和音频各最多选择原段 50%，音频送模窗口最长 15 秒。轻量结果不直接评分；只有姿态/ASR 真正处理成功的时长才贡献风险 0 分覆盖。
+
+关键段只在内存中存在：姿态模型直接接收选中帧，ASR 直接接收选中 PCM 数组，处理完成后由引用释放。本地候选只保存所属审计段、派生证据和最长 120 字的风险相关转写片段；没有本地证据视频下载或播放路由。
+
+异常回看按需工作：候选详情 POST 通过同源、CSRF 和 JSON 门后，后端将事件前 10 秒至后 20 秒限制在所属审计段内，再临时向云平台取得 HTTPS HLS 地址。浏览器弹窗播放同一片段的画面和声音；关闭后移除 URL。token、直播地址、播放地址和设备序列号均不写入 SQLite、日志或报告。浏览器不能原生播放 HLS 时，只提供新窗口云端降级链接。
 
 ## 5. 提交演示
 
-展示页是标准库 HTTP 服务内嵌的独立 HTML/CSS/JS，不依赖 CDN、Node 或前端构建链。用户侧品牌只显示“康盾”和盾牌叶片图标，不展示策略版本、模型名、接口状态、`pilot_unvalidated` 或 `global_score` 等工程字段。首屏固定呈现三域状态；后续区域提供 28 天按域趋势、个人基线摘要、按自然月提醒的 WHO-5 填写区、近期提醒筛选、确认弹窗和仅照护者可见备注。填写、覆盖修改或删除本月问卷都会持久化新的 assessment 并立即刷新风险卡。所有动态文本通过 DOM `textContent` 写入，不将候选内容拼入 HTML。
+展示页是标准库 HTTP 服务内嵌的独立 HTML/CSS/JS，不依赖 CDN、Node 或前端构建链。用户侧品牌只显示“康盾”和盾牌叶片图标，不展示策略版本、模型名、接口状态、`pilot_unvalidated` 或 `global_score` 等工程字段。首屏固定呈现三域状态；后续区域提供 28 天按域趋势、个人基线摘要、按自然月提醒的 WHO-5 填写区、近期提醒筛选、云端片段播放、确认弹窗和仅照护者可见备注。填写、覆盖修改或删除本月问卷都会持久化新的 assessment 并立即刷新风险卡。所有动态文本通过 DOM `textContent` 写入，不将候选内容拼入 HTML。
 
 前端每 30 秒只请求一次 `/api/dashboard`。后端在单个 SQLite 连接内构建一次 snapshot，并读取事件、全量复核审计、28 天趋势、个人基线和月度问卷，避免原先五个并行接口造成的重复连接与重复评分；旧分项 GET 保留用于兼容和诊断。事件复核、问卷写入与删除由运行时互斥锁串行化，SQLite 继续使用 WAL 和事务保证持久化一致性。
 
@@ -71,10 +80,9 @@ kangshield-info serve-product \
   --elder-ref demo-elder \
   --device-ref demo-c6c \
   --store-root /tmp/kangshield-submission-demo \
-  --runs-dir /tmp/kangshield-submission-runs \
   --demo
 ```
 
 `--demo` 强制老人和设备引用均以 `demo-` 开头，按启动墙钟时间生成 24 小时覆盖、11 天个人基线、三域等级、候选事件和历史趋势。演示仍经过真实 SQLite、正式评分器和复核 API，不读取真实媒体或逐字稿，也不是写死在页面中的展示值。
 
-界面参考实时守护产品常用的首屏导览、状态分区和事件队列表达，但不提供实时画面或语音记录路由，不建设公网隧道。`fall-detection` 当前无项目 LICENSE，因此本页没有复制其 HTML/CSS/JS；已有预测算法同步仍受 `prediction_sync/SYNC_MANIFEST.json` 和发布许可证门约束。
+界面参考实时守护产品常用的首屏导览、状态分区和事件队列表达，不提供实时监控画面或完整语音记录，不建设公网隧道。对 `fall-detection` 只借鉴产品信息组织和实时检测方向，最终提交未复制其 HTML/CSS/JS，也未包含此前同步的算法代码。

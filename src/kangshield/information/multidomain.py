@@ -151,11 +151,26 @@ def build_snapshot(
         policy=policy,
         policy_digest=policy_digest,
     )
-    failures = int(
-        store._connection.execute(
-            "SELECT COUNT(*) FROM analysis_ledger WHERE status = 'failed'"
-        ).fetchone()[0]
+    latest_failure = (
+        str(latest_row["failure_code"])
+        if latest_row is not None
+        and "failure_code" in latest_row.keys()
+        and latest_row["failure_code"]
+        else None
     )
+    if latest_failure:
+        affected = {
+            "pose_model_failed": (fall, mental),
+            "speech_model_failed": (mental, fraud),
+            "pose_and_speech_models_failed": (fall, mental, fraud),
+        }.get(latest_failure, ())
+        for assessment in affected:
+            if assessment.score is None:
+                assessment.status = DomainRiskStatus.MODEL_UNAVAILABLE
+                marker = f"latest_edge_segment_{latest_failure}"
+                if marker not in assessment.limitations:
+                    assessment.limitations.append(marker)
+    failures = store.analysis_failure_count()
     if failures and latest_capture is None:
         for assessment in (fall, mental, fraud):
             if assessment.score is None:
@@ -178,6 +193,11 @@ def build_snapshot(
             "analysis_failures": failures,
             "pose_valid_minutes_24h": round(coverage["pose_seconds"] / 60, 3),
             "audio_valid_minutes_24h": round(coverage["audio_seconds"] / 60, 3),
+            "latest_edge_status": (
+                str(latest_row["status"])
+                if latest_row is not None and latest_row["source"] == "edge_stream"
+                else None
+            ),
         },
         limitations=list(policy["limitations"]),
     )

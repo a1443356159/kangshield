@@ -6,7 +6,7 @@ import sqlite3
 from kangshield.information.longitudinal.store import LongitudinalStore
 
 
-def test_v1_database_migrates_forward_to_v3(tmp_path):
+def test_v1_database_migrates_forward_to_v4(tmp_path):
     elder_dir = tmp_path / "elder_a"
     elder_dir.mkdir()
     db = sqlite3.connect(elder_dir / "longitudinal.sqlite")
@@ -41,7 +41,7 @@ def test_v1_database_migrates_forward_to_v3(tmp_path):
         version = store._connection.execute(
             "SELECT value FROM meta WHERE key='schema_version'"
         ).fetchone()[0]
-        assert version == "3"
+        assert version == "4"
         observation_columns = {
             row[1] for row in store._connection.execute("PRAGMA table_info(observations)")
         }
@@ -51,6 +51,9 @@ def test_v1_database_migrates_forward_to_v3(tmp_path):
         ).fetchone()
         assert store._connection.execute(
             "SELECT 1 FROM sqlite_master WHERE name='wellbeing_checkins'"
+        ).fetchone()
+        assert store._connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE name='edge_segment_audits'"
         ).fetchone()
 
 

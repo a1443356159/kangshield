@@ -4,46 +4,20 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kangshield"
-version = "0.3.0"
-description = "KangShield information-side V1 exploration pipeline"
+version = "0.5.0"
+description = "KangShield continuous per-person multidomain risk pilot"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = [
-    "packaging>=24,<27",
-    "pydantic>=2.10,<3",
-]
+dependencies = ["pydantic>=2.10,<3"]
 
 [project.optional-dependencies]
-media = [
-    "numpy>=1.26,<3",
-    "opencv-python-headless>=4.10,<5",
-    "av==18.0.0",
-]
-multimodal = [
+edge = [
     "numpy>=1.26,<3",
     "opencv-python-headless>=4.10,<5",
     "av==18.0.0",
     "torch>=2.3",
-    "torchvision>=0.28,<0.29",
-    "torchaudio>=2.11",
     "ultralytics>=8.4,<9",
     "funasr>=1.3.22,<1.4",
-    "facexlib==0.3.0",
-    "lapx>=0.9.4,<1",
-    "soundfile>=0.12.1,<1",
-]
-rtmpose-cpu = [
-    "numpy>=1.26,<3",
-    "opencv-python-headless>=4.10,<5",
-    "onnxruntime==1.27.0",
-]
-rtmpose-gpu = [
-    "numpy>=1.26,<3",
-    "opencv-python-headless>=4.10,<5",
-    "onnxruntime-gpu[cuda,cudnn]==1.27.0",
-]
-speech-compare = [
-    "openai-whisper==20250625",
 ]
 dev = [
     "pytest>=8,<10",

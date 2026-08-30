@@ -1,0 +1,17 @@
+[Unit]
+Description=KangShield continuous local risk product
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/kangshield
+ExecStart=%h/kangshield/scripts/run_product.sh
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

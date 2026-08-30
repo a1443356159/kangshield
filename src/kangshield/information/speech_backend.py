@@ -1,21 +1,30 @@
 from __future__ import annotations
 
-import math
 import os
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from .contracts import ModelBinding, SpeechSegment
 from .privacy import sha256_file
-from .streaming import AudioBuffer
 
 
 __all__ = [
     "SpeechSegment",
+    "AudioBuffer",
     "SpeechBackend",
     "FunASRSpeechBackend",
-    "WhisperSpeechBackend",
 ]
+
+
+@dataclass(frozen=True)
+class AudioBuffer:
+    """A bounded, in-memory mono audio window passed to the speech backend."""
+
+    samples: Any
+    sample_rate_hz: int
+    duration_ms: int
+    start_ms: int = 0
 
 
 class SpeechBackend(Protocol):
@@ -39,7 +48,10 @@ SEMANTIC_KEYWORDS = {
 }
 
 MODEL_REPOSITORIES = {
-    "paraformer-zh": "iic/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
+    "paraformer-zh": (
+        "iic/speech_seaco_paraformer_large_asr_nat-zh-cn-"
+        "16k-common-vocab8404-pytorch"
+    ),
     "fsmn-vad": "iic/speech_fsmn_vad_zh-cn-16k-common-pytorch",
     "ct-punc": "iic/punc_ct-transformer_cn-en-common-vocab471067-large",
 }
@@ -51,16 +63,6 @@ MODEL_CACHE_ALIASES = {
     alias: repository.replace("/", "--", 1)
     for alias, repository in MODEL_REPOSITORIES.items()
 }
-
-WHISPER_SMALL_VERSION = "20250625"
-WHISPER_SMALL_SHA256 = (
-    "9ecf779972d90ba49c06d968637d720dd632c55bbf19d441fb42bf17a411e794"
-)
-WHISPER_SMALL_URL = (
-    "https://openaipublic.azureedge.net/main/whisper/models/"
-    f"{WHISPER_SMALL_SHA256}/small.pt"
-)
-
 
 def tag_transcript(text: str) -> list[str]:
     return sorted(
@@ -178,122 +180,6 @@ class FunASRSpeechBackend:
         )
 
 
-class WhisperSpeechBackend:
-    """Pinned OpenAI Whisper small adapter for the V1-M3 Mandarin comparison."""
-
-    def __init__(
-        self,
-        model_path: Path | str = Path("models/whisper/small.pt"),
-        device: str = "auto",
-        language: str = "zh",
-        task: str = "transcribe",
-        beam_size: int = 5,
-        temperature: float = 0.0,
-        fp16: bool | None = None,
-        condition_on_previous_text: bool = False,
-        no_speech_threshold: float = 0.6,
-        logprob_threshold: float = -1.0,
-        compression_ratio_threshold: float = 2.4,
-    ) -> None:
-        if beam_size <= 0:
-            raise ValueError("beam_size must be positive")
-        if task != "transcribe":
-            raise ValueError("V1-M3 Whisper task must remain transcribe")
-        path = Path(model_path).expanduser().resolve()
-        if not path.is_file():
-            raise FileNotFoundError(f"Whisper checkpoint not found: {path}")
-        digest = sha256_file(path)
-        if digest != WHISPER_SMALL_SHA256:
-            raise ValueError(
-                "Whisper small checkpoint digest changed; review the upstream "
-                "revision before updating the V1-M3 candidate"
-            )
-        try:
-            import torch
-            import whisper
-        except ImportError as error:
-            raise RuntimeError(
-                f"OpenAI Whisper backend dependency import failed: {error}"
-            ) from error
-
-        resolved_device = (
-            "cuda:0" if device == "auto" and torch.cuda.is_available() else device
-        )
-        if resolved_device == "auto":
-            resolved_device = "cpu"
-        resolved_fp16 = (
-            resolved_device.startswith("cuda") if fp16 is None else fp16
-        )
-        self.language = language
-        self.task = task
-        self.device = resolved_device
-        self.beam_size = beam_size
-        self.temperature = float(temperature)
-        self.fp16 = resolved_fp16
-        self.condition_on_previous_text = condition_on_previous_text
-        self.no_speech_threshold = no_speech_threshold
-        self.logprob_threshold = logprob_threshold
-        self.compression_ratio_threshold = compression_ratio_threshold
-        self._model = whisper.load_model(str(path), device=resolved_device)
-        self._bindings = [
-            ModelBinding(
-                task="mandarin_speech_recognition",
-                backend="openai-whisper",
-                model_name="small",
-                model_version=WHISPER_SMALL_VERSION,
-                model_digest=digest,
-                license="MIT",
-                device=resolved_device,
-                configuration={
-                    "checkpoint_path": str(path),
-                    "official_checkpoint_url": WHISPER_SMALL_URL,
-                    "parameter_count": "244M",
-                    "language": language,
-                    "task": task,
-                    "beam_size": beam_size,
-                    "temperature": self.temperature,
-                    "fp16": resolved_fp16,
-                    "condition_on_previous_text": condition_on_previous_text,
-                    "no_speech_threshold": no_speech_threshold,
-                    "logprob_threshold": logprob_threshold,
-                    "compression_ratio_threshold": compression_ratio_threshold,
-                    "verbose": None,
-                    "openai_whisper_version": getattr(
-                        whisper, "__version__", "unknown"
-                    ),
-                    "segment_confidence": "not_reported_uncalibrated",
-                },
-            )
-        ]
-
-    @property
-    def bindings(self) -> list[ModelBinding]:
-        return list(self._bindings)
-
-    def transcribe(self, audio: AudioBuffer) -> list[SpeechSegment]:
-        if audio.sample_rate_hz != 16000:
-            raise ValueError("Whisper comparison input must be 16 kHz")
-        raw_result = self._model.transcribe(
-            audio.samples,
-            language=self.language,
-            task=self.task,
-            beam_size=self.beam_size,
-            temperature=self.temperature,
-            fp16=self.fp16,
-            condition_on_previous_text=self.condition_on_previous_text,
-            no_speech_threshold=self.no_speech_threshold,
-            logprob_threshold=self.logprob_threshold,
-            compression_ratio_threshold=self.compression_ratio_threshold,
-            word_timestamps=False,
-            verbose=None,
-        )
-        return _normalize_whisper_result(
-            raw_result,
-            duration_ms=audio.duration_ms,
-            language=self.language,
-        )
-
-
 def _normalize_funasr_result(
     raw_result: object,
     duration_ms: int,
@@ -352,55 +238,6 @@ def _normalize_funasr_result(
                 )
             )
     return segments
-
-
-def _normalize_whisper_result(
-    raw_result: object,
-    duration_ms: int,
-    language: str,
-) -> list[SpeechSegment]:
-    if not isinstance(raw_result, dict):
-        raise ValueError("Whisper returned an unsupported result shape")
-    raw_segments = raw_result.get("segments")
-    segments: list[SpeechSegment] = []
-    if isinstance(raw_segments, list):
-        for item in raw_segments:
-            if not isinstance(item, dict):
-                continue
-            text = str(item.get("text") or "").strip()
-            start_ms = _bounded_seconds_ms(item.get("start"), 0, duration_ms)
-            end_ms = _bounded_seconds_ms(
-                item.get("end"), duration_ms, duration_ms
-            )
-            end_ms = max(start_ms, end_ms)
-            if text or end_ms > start_ms:
-                segments.append(
-                    SpeechSegment(
-                        start_ms=start_ms,
-                        end_ms=end_ms,
-                        text=text,
-                        language=language,
-                    )
-                )
-    if segments:
-        return segments
-    text = str(raw_result.get("text") or "").strip()
-    if not text:
-        return []
-    return [
-        SpeechSegment(
-            start_ms=0,
-            end_ms=duration_ms,
-            text=text,
-            language=language,
-        )
-    ]
-
-
-def _bounded_seconds_ms(value: object, default: int, duration_ms: int) -> int:
-    if isinstance(value, (int, float)) and math.isfinite(float(value)):
-        return max(0, min(round(float(value) * 1000.0), duration_ms))
-    return max(0, min(default, duration_ms))
 
 
 def _bounded_ms(value: object, default: int, duration_ms: int) -> int:

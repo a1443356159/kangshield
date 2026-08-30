@@ -1,25 +1,15 @@
-"""V1 information acquisition and feasibility probes."""
+"""KangShield continuous, per-person multidomain risk product."""
 
 from .contracts import (
-    EvidenceLevel,
-    FeatureEvent,
-    Modality,
-    ModelBinding,
-    MultimodalPipelineReport,
-    MultimodalWindow,
-    Observation,
-    RunManifest,
-    SourceAsset,
+    DomainCandidate,
+    DomainRiskAssessment,
+    MultidomainSnapshotReport,
+    RiskDomain,
 )
 
 __all__ = [
-    "EvidenceLevel",
-    "FeatureEvent",
-    "Modality",
-    "ModelBinding",
-    "MultimodalPipelineReport",
-    "MultimodalWindow",
-    "Observation",
-    "RunManifest",
-    "SourceAsset",
+    "DomainCandidate",
+    "DomainRiskAssessment",
+    "MultidomainSnapshotReport",
+    "RiskDomain",
 ]

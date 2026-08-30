@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sqlite3
 import stat
 
 import pytest
@@ -8,43 +7,13 @@ import pytest
 from kangshield.information.longitudinal.store import LongitudinalStore
 
 
-def _observation_row(**overrides):
-    row = {
-        "observed_at": "2026-08-01T10:00:00+08:00",
-        "bucket": "day",
-        "device_ref": None,
-        "indicator_id": "gait_speed",
-        "group_id": "gait",
-        "source_modality": "video",
-        "value": 1.05,
-        "unit": "m/s",
-        "assessability": "assessable",
-        "quality_status": "pass",
-        "sample_count": 3,
-        "scenario_id": "C02",
-        "time_start_at": "2026-08-01T10:00:00+08:00",
-        "time_end_at": "2026-08-01T10:00:18+08:00",
-        "source_ref": "sha256:" + "0" * 64,
-        "run_id": "run-1",
-        "report_digest": "a" * 64,
-        "limitations_json": "[]",
-        "quality_metrics_json": "{}",
-        "baseline_eligible": 1,
-    }
-    row.update(overrides)
-    return row
+def test_elder_ref_rejects_path_escape_and_ambiguous_names(tmp_path):
+    for value in ("../escape", "", "has space", "/absolute"):
+        with pytest.raises(ValueError):
+            LongitudinalStore(value, root=tmp_path)
 
 
-def test_elder_ref_validation():
-    with pytest.raises(ValueError):
-        LongitudinalStore("../escape")
-    with pytest.raises(ValueError):
-        LongitudinalStore("")
-    with pytest.raises(ValueError):
-        LongitudinalStore("has space")
-
-
-def test_store_creates_schema_and_owner_only_permissions(tmp_path):
+def test_final_store_schema_and_permissions_are_owner_only(tmp_path):
     with LongitudinalStore("elder_a", root=tmp_path) as store:
         tables = {
             row[0]
@@ -53,52 +22,50 @@ def test_store_creates_schema_and_owner_only_permissions(tmp_path):
             )
         }
         assert {
-            "meta",
-            "ingest_ledger",
-            "observations",
-            "episodes",
-            "baselines",
-            "deviation_candidates",
+            "analysis_ledger",
+            "edge_segment_audits",
+            "daily_features",
+            "domain_candidates",
+            "domain_assessments",
+            "candidate_reviews",
+            "wellbeing_checkins",
         } <= tables
-        dir_mode = stat.S_IMODE(store.elder_dir.stat().st_mode)
-        db_mode = stat.S_IMODE(store.db_path.stat().st_mode)
-        assert dir_mode == 0o700
-        assert db_mode == 0o600
+        assert stat.S_IMODE(store.elder_dir.stat().st_mode) == 0o700
+        assert stat.S_IMODE(store.db_path.stat().st_mode) == 0o600
 
 
-def test_ingest_ledger_makes_reingest_idempotent(tmp_path):
+def test_analysis_ledger_retries_are_idempotent_by_media_digest(tmp_path):
     with LongitudinalStore("elder_a", root=tmp_path) as store:
-        assert store.already_ingested("b" * 64) is None
-        store.record_ingest(
-            report_digest="b" * 64,
-            ingested_at="2026-08-01T00:00:00+00:00",
-            report_kind="indicator_extraction",
-            run_id="run-1",
-            observation_count=2,
-            episode_count=0,
+        common = {
+            "media_digest": "a" * 64,
+            "report_digest": "b" * 64,
+            "run_id": "edge-1",
+            "device_ref": "target",
+            "captured_start_at": "2026-08-30T00:00:00+00:00",
+            "captured_end_at": "2026-08-30T00:01:00+00:00",
+        }
+        store.record_analysis_attempt(
+            **common,
+            attempted_at="2026-08-30T00:01:01+00:00",
+            status="failed",
+            error="speech_model_failed",
         )
-        assert store.already_ingested("b" * 64) == "indicator_extraction"
-        with pytest.raises(sqlite3.IntegrityError):
-            store.record_ingest(
-                report_digest="b" * 64,
-                ingested_at="2026-08-01T00:00:01+00:00",
-                report_kind="indicator_extraction",
-                run_id="run-1",
-                observation_count=2,
-                episode_count=0,
-            )
+        store.record_analysis_attempt(
+            **common,
+            attempted_at="2026-08-30T00:02:01+00:00",
+            status="completed",
+            pose_quality_seconds=10,
+            audio_valid_seconds=12,
+        )
+        row = store._connection.execute(
+            "SELECT * FROM analysis_ledger WHERE media_digest = ?", ("a" * 64,)
+        ).fetchone()
+        assert row["attempts"] == 2
+        assert row["status"] == "completed"
+        assert store.analysis_status("a" * 64) == "completed"
 
 
-def test_observation_insert_is_row_idempotent(tmp_path):
-    with LongitudinalStore("elder_a", root=tmp_path) as store:
-        first = store.insert_observations([_observation_row()])
-        second = store.insert_observations([_observation_row()])
-        assert first == 1
-        assert second == 0
-        assert store.counts()["observations"] == 1
-
-
-def test_delete_elder_removes_only_that_elder(tmp_path):
+def test_delete_elder_removes_only_the_confirmed_person(tmp_path):
     with LongitudinalStore("elder_a", root=tmp_path):
         pass
     with LongitudinalStore("elder_b", root=tmp_path):

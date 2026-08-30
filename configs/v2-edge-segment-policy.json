@@ -1,0 +1,31 @@
+{
+  "revision": "v2-edge-segment-policy-r1",
+  "segment_duration_seconds": 60,
+  "minimum_segment_seconds": 50,
+  "video_sample_fps": 5.0,
+  "video_buffer_width_px": 640,
+  "jpeg_quality": 75,
+  "motion_thumbnail_width_px": 160,
+  "motion_min_score": 0.025,
+  "motion_mad_multiplier": 4.0,
+  "motion_pre_seconds": 3.0,
+  "motion_post_seconds": 7.0,
+  "baseline_interval_seconds": 10.0,
+  "maximum_selected_video_ratio": 0.5,
+  "audio_sample_rate_hz": 16000,
+  "audio_gate_window_ms": 500,
+  "audio_min_rms": 0.004,
+  "audio_noise_multiplier": 2.5,
+  "audio_activity_override_rms": 0.02,
+  "audio_pad_seconds": 1.0,
+  "audio_merge_gap_seconds": 0.75,
+  "maximum_asr_window_seconds": 15.0,
+  "maximum_selected_audio_ratio": 0.5,
+  "limitations": [
+    "pilot_unvalidated_lightweight_gate",
+    "quiet_or_occluded_events_can_be_missed_by_motion_and_energy_gating",
+    "only_model_selected_coverage_contributes_to_zero_score_gates",
+    "cloud_recording_is_the_raw_evidence_source",
+    "no_raw_video_or_audio_is_persisted_locally"
+  ]
+}

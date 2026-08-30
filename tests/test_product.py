@@ -5,7 +5,7 @@ import threading
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http.server import ThreadingHTTPServer
 
 import pytest
@@ -78,6 +78,8 @@ def test_dashboard_is_submission_ready_and_self_contained():
     assert "/api/dashboard" in rendered
     assert "Promise.all" not in rendered
     assert "近期提醒" in rendered
+    assert "播放异常片段" in rendered
+    assert "云端事件回看" in rendered
     assert "pilot_unvalidated" not in rendered
     assert "global_score" not in rendered
     assert "KangShield" not in rendered
@@ -104,7 +106,6 @@ def test_dashboard_aggregate_uses_one_store_connection(tmp_path, monkeypatch):
         elder_ref="elder_a",
         device_ref="target-camera-secret",
         store_root=store_root,
-        runs_dir=tmp_path / "runs",
     )
     real_store = LongitudinalStore
     opened = []
@@ -140,7 +141,6 @@ def test_demo_seed_requires_demo_refs_and_populates_all_domains(tmp_path):
         elder_ref="demo-elder",
         device_ref="demo-device",
         store_root=tmp_path,
-        runs_dir=tmp_path / "runs",
     )
     snapshot = runtime.snapshot()
     scores = {item.domain.value: item.score for item in snapshot.assessments}
@@ -166,7 +166,6 @@ def test_review_api_requires_json_same_origin_and_csrf(tmp_path):
         elder_ref="elder_a",
         device_ref="target-camera-secret",
         store_root=tmp_path / "store",
-        runs_dir=tmp_path / "runs",
     )
     placeholder = type("Placeholder", (), {})
     server = ThreadingHTTPServer(("127.0.0.1", 0), placeholder)
@@ -192,7 +191,9 @@ def test_review_api_requires_json_same_origin_and_csrf(tmp_path):
             "trends",
             "profile",
             "wellbeing_checkin",
+            "monitor",
         }
+        assert dashboard["monitor"]["raw_media_persisted"] is False
         with urllib.request.urlopen(origin + "/docs") as response:
             docs_page = response.read().decode("utf-8")
             assert "frame-ancestors 'none'" in response.headers["Content-Security-Policy"]
@@ -311,7 +312,6 @@ def test_concurrent_reviews_remain_auditable(tmp_path):
         elder_ref="elder_a",
         device_ref="target-camera-secret",
         store_root=tmp_path / "store",
-        runs_dir=tmp_path / "runs",
     )
 
     def decide(value):
@@ -331,6 +331,137 @@ def test_concurrent_reviews_remain_auditable(tmp_path):
         reviews = store.fetch_candidate_reviews("fall-1")
         assert {row["decision"] for row in reviews} == {"confirmed", "rejected"}
         assert len(reviews) == 2
+
+
+def test_candidate_cloud_playback_is_on_demand_and_not_persisted(tmp_path):
+    store_root = tmp_path / "store"
+    started = datetime(2026, 8, 30, 0, 0, tzinfo=timezone.utc)
+    occurred = started + timedelta(seconds=30)
+    with LongitudinalStore("elder_a", root=store_root) as store:
+        store.record_edge_segment(
+            {
+                "segment_id": "edge-1",
+                "device_ref": "target",
+                "segment_started_at": started.isoformat(),
+                "segment_ended_at": (started + timedelta(seconds=60)).isoformat(),
+                "status": "completed",
+                "failure_code": None,
+                "cloud_recording_ref": "cloud-recording:opaque",
+                "selector_revision": "r1",
+                "selector_digest": "a" * 64,
+                "raw_media_persisted": 0,
+                "endpoint_value_persisted": 0,
+                "screened_video_seconds": 60,
+                "screened_audio_seconds": 60,
+                "selected_pose_seconds": 5,
+                "selected_asr_seconds": 5,
+                "screened_frame_count": 300,
+                "selected_frame_count": 25,
+                "candidate_count": 1,
+                "key_windows_json": "[]",
+                "limitations_json": "[]",
+                "created_at": started.isoformat(),
+            }
+        )
+        store.upsert_domain_candidate(
+            {
+                "candidate_id": "event-1",
+                "device_ref": "target",
+                "domain": "fraud",
+                "category": "fraud_language",
+                "occurred_at": occurred.isoformat(),
+                "evidence_refs_json": json.dumps(["edge:edge-1"]),
+                "evidence_summary_json": "[]",
+                "created_at": occurred.isoformat(),
+                "updated_at": occurred.isoformat(),
+                "payload_json": json.dumps({"segment_id": "edge-1"}),
+            }
+        )
+    calls = []
+
+    def playback(start, end):
+        calls.append((start, end))
+        return "https://open.ys7.com/event/private-signed.m3u8"
+
+    runtime = ProductRuntime(
+        elder_ref="elder_a",
+        device_ref="target",
+        store_root=store_root,
+        playback_provider=playback,
+    )
+
+    assert runtime.candidates()[0]["playback_available"] is True
+    payload = runtime.cloud_playback("event-1")
+    assert payload["locally_persisted"] is False
+    assert payload["url"].endswith("private-signed.m3u8")
+    assert calls == [
+        (
+            occurred - timedelta(seconds=10),
+            occurred + timedelta(seconds=20),
+        )
+    ]
+    serialized = (store_root / "elder_a" / "longitudinal.sqlite").read_bytes()
+    assert b"private-signed.m3u8" not in serialized
+
+    placeholder = type("Placeholder", (), {})
+    server = ThreadingHTTPServer(("127.0.0.1", 0), placeholder)
+    port = server.server_port
+    server.server_close()
+    origin = f"http://127.0.0.1:{port}"
+    handler = make_product_handler(runtime, host="127.0.0.1", port=port)
+    server = ThreadingHTTPServer(("127.0.0.1", port), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        missing_csrf = urllib.request.Request(
+            origin + "/api/candidates/event-1/playback",
+            data=b"{}",
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as caught:
+            urllib.request.urlopen(missing_csrf)
+        assert caught.value.code == 403
+
+        request = urllib.request.Request(
+            origin + "/api/candidates/event-1/playback",
+            data=b"{}",
+            headers={
+                "Content-Type": "application/json",
+                "Origin": origin,
+                "X-CSRF-Token": runtime.csrf_token,
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(request) as response:
+            over_http = json.load(response)
+            assert response.headers["Cache-Control"] == "no-store"
+        assert over_http["url"].endswith("private-signed.m3u8")
+        assert over_http["locally_persisted"] is False
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_continuous_runtime_does_not_block_on_missing_stream_endpoint(
+    tmp_path, monkeypatch
+):
+    monkeypatch.delenv("KANG_TEST_MISSING_ENDPOINT", raising=False)
+
+    runtime = ProductRuntime(
+        elder_ref="elder_a",
+        device_ref="target",
+        store_root=tmp_path / "store",
+        continuous=True,
+        edge_provider="endpoint_env",
+        edge_endpoint_env="KANG_TEST_MISSING_ENDPOINT",
+        cloud_playback_provider="none",
+    )
+
+    assert runtime.edge_monitor is not None
+    assert runtime.last_edge_segment == {"status": "not_started"}
+    runtime.stop()
 
 
 def test_public_export_is_redacted_and_owner_export_keeps_audit(tmp_path):

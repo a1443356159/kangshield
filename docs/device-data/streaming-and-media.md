@@ -1,130 +1,77 @@
-# C6c 取流、媒体时间基与长稳
+# 连续取流、分段审计与云端回看
 
-状态：Active consolidated guide v1.0
-更新时间：2026-08-09
+状态：产品运行说明 v0.5
+更新时间：2026-08-30
 
-本文合并有界取流、重复开流、故障矩阵、流会话和媒体时间基文档。特定历史运行结果仍保留在[证据索引](../evidence/README.md)。
+## 1. 媒体原则
 
-## 1. 能回答什么
+- 正式产品连续处理直播流，不再按两小时落盘采集。
+- 原始录像由摄像头云服务管理；本机不创建视频、音频或异常切片文件。
+- 每 60 秒形成一个逻辑审计段，视频帧、PCM 和关键窗口只存在于进程内存。
+- 候选出现也不会触发本地媒体留存；SQLite 只保存事件时间、派生证据和无媒体审计。
+- 临时直播地址、回放地址、token、应用密钥和设备序列号不得进入日志、SQLite 或报告。
 
-- `capture-stream`：一次真实来源能否生成独立、可解码、owner-only 的同容器音视频 artifact；
-- `qualify-stream`：多个独立连接是否全部 ready，轨道签名是否一致；
-- `probe-media`：video/audio track、codec、time base、PTS/DTS、包覆盖和扫描截断；
-- `run-stream-session`：多个独立 segment 的 gap、失败 streak、外部重开和 wall/media 双门；
-- `exercise-stream-faults/recovery`：E1 环境中的 stall、截断、503、reset 和 supervisor 状态机。
+## 2. 轻量关键窗口
 
-这些工具不证明平台级接入、同连接自动重连、packet-loss 容忍、物理声画同步、漂移或长期稳定；每项声明必须由对应真机证据单独打开。
+`configs/v2-edge-segment-policy.json` 固定首版选择策略：
 
-## 2. 隐私和共同规则
+- 视频以 5 fps、最大宽度 640 px 的内存 JPEG 缓冲，使用缩略灰度帧差、median/MAD 和最小运动阈值选取窗口；每 10 秒保留一个个人基线帧。
+- 音频在内存中转换为 16 kHz mono PCM，以 500 ms RMS、噪声底和活动阈值选择可能有人声的窗口。
+- 视频和音频各最多选择原段的 50%，单个 ASR 窗口最长 15 秒。
+- 轻量门只节省计算，不输出风险；未进入姿态或 ASR 的时间不能支持“无异常”的 0 分。
 
-- endpoint 只经环境变量读取；不得写入命令行、配置、日志、文档或聊天。
-- 原始媒体与 runs 目录 owner-only，raw/目录权限分别保持 `0600/0700`。
-- 每次连接生成独立 artifact，不在一个文件中静默拼接断点或修改时间轴。
-- 默认要求一条视频轨和一条音频轨；只有纯视频指标才可显式 `--allow-video-only`。
-- 失败只持久化固定错误码，不保存底层异常正文、URL、token、序列号或容器 metadata 值。
+采集线程持续产生内存段，单工作线程复用模型。队列背压、断流、轨道错误、时间戳错误和模型失败都会写固定状态，不会被静默跳过。
 
-安全输入 endpoint：
+## 3. 云端异常片段播放
 
-```bash
-read -rsp 'Stream endpoint: ' KANG_STREAM_ENDPOINT
-printf '\n'
-export KANG_STREAM_ENDPOINT
-```
+事件候选保存所属审计段和精确事件时间，不保存媒体 URL。照护者点击“播放异常片段”时：
 
-结束后立即执行：
+1. POST 请求通过 localhost、同源、CSRF 和 JSON 校验；
+2. 后端确认候选属于当前目标设备，并把播放范围限制在审计段内的事件前 10 秒至后 20 秒；
+3. 后端临时向萤石开放平台换取 HTTPS HLS 云回放地址；
+4. 浏览器在弹窗中播放同一云端片段的画面和声音；
+5. 关闭弹窗后立即移除页面中的 URL，后端不缓存或持久化该地址。
 
-```bash
-unset KANG_STREAM_ENDPOINT
-```
+若浏览器不能原生播放返回的 HLS 格式，页面提供“在新窗口打开云端片段”的降级入口。萤石官方另有跨浏览器 HLS SDK，但其许可证和自托管资源尚未通过本项目发布门，因此当前不捆绑。云录像套餐、设备在线状态、账户权限和云端留存周期都会影响回看是否可用，但不影响既有派生审计和人工复核。
 
-## 2.1 开放平台取地址与已知设备差异
+public 导出不包含播放能力、云端引用、candidate 或精确事件时间。删除本机个人数据不会删除云录像；两处需分别管理。
 
-直播地址每次会话现取（有过期时间）。`scripts/ezviz_live_endpoint.py` 从 `YS7_APP_KEY`/`YS7_APP_SECRET` 环境变量换 token 并打印 `protocol=4, quality=1, supportH265=1` 的 FLV 地址到 stdout，密钥与地址均不落盘：
+## 4. 启动
 
-```bash
-export KANG_STREAM_ENDPOINT="$(
-  .venv/bin/python scripts/ezviz_live_endpoint.py <deviceSerial>
-)"
-```
-
-- 云端流未建立时拉流返回 404：先 `curl -r 0-1023` 预热一次（或在平台 App 看一眼画面）再 `capture-stream`。
-- 揭榜挂帅/资源包设备需先按设备绑定激活码（`mall/device/package/code/active`，每设备一个码），否则地址可生成但拉流 404。
-- 音频 codec 随设备而异：C6c 为 AAC 16 kHz；HK-Q1S4M 为 pcm_alaw 8 kHz，Matroska 无法直拷，取流时透明转码为 pcm_s16le 并在报告挂 `audio_track_transcoded_to_pcm_s16le`（契约字段 `output_codec_name` 记录落盘 codec）。
-
-## 2.2 定时自动采集
-
-`scripts/scheduled_capture.sh` 由系统 crontab 驱动（当前 `23 */2 * * *`）：每台设备取新地址、curl 预热、`capture-stream` 60 秒（内置 probe 质检），每台设备写一行无值状态到 `logs/scheduled_capture/status.jsonl`（ready、包数、音频 RMS——RMS 用于当场发现无声/异常录制）；凭证和设备列表均从 `secrets/ys7.env`（0600，gitignored）读取，设备列表格式为 `KANG_CAPTURE_DEVICES='serial:pseudonymous_ref ...'`，真实序列号不得写入脚本或文档；14 天前的 `stream-capture.mkv` 自动清理。冒烟用 `DURATION_S=10 bash scripts/scheduled_capture.sh`。调整节奏或停用用 `crontab -e`。
-
-## 3. 短取流与资格门
+`secrets/ys7.env` 必须为 Git ignored 的私密文件，建议权限 `0600`：
 
 ```bash
-kangshield-info capture-stream \
-  --evidence-level E2 \
-  --source-type network_stream \
-  --device-ref c6c_demo_01 \
-  --duration-s 30 \
-  --minimum-duration-s 20 \
-  --transport tcp \
-  --require-ready
-
-kangshield-info qualify-stream \
-  --evidence-level E2 \
-  --source-type network_stream \
-  --device-ref c6c_demo_01 \
-  --attempt-count 3 \
-  --duration-s 10 \
-  --minimum-duration-s 8 \
-  --transport tcp \
-  --require-ready
+YS7_APP_KEY=...
+YS7_APP_SECRET=...
+KANG_DEVICE_SERIAL=...
+KANG_ELDER_REF=elder_pseudonym
+KANG_DEVICE_REF=c6c_target
 ```
 
-资格门要求所有尝试 ready，视频/音频 packet 与 PTS 可审计，输出 artifact 可解码，轨道类型、codec、宽高/fps、采样率/声道/time base 签名一致。一次或三次成功仍只属于短 E2，不等于长稳。
-
-## 4. 媒体时间基
-
-`probe-media --require-audio-track` 检查：
-
-- container start/duration 与 video/audio stream 数；
-- 每轨 codec、time base、声明 start/duration、packet 和 PTS/DTS 完整性；
-- 首尾 PTS、负值、后退、跨度、相邻步长和扫描截断；
-- `audio_minus_video_start_ms`、`audio_minus_video_end_ms` 与 duration delta。
-
-容器首尾偏移不能替代物理同步或 drift。真实语音 clip 应在开始和结束附近各录一次可见/可听拍手或击板；只有两个事件的音频峰值与画面变化都可定位时，才可计算起始 offset 和随时间变化。
-
-多轨、缺 PTS、扫描截断、断流或重连进入 Review。B-frame 可能导致合法的 demux PTS/DTS 重排，不能只凭一次后退计数判错。
-
-## 5. 长稳会话
+完整产品：
 
 ```bash
-kangshield-info run-stream-session \
-  --evidence-level E2 \
-  --source-type network_stream \
-  --device-ref c6c_demo_01 \
-  --segment-count 31 \
-  --duration-s 60 \
-  --minimum-duration-s 50 \
-  --minimum-session-wall-s 1800 \
-  --minimum-ready-media-s 1800 \
-  --failure-backoff-s 2 \
-  --transport tcp \
-  --require-ready
+scripts/run_product.sh
 ```
 
-`minimum-session-wall-s` 和 `minimum-ready-media-s` 是独立验收条件，不是自动延长器。只有全部 segment ready、轨道签名一致，且 wall 与 ready media 均达到声明门，才能声明 segmented long-running stability。stall、gap、backoff 和 failed segment 不贡献有效媒体时长。
+或直接运行：
 
-## 6. 受控故障
+```bash
+kangshield-info serve-product \
+  --elder-ref "$KANG_ELDER_REF" \
+  --device-ref "$KANG_DEVICE_REF" \
+  --host 127.0.0.1 \
+  --port 8765 \
+  --continuous \
+  --edge-provider ezviz
+```
 
-E1 固定覆盖完整响应、分块延迟、HTTP 503、首包/部分 body stall、截断和 TCP reset。工具门要求实际注入场景与预期状态/时限一致、partial 清理完成、报告无敏感信息。
+仅分析、不启动看板时使用 `run-edge-monitor`。两种连续入口不能对同一设备同时运行。
 
-受控恢复只证明 supervisor 能记录 `ready -> failed -> ready` 的三个独立 segment；不证明 RTSP 同连接 reconnect、packet loss/jitter 或目标设备容忍。真实升级顺序为短取流、三次资格、场景采集、双同步事件、31 × 60 秒长稳，最后才是非自愿网络故障试验。
+## 5. 验收重点
 
-## 7. 失败与退出语义
-
-- `--require-ready` 在报告完整但 gate 未通过时返回 2；非预期内部错误才是 run failed。
-- 常见固定原因包括 open/remux/output verification 失败、required audio missing、轨道布局错误、packet/PTS/关键帧缺失、时长不足和扫描截断。
-- `captured_not_ready` 可以保留完整 artifact 供诊断，但不得贡献 readiness；failed segment 不得引用 raw artifact。
-- 任何失败都不得通过手工改时间轴、覆盖原文件或删除失败记录变成成功证据。
-
-## 8. 当前事实
-
-C6c 已有 HEVC 2560×1440@15fps + AAC 16 kHz mono 短 E2，以及 3/3 独立开流一致性。真实夜视/远距/遮挡/多人、物理同步/漂移、31 × 60 秒长稳、非自愿断流和 packet loss 仍需补证据。
+- 真实目标设备的分段间隙、时间引用和云回放范围一致；
+- 轻量门对跌倒、低运动异常和远场语音的召回不因节省计算而不可接受；
+- 模型处理速度长期跟得上采集速度，背压率在 owner 批准范围内；
+- 本机目录、SQLite、日志和导出中不存在媒体文件、endpoint、token 或临时回放 URL；
+- 模型不可用时三域降级明确，Web 服务仍可访问。

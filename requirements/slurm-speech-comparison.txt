@@ -1,2 +1,0 @@
--r slurm-models.txt
-openai-whisper==20250625

@@ -4,18 +4,17 @@ from __future__ import annotations
 
 import json
 import secrets
+import tempfile
 import threading
 from datetime import date, datetime, timedelta, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from statistics import median
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import urlsplit
 
-from .artifacts import atomic_write_json, atomic_write_text
 from .contracts import CandidateReviewDecision, WellbeingCheckinSubmission
-from .incremental_analysis import IncrementalAnalyzer
 from .longitudinal.store import DEFAULT_STORE_ROOT, LongitudinalStore
 from .multidomain import (
     DEFAULT_POLICY_PATH,
@@ -25,7 +24,7 @@ from .multidomain import (
 )
 from .product_ui import dashboard_html, documentation_html, offline_report_html
 
-PRODUCT_VERSION = "multidomain-product-v0.4.0"
+PRODUCT_VERSION = "multidomain-product-v0.5.0"
 WHO5_QUESTIONS = [
     "我感觉快乐、心情舒畅",
     "我感觉宁静和放松",
@@ -43,6 +42,20 @@ WHO5_OPTIONS = [
 ]
 
 
+def _atomic_write(path: Path, value: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        "w",
+        encoding="utf-8",
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        delete=False,
+    ) as stream:
+        stream.write(value)
+        temporary = Path(stream.name)
+    temporary.replace(path)
+
+
 class ProductRuntime:
     def __init__(
         self,
@@ -50,69 +63,101 @@ class ProductRuntime:
         elder_ref: str,
         device_ref: str,
         store_root: Path = DEFAULT_STORE_ROOT,
-        runs_dir: Path = Path("runs"),
         policy_path: Path = DEFAULT_POLICY_PATH,
-        scan_interval_seconds: int = 300,
+        continuous: bool = False,
+        edge_endpoint_env: str = "KANG_STREAM_ENDPOINT",
+        edge_provider: str = "endpoint_env",
+        edge_device_serial_env: str = "KANG_DEVICE_SERIAL",
+        edge_endpoint_refresh_seconds: float = 1800.0,
+        edge_policy_path: Path = Path("configs/v2-edge-segment-policy.json"),
+        edge_failure_backoff_s: float = 2.0,
+        cloud_playback_provider: str = "auto",
+        playback_provider: Callable[[datetime, datetime], str] | None = None,
     ) -> None:
         self.elder_ref = elder_ref
         self.device_ref = device_ref
         self.store_root = Path(store_root)
-        self.runs_dir = Path(runs_dir)
         self.policy_path = Path(policy_path)
-        self.scan_interval_seconds = max(1, int(scan_interval_seconds))
         self.csrf_token = secrets.token_urlsafe(32)
-        self.analyzer = IncrementalAnalyzer(
-            elder_ref=elder_ref,
-            device_ref=device_ref,
-            store_root=self.store_root,
-            runs_dir=self.runs_dir,
-            policy_path=self.policy_path,
-        )
         self.stop_event = threading.Event()
         self.mutation_lock = threading.RLock()
-        self.worker: threading.Thread | None = None
-        self.last_scan: dict[str, object] = {"status": "not_started"}
+        self.edge_worker: threading.Thread | None = None
+        self.last_edge_segment: dict[str, object] = {
+            "status": "disabled" if not continuous else "not_started"
+        }
+        self.edge_monitor: Any | None = None
+        if cloud_playback_provider not in {"auto", "none", "ezviz"}:
+            raise ValueError("cloud_playback_provider must be auto, none, or ezviz")
+        self.playback_provider = playback_provider
+        if continuous:
+            from .edge_monitor import (
+                EdgeMonitor,
+                endpoint_provider_from_environment,
+                ezviz_provider_from_environment,
+            )
+
+            if edge_provider not in {"endpoint_env", "ezviz"}:
+                raise ValueError("edge_provider must be endpoint_env or ezviz")
+            provider = (
+                ezviz_provider_from_environment(
+                    edge_device_serial_env,
+                    refresh_seconds=edge_endpoint_refresh_seconds,
+                )
+                if edge_provider == "ezviz"
+                else endpoint_provider_from_environment(edge_endpoint_env)
+            )
+            self.edge_monitor = EdgeMonitor(
+                elder_ref=elder_ref,
+                device_ref=device_ref,
+                endpoint_provider=provider,
+                store_root=self.store_root,
+                risk_policy_path=self.policy_path,
+                selection_policy_path=edge_policy_path,
+                failure_backoff_s=edge_failure_backoff_s,
+                stop_event=self.stop_event,
+            )
+        should_enable_ezviz_playback = cloud_playback_provider == "ezviz" or (
+            cloud_playback_provider == "auto"
+            and continuous
+            and edge_provider == "ezviz"
+        )
+        if self.playback_provider is None and should_enable_ezviz_playback:
+            from .ezviz_live import playback_provider_from_environment
+
+            self.playback_provider = playback_provider_from_environment(
+                edge_device_serial_env
+            )
 
     def start(self) -> None:
-        if self.worker is not None:
+        if self.edge_worker is not None or self.edge_monitor is None:
             return
-        self.worker = threading.Thread(
-            target=self._scan_loop, name="kangshield-product-analysis", daemon=True
+        self.edge_worker = threading.Thread(
+            target=self._edge_loop,
+            name="kangshield-edge-monitor",
+            daemon=True,
         )
-        self.worker.start()
+        self.edge_worker.start()
 
     def stop(self) -> None:
         self.stop_event.set()
-        if self.worker is not None:
-            self.worker.join(timeout=5)
+        if self.edge_worker is not None:
+            self.edge_worker.join(timeout=5)
 
-    def _scan_loop(self) -> None:
-        while not self.stop_event.is_set():
-            try:
-                counts = self.analyzer.scan_once()
-                if counts.get("completed"):
-                    with LongitudinalStore(
-                        self.elder_ref, root=self.store_root
-                    ) as store:
-                        build_snapshot(
-                            store,
-                            device_ref=self.device_ref,
-                            policy_path=self.policy_path,
-                            persist=True,
-                        )
-            except Exception as error:
-                self.last_scan = {
-                    "status": "failed",
-                    "error": type(error).__name__,
-                    "at": datetime.now(timezone.utc).isoformat(),
-                }
-            else:
-                self.last_scan = {
-                    "status": "completed",
-                    "counts": counts,
-                    "at": datetime.now(timezone.utc).isoformat(),
-                }
-            self.stop_event.wait(self.scan_interval_seconds)
+    def _edge_loop(self) -> None:
+        assert self.edge_monitor is not None
+        self.edge_monitor.run(on_audit=self._observe_edge_audit)
+
+    def _observe_edge_audit(self, audit: Any) -> None:
+        self.last_edge_segment = {
+            "status": audit.status,
+            "failure_code": audit.failure_code,
+            "segment_ended_at": audit.segment_ended_at.isoformat(),
+            "screened_video_seconds": audit.screened_video_seconds,
+            "screened_audio_seconds": audit.screened_audio_seconds,
+            "selected_pose_seconds": audit.selected_pose_seconds,
+            "selected_asr_seconds": audit.selected_asr_seconds,
+            "raw_media_persisted": False,
+        }
 
     def snapshot(self):
         with LongitudinalStore(self.elder_ref, root=self.store_root) as store:
@@ -142,9 +187,64 @@ class ProductRuntime:
             transcript_excerpt = payload.get("transcript_excerpt")
             if isinstance(transcript_excerpt, str) and transcript_excerpt.strip():
                 item["transcript_excerpt"] = transcript_excerpt.strip()[:120]
+            item["playback_available"] = bool(
+                self.playback_provider is not None and payload.get("segment_id")
+            )
             item["reviews"] = reviews_by_candidate.get(candidate_id, [])
             result.append(item)
         return result
+
+    def cloud_playback(self, candidate_id: str) -> dict[str, object]:
+        """Resolve a short event window to an ephemeral cloud URL on owner request."""
+
+        if self.playback_provider is None:
+            raise LookupError("cloud playback is not configured")
+        with LongitudinalStore(self.elder_ref, root=self.store_root) as store:
+            candidate = store.fetch_domain_candidate(candidate_id)
+            if candidate is None or candidate["device_ref"] != self.device_ref:
+                raise KeyError(candidate_id)
+            payload = json.loads(candidate["payload_json"])
+            segment_id = payload.get("segment_id")
+            if not isinstance(segment_id, str) or not segment_id:
+                raise LookupError("candidate has no cloud segment")
+            segment = store.fetch_edge_segment(segment_id)
+            if segment is None or segment["device_ref"] != self.device_ref:
+                raise LookupError("candidate cloud segment is unavailable")
+            occurred_at = datetime.fromisoformat(str(candidate["occurred_at"]))
+            segment_start = datetime.fromisoformat(str(segment["segment_started_at"]))
+            segment_end = datetime.fromisoformat(str(segment["segment_ended_at"]))
+        if any(
+            value.tzinfo is None
+            for value in (occurred_at, segment_start, segment_end)
+        ):
+            raise LookupError("candidate cloud timing is invalid")
+        if not segment_start <= occurred_at <= segment_end:
+            raise LookupError("candidate falls outside its audited cloud segment")
+        started_at = max(segment_start, occurred_at - timedelta(seconds=10))
+        ended_at = min(segment_end, occurred_at + timedelta(seconds=20))
+        if ended_at <= started_at:
+            raise LookupError("candidate cloud window is unavailable")
+        try:
+            url = self.playback_provider(started_at, ended_at)
+        except Exception as error:
+            raise LookupError("cloud playback provider is unavailable") from error
+        parsed = urlsplit(url) if isinstance(url, str) else None
+        if (
+            parsed is None
+            or parsed.scheme != "https"
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+        ):
+            raise LookupError("cloud playback provider returned an invalid URL")
+        return {
+            "candidate_id": candidate_id,
+            "started_at": started_at.isoformat(),
+            "ended_at": ended_at.isoformat(),
+            "url": url,
+            "ephemeral": True,
+            "locally_persisted": False,
+        }
 
     def trends(self) -> list[dict[str, object]]:
         with LongitudinalStore(self.elder_ref, root=self.store_root) as store:
@@ -227,7 +327,12 @@ class ProductRuntime:
         for feature in spec["features"]:
             if feature == "sleep_regularity" and not bool(current["sleep_confirmed"]):
                 features.append(
-                    {"key": feature, "label": feature_labels[feature], "state": "unavailable", "direction": "unknown"}
+                    {
+                        "key": feature,
+                        "label": feature_labels[feature],
+                        "state": "unavailable",
+                        "direction": "unknown",
+                    }
                 )
                 continue
             values = [
@@ -242,7 +347,13 @@ class ProductRuntime:
             else:
                 severe = f"{feature}:severe_personal_baseline_change" in evidence
                 mild = f"{feature}:mild_personal_baseline_change" in evidence
-                state = "significant_change" if severe else "slight_change" if mild else "stable"
+                state = (
+                    "significant_change"
+                    if severe
+                    else "slight_change"
+                    if mild
+                    else "stable"
+                )
                 center = median(values)
                 direction = (
                     "higher"
@@ -252,7 +363,12 @@ class ProductRuntime:
                     else "stable"
                 )
             features.append(
-                {"key": feature, "label": feature_labels[feature], "state": state, "direction": direction}
+                {
+                    "key": feature,
+                    "label": feature_labels[feature],
+                    "state": state,
+                    "direction": direction,
+                }
             )
         return {
             "ready": ready,
@@ -352,6 +468,18 @@ class ProductRuntime:
                 "wellbeing_checkin": self._wellbeing_checkin_from_store(
                     store, policy, now_utc.astimezone()
                 ),
+                "monitor": {
+                    "mode": (
+                        "continuous_in_memory"
+                        if self.edge_monitor is not None
+                        else "database_only"
+                    ),
+                    "last_segment": self.last_edge_segment,
+                    "raw_media_persisted": False,
+                    "cloud_recording_is_source_of_truth": (
+                        self.edge_monitor is not None
+                    ),
+                },
             }
 
     def save_wellbeing_checkin(
@@ -427,7 +555,7 @@ def make_product_handler(runtime: ProductRuntime, *, host: str, port: int):
     expected_origin = f"http://{host}:{port}"
 
     class ProductHandler(BaseHTTPRequestHandler):
-        server_version = "KangShieldLocal/0.4"
+        server_version = "KangShieldLocal/0.5"
 
         def log_message(self, format: str, *args: object) -> None:
             return None
@@ -445,7 +573,7 @@ def make_product_handler(runtime: ProductRuntime, *, host: str, port: int):
                         "product_version": PRODUCT_VERSION,
                         "local_only": True,
                         "global_score": None,
-                        "last_scan": runtime.last_scan,
+                        "last_edge_segment": runtime.last_edge_segment,
                     }
                 )
             elif path == "/api/dashboard":
@@ -472,7 +600,12 @@ def make_product_handler(runtime: ProductRuntime, *, host: str, port: int):
                 and parts[3] == "review"
             )
             is_checkin = path == "/api/wellbeing-checkin"
-            if not is_review and not is_checkin:
+            is_playback = (
+                len(parts) == 4
+                and parts[:2] == ["api", "candidates"]
+                and parts[3] == "playback"
+            )
+            if not is_review and not is_checkin and not is_playback:
                 self.send_error(HTTPStatus.NOT_FOUND)
                 return
             if not self._authorize_json_mutation(expected_origin, runtime.csrf_token):
@@ -483,11 +616,16 @@ def make_product_handler(runtime: ProductRuntime, *, host: str, port: int):
                     payload["candidate_id"] = parts[2]
                     decision = CandidateReviewDecision.model_validate(payload)
                     result = {"snapshot": runtime.review(decision)}
+                elif is_playback:
+                    result = runtime.cloud_playback(parts[2])
                 else:
                     submission = WellbeingCheckinSubmission.model_validate(payload)
                     result = runtime.save_wellbeing_checkin(submission)
             except KeyError:
                 self.send_error(HTTPStatus.NOT_FOUND)
+                return
+            except LookupError:
+                self.send_error(HTTPStatus.SERVICE_UNAVAILABLE)
                 return
             except Exception:
                 self.send_error(HTTPStatus.BAD_REQUEST)
@@ -578,6 +716,7 @@ def make_product_handler(runtime: ProductRuntime, *, host: str, port: int):
                 "Content-Security-Policy",
                 "default-src 'self'; script-src 'self' 'unsafe-inline';"
                 " style-src 'self' 'unsafe-inline'; connect-src 'self';"
+                " media-src https:;"
                 " frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
             )
             self.send_header("Content-Length", str(len(body)))
@@ -594,15 +733,23 @@ def serve_product(
     host: str = "127.0.0.1",
     port: int = 8765,
     store_root: Path = DEFAULT_STORE_ROOT,
-    runs_dir: Path = Path("runs"),
     policy_path: Path = DEFAULT_POLICY_PATH,
-    scan_interval_seconds: int = 300,
     demo: bool = False,
+    continuous: bool = False,
+    edge_endpoint_env: str = "KANG_STREAM_ENDPOINT",
+    edge_provider: str = "endpoint_env",
+    edge_device_serial_env: str = "KANG_DEVICE_SERIAL",
+    edge_endpoint_refresh_seconds: float = 1800.0,
+    edge_policy_path: Path = Path("configs/v2-edge-segment-policy.json"),
+    edge_failure_backoff_s: float = 2.0,
+    cloud_playback_provider: str = "auto",
 ) -> None:
     if host != "127.0.0.1":
         raise ValueError("serve-product only permits host 127.0.0.1")
     if not 1 <= port <= 65535:
         raise ValueError("port must be 1..65535")
+    if demo and continuous:
+        raise ValueError("demo mode cannot open a continuous live stream")
     if demo:
         from .product_demo import seed_product_demo
 
@@ -616,9 +763,15 @@ def serve_product(
         elder_ref=elder_ref,
         device_ref=device_ref,
         store_root=store_root,
-        runs_dir=runs_dir,
         policy_path=policy_path,
-        scan_interval_seconds=scan_interval_seconds,
+        continuous=continuous,
+        edge_endpoint_env=edge_endpoint_env,
+        edge_provider=edge_provider,
+        edge_device_serial_env=edge_device_serial_env,
+        edge_endpoint_refresh_seconds=edge_endpoint_refresh_seconds,
+        edge_policy_path=edge_policy_path,
+        edge_failure_backoff_s=edge_failure_backoff_s,
+        cloud_playback_provider=cloud_playback_provider,
     )
     server = ThreadingHTTPServer((host, port), make_product_handler(runtime, host=host, port=port))
     runtime.start()
@@ -683,8 +836,10 @@ def export_product_report(
     output.chmod(0o700)
     json_path = output / "report.json"
     html_path = output / "report.html"
-    atomic_write_json(json_path, payload)
-    atomic_write_text(html_path, _offline_report_html(payload))
+    _atomic_write(
+        json_path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    )
+    _atomic_write(html_path, _offline_report_html(payload))
     json_path.chmod(0o600)
     html_path.chmod(0o600)
     return html_path, json_path

@@ -20,7 +20,7 @@ def seed_product_demo(
     policy_path: Path = DEFAULT_POLICY_PATH,
     now: datetime | None = None,
 ) -> dict[str, int]:
-    """Seed an idempotent, wall-clock-relative demo without media or transcripts."""
+    """Seed an idempotent demo without raw media or real-person data."""
 
     if not elder_ref.startswith("demo-") or not device_ref.startswith("demo-"):
         raise ValueError("demo mode requires demo-* elder and device references")

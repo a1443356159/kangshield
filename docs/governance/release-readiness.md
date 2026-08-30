@@ -1,54 +1,50 @@
-# 发布与 Runtime 就绪门
+# 发布就绪门
 
-状态：Blocked pending D1 decisions
-更新时间：2026-08-09
-
-本文合并比赛包 distribution readiness 与 runtime closure。历史审计结果见[分发证据](../evidence/release/v1-r1-distribution-readiness.md)和[runtime 证据](../evidence/release/v1-r1-runtime-closure.md)。
+状态：本地展示可用，公开发布未通过
+更新时间：2026-08-30
 
 ## 当前阻断
 
-- 项目 LICENSE、源码分发方式和 `THIRD_PARTY_NOTICES.md` 未完成；
-- 最终姿态、VAD/ASR 模型和 checkpoint 携带/外部缓存方式未决定；
-- 最小 `core`、`speech` 和 `core+speech` runtime profile 未冻结；
-- competition dependency lock 和全新非 editable 环境未验证。
+- 仓库尚未包含 owner 批准的项目 LICENSE 和第三方 NOTICE。
+- 最终 Python 依赖锁与全新、非 editable 环境安装验证尚未冻结。
+- 姿态与语音模型权重不在 Git 中；来源、版本、SHA-256、许可证和携带方式尚未全部关闭。
+- Ultralytics 代码/模型适用 AGPL-3.0 或企业许可选择，必须由 owner 根据提交与分发方式决定。
+- 萤石当前提供 [`@ezuikit/player-hls`](https://www.npmjs.com/package/%40ezuikit/player-hls) 跨浏览器播放器，但其 npm 元数据未声明许可证，且需要自托管 JS/WASM/Worker；本提交不捆绑该 SDK，只使用浏览器原生 HLS 与新窗口降级。跨浏览器播放器在许可证关闭后再决定是否纳入。
+- WHO-5 当前按 CC BY-NC-SA 3.0 IGO、带署名用于本地非商业试点；若提交渠道涉及商业使用或重新许可，需单独复核。
+- 目标 C6c 的真实 held-out 三域校准、连续长稳、轻量门召回和云回看时间一致性未完成。
 
-## 新增待审模型资产（V1-G4 骨架同步）
+因此页面和报告必须继续显示“本地试点”与非诊断边界，不能宣传为公开发布或临床就绪。
 
-- PoseC3D SlowOnly-R50 NTU60-XSub checkpoint：实现 Apache-2.0，NTU RGB+D 训练数据仅研究用途，`configs/v1-g4-posec3d-model.json` 记为 `blocked_pending_review`，权重 sha256 待 prepare 时钉入；
-- RetinaFace-R50 / ArcFace IR-SE50：facexlib 分发，ArcFace 血缘 InsightFace 非商业限制，`configs/v1-g4-face-models.json` 记为 `blocked_pending_review`，权重 sha256 待钉入；
-- 人脸白名单库 `data/face/gallery.npz` 属敏感个人信息，不进 Git，需要最小权限、留存期限和删除机制；
-- 同步代码 `src/kangshield/information/prediction_sync/` 以 fall-detection 仓（commit `b263b3f`）为算法权威来源；2026-08-30 核查上游已到 `711e2c0`，共享算法存在漂移且仓库根目录仍无项目 LICENSE。再同步或分发前必须先完成逐文件差异与许可证 owner 决定，不能因公开可读而推定可复制。
-- WHO-5 题目与计分说明来源为世界卫生组织 2024 开放版本，许可为 CC BY-NC-SA 3.0 IGO；当前只用于带显式署名的本地非商业试点。若提交渠道允许商业使用或重新许可，必须先单独关闭该内容资产的许可证门。
+## Runtime 冻结要求
 
-## Runtime 必须冻结
+1. 记录 OS、架构、Python、GPU、CUDA/cuDNN 和浏览器范围。
+2. 冻结 PyAV、OpenCV、NumPy、Torch、Ultralytics、FunASR 与 Pydantic 的完整依赖闭包。
+3. 对每个模型记录任务、来源、版本、权重 SHA-256、许可证、设备和推理配置。
+4. 在全新环境安装非 editable 包，离线或受控缓存加载模型，并运行完整测试。
+5. 连续运行验证内存上界、模型实时系数、段间隙、失败恢复和背压率。
 
-- OS、架构、Python、GPU、CUDA/cuDNN；
-- 姿态 backend、视频/音频解码、数值与睡眠依赖；
-- FunASR/SenseVoice 采用决定、模型摘要和来源；
-- 每个直接/传递依赖版本、extras、来源和许可证 metadata；
-- 模型获取、摘要校验、离线缓存和安装方式。
+## 隐私与安全门
 
-最终演示使用 `core+speech`。speech 失败时允许 core 明确降级，但不能宣称语音能力已验收。
+- 服务只监听 `127.0.0.1`，不存在公网隧道或反向代理默认配置。
+- SQLite、日志、导出和 Git 历史中不存在应用密钥、token、真实设备序列号、直播 URL、临时回放 URL或原始媒体。
+- 候选回放只能通过 owner 点击、精确同源、CSRF 和 JSON POST 触发；播放范围受所属审计段约束。
+- public HTML+JSON 自动扫描身份、设备、转写、备注、路径、精确事件时间、问卷答案和播放字段。
+- 单老人删除只接受精确重复确认；云录像删除由云账户另行执行。
 
-## Runtime 八门
+## 功能门
 
-1. target environment 匹配；
-2. repository source 完整；
-3. direct requirements 匹配；
-4. dependency closure 完整；
-5. prohibited closure 为零；
-6. installation provenance 可复核；
-7. 非 editable、无 `PYTHONPATH` 的隔离运行；
-8. license metadata 完整。
+- 契约强制恰好三个域、分数仅 `0–3/null`、null 有原因、策略摘要必填且全局分固定 null。
+- 三域所有等级、覆盖不足、hard negative、共现窗口、数据过期和问卷合并规则有测试。
+- 分段幂等、失败降级、复核持久化、并发复核、schema v1→v4 和完整个人删除有测试。
+- localhost、API schema、CSRF、XSS 安全写入、路径穿越、云回放按需解析和 public 脱敏有测试。
+- owner/public 离线报告在断网浏览器中可打开。
 
-共享开发环境或历史候选 profile 不能生成最终 lock 或发布声明。
+## 发布验收命令
 
-## 分发五门
+```bash
+make test PYTHON=.venv/bin/python
+bash -n scripts/run_product.sh
+git diff --check
+```
 
-1. 所有代码、模型、数据和文档资产标为 include/exclude/undecided；
-2. 所有非排除资产都有来源摘要、许可证证据和 owner 决定；
-3. LICENSE、NOTICE、competition lock 内容与摘要匹配；
-4. `core`、`speech`、`core+speech` runtime closure 和离线回归通过；
-5. 最终 RC 在全新环境以 `--require-ready` 通过分发审计。
-
-模型权重不进入 Git，只能随明确许可的比赛包携带，或由摘要校验的受控外部缓存提供。工程审计不替代法律判断。
+另外必须运行 Markdown 链接、前端 JavaScript 语法、隐私字符串、跟踪媒体/数据库文件和 public 报告泄露扫描。工程检查不能替代法律审查或真实目标域验证。
