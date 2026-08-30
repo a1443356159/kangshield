@@ -1,7 +1,7 @@
 # KangShield 文档中心
 
 状态：三域 MVP，本地试点
-更新时间：2026-08-30
+更新时间：2026-08-31
 
 仓库文档只保留最终产品需要的设计、运行、状态、决策与发布边界。用户可直接在看板底部打开 `/docs` 阅读服务条款和技术说明，无需访问仓库文件。
 
@@ -13,6 +13,7 @@
 4. [当前状态](governance/current-status.md)：已完成能力、验证结果和仍待关闭事项。
 5. [有效决策](governance/decisions.md)：当前设计不可随意漂移的决定。
 6. [发布门](governance/release-readiness.md)：许可证、模型、锁文件和真实校准要求。
+7. [公开数据集交付验证报告](governance/delivery-validation-report.md)：公开样本、固定划分、策略绑定与最终盲测。
 
 ## 源材料
 

@@ -27,6 +27,7 @@ from .contracts import (
 )
 from .longitudinal.store import DEFAULT_STORE_ROOT, LongitudinalStore, dumps_compact
 from .multidomain import DEFAULT_POLICY_PATH, build_snapshot, insert_candidate, load_policy
+from .privacy import sha256_file
 from .segment_analysis import (
     AnalysisResult,
     SegmentResultSummarizer,
@@ -39,6 +40,7 @@ from .speech_backend import AudioBuffer
 
 EDGE_MONITOR_VERSION = "edge-monitor-v0.2.0"
 DEFAULT_EDGE_POLICY_PATH = Path("configs/v2-edge-segment-policy.json")
+DEFAULT_POSE_MODEL_PATH = Path("models/yolo26s-pose.pt")
 _PUBLIC_FAILURE_CODES = frozenset(
     {
         "endpoint_unavailable",
@@ -77,12 +79,19 @@ class EdgeSelectionPolicy:
     video_buffer_width_px: int
     jpeg_quality: int
     motion_thumbnail_width_px: int
+    motion_local_top_fraction: float
     motion_min_score: float
     motion_mad_multiplier: float
+    motion_threshold_quantile_cap: float
     motion_pre_seconds: float
     motion_post_seconds: float
     baseline_interval_seconds: float
     maximum_selected_video_ratio: float
+    pose_model_image_size: int
+    pose_model_confidence: float
+    pose_model_name: str
+    pose_model_sha256: str
+    pose_model_license: str
     audio_sample_rate_hz: int
     audio_gate_window_ms: int
     audio_min_rms: float
@@ -116,14 +125,23 @@ class EdgeSelectionPolicy:
             video_buffer_width_px=int(payload["video_buffer_width_px"]),
             jpeg_quality=int(payload["jpeg_quality"]),
             motion_thumbnail_width_px=int(payload["motion_thumbnail_width_px"]),
+            motion_local_top_fraction=float(payload["motion_local_top_fraction"]),
             motion_min_score=float(payload["motion_min_score"]),
             motion_mad_multiplier=float(payload["motion_mad_multiplier"]),
+            motion_threshold_quantile_cap=float(
+                payload["motion_threshold_quantile_cap"]
+            ),
             motion_pre_seconds=float(payload["motion_pre_seconds"]),
             motion_post_seconds=float(payload["motion_post_seconds"]),
             baseline_interval_seconds=float(payload["baseline_interval_seconds"]),
             maximum_selected_video_ratio=float(
                 payload["maximum_selected_video_ratio"]
             ),
+            pose_model_image_size=int(payload["pose_model_image_size"]),
+            pose_model_confidence=float(payload["pose_model_confidence"]),
+            pose_model_name=str(payload["pose_model_name"]),
+            pose_model_sha256=str(payload["pose_model_sha256"]),
+            pose_model_license=str(payload["pose_model_license"]),
             audio_sample_rate_hz=int(payload["audio_sample_rate_hz"]),
             audio_gate_window_ms=int(payload["audio_gate_window_ms"]),
             audio_min_rms=float(payload["audio_min_rms"]),
@@ -172,8 +190,11 @@ class EdgeSelectionPolicy:
         if self.minimum_segment_seconds > self.segment_duration_seconds:
             raise ValueError("minimum edge segment exceeds requested duration")
         for value in (
+            self.motion_local_top_fraction,
             self.motion_min_score,
+            self.motion_threshold_quantile_cap,
             self.maximum_selected_video_ratio,
+            self.pose_model_confidence,
             self.audio_min_rms,
             self.audio_activity_override_rms,
             self.maximum_selected_audio_ratio,
@@ -185,10 +206,20 @@ class EdgeSelectionPolicy:
         if min(
             self.video_buffer_width_px,
             self.motion_thumbnail_width_px,
+            self.pose_model_image_size,
             self.audio_sample_rate_hz,
             self.audio_gate_window_ms,
         ) <= 0:
             raise ValueError("edge selection dimensions must be positive")
+        if Path(self.pose_model_name).name != self.pose_model_name:
+            raise ValueError("pose model name must not contain a path")
+        if (
+            len(self.pose_model_sha256) != 64
+            or any(character not in "0123456789abcdef" for character in self.pose_model_sha256)
+        ):
+            raise ValueError("pose model SHA-256 is invalid")
+        if not self.pose_model_license:
+            raise ValueError("pose model license must be declared")
         if (
             not isfinite(self.archive_event_pre_seconds)
             or self.archive_event_pre_seconds < 0
@@ -330,13 +361,22 @@ class LightweightSegmentSelector:
             )
         scores = [0.0]
         for previous, current in zip(grays, grays[1:]):
-            score = float(np.mean(cv2.absdiff(previous, current)) / 255.0)
+            difference = cv2.absdiff(previous, current).astype(np.float32).reshape(-1)
+            retained = max(
+                1,
+                round(difference.size * self.policy.motion_local_top_fraction),
+            )
+            start = difference.size - retained
+            score = float(np.partition(difference, start)[start:].mean() / 255.0)
             scores.append(max(0.0, min(score, 1.0)))
         center = median(scores)
         mad = median(abs(value - center) for value in scores)
+        quantile_cap = float(
+            np.quantile(scores, self.policy.motion_threshold_quantile_cap)
+        )
         threshold = max(
             self.policy.motion_min_score,
-            center + self.policy.motion_mad_multiplier * mad,
+            min(center + self.policy.motion_mad_multiplier * mad, quantile_cap),
         )
         pre_ms = round(self.policy.motion_pre_seconds * 1000)
         post_ms = round(self.policy.motion_post_seconds * 1000)
@@ -368,7 +408,7 @@ class LightweightSegmentSelector:
         }
         maximum = max(
             len(baseline_indices),
-            round(len(frames) * self.policy.maximum_selected_video_ratio),
+            int(len(frames) * self.policy.maximum_selected_video_ratio),
         )
         selected_indices = set(baseline_indices)
         remaining = maximum - len(selected_indices)
@@ -774,26 +814,50 @@ class EdgeModelAnalyzer:
         *,
         selection_policy: EdgeSelectionPolicy,
         risk_policy_path: Path = DEFAULT_POLICY_PATH,
+        pose_model_path: Path | None = None,
         pose_backend: Any | None = None,
         speech_backend: Any | None = None,
     ) -> None:
         self.selection_policy = selection_policy
         self.selector = LightweightSegmentSelector(selection_policy)
         self.risk_policy_path = Path(risk_policy_path)
+        configured_pose_model = os.environ.get("KANGSHIELD_POSE_MODEL")
+        self.pose_model_path = Path(
+            pose_model_path or configured_pose_model or DEFAULT_POSE_MODEL_PATH
+        )
         self._pose_backend = pose_backend
         self._speech_backend = speech_backend
         self._summarizer = SegmentResultSummarizer(self.risk_policy_path)
 
     def _ensure_pose(self) -> Any:
         if self._pose_backend is None:
-            model = Path("models/yolo26n-pose.pt")
+            model = self.pose_model_path
             if not model.is_file():
                 raise EdgeMonitorError("pose model unavailable", code="pose_model_failed")
+            if sha256_file(model) != self.selection_policy.pose_model_sha256:
+                raise EdgeMonitorError(
+                    "pose model digest mismatch", code="pose_model_failed"
+                )
             from .pose_backend import UltralyticsPoseBackend
 
-            self._pose_backend = UltralyticsPoseBackend(
-                model=model, device="auto", image_size=640, confidence=0.35, track=True
+            backend = UltralyticsPoseBackend(
+                model=model,
+                device="auto",
+                image_size=self.selection_policy.pose_model_image_size,
+                confidence=self.selection_policy.pose_model_confidence,
+                track=True,
             )
+            bindings = list(backend.bindings)
+            if (
+                len(bindings) != 1
+                or bindings[0].model_name != self.selection_policy.pose_model_name
+                or bindings[0].model_digest != self.selection_policy.pose_model_sha256
+                or bindings[0].license != self.selection_policy.pose_model_license
+            ):
+                raise EdgeMonitorError(
+                    "pose model binding mismatch", code="pose_model_failed"
+                )
+            self._pose_backend = backend
         return self._pose_backend
 
     def _ensure_speech(self) -> Any:
@@ -946,6 +1010,7 @@ class EdgeMonitor:
         store_root: Path = DEFAULT_STORE_ROOT,
         risk_policy_path: Path = DEFAULT_POLICY_PATH,
         selection_policy_path: Path = DEFAULT_EDGE_POLICY_PATH,
+        pose_model_path: Path | None = None,
         evidence_level: EvidenceLevel = EvidenceLevel.E2,
         source_type: SourceType = SourceType.NETWORK_STREAM,
         open_timeout_s: float = 10.0,
@@ -990,6 +1055,7 @@ class EdgeMonitor:
         self.analyzer = analyzer or EdgeModelAnalyzer(
             selection_policy=self.selection_policy,
             risk_policy_path=self.risk_policy_path,
+            pose_model_path=pose_model_path,
         )
 
     def _capture_once(self) -> InMemoryEdgeSegment | EdgeSegmentAudit:

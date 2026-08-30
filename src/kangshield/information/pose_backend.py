@@ -28,7 +28,7 @@ class UltralyticsPoseBackend:
 
     def __init__(
         self,
-        model: str | Path = "models/yolo26n-pose.pt",
+        model: str | Path = "models/yolo26s-pose.pt",
         device: str = "auto",
         image_size: int = 640,
         confidence: float = 0.35,

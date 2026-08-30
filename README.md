@@ -60,6 +60,7 @@ YS7_APP_SECRET=...
 KANG_DEVICE_SERIAL=...
 KANG_ELDER_REF=elder_pseudonym
 KANG_DEVICE_REF=c6c_target
+KANGSHIELD_POSE_MODEL=/cache/DeepLearning/your-user/kangshield-models/yolo26s-pose.pt
 ```
 
 加载环境后，一条命令启动连续分析、看板、问卷、复核、本机异常归档和云端回退：
@@ -75,6 +76,7 @@ kangshield-info serve-product \
   --host 127.0.0.1 \
   --port 8765 \
   --continuous \
+  --pose-model "$KANGSHIELD_POSE_MODEL" \
   --edge-provider ezviz
 ```
 
@@ -84,7 +86,8 @@ kangshield-info serve-product \
 kangshield-info run-edge-monitor \
   --provider ezviz \
   --elder-ref "$KANG_ELDER_REF" \
-  --device-ref "$KANG_DEVICE_REF"
+  --device-ref "$KANG_DEVICE_REF" \
+  --pose-model "$KANGSHIELD_POSE_MODEL"
 ```
 
 不要对同一设备同时运行这两个连续入口。systemd 示例见 [`deploy/kangshield-product.service`](deploy/kangshield-product.service)，启动脚本见 [`scripts/run_product.sh`](scripts/run_product.sh)。
@@ -118,7 +121,7 @@ kangshield-info delete-product-data \
 - Python 3.11+、Pydantic、SQLite、标准库 HTTP 和内嵌 HTML/CSS/JS；无前端构建链或 CDN。
 - HTTP 服务只接受 `127.0.0.1`，写操作要求精确同源、随机 CSRF token 和 JSON content type。
 - 本机媒体只能通过候选播放 POST 换取的 10 分钟随机令牌读取；没有任意文件路由或完整逐字稿路由。
-- 直播流按 60 秒在内存中分段；5 fps 灰度帧差和 500 ms 音频 RMS 先筛选，重模型只处理关键窗口。
+- 直播流按 60 秒在内存中分段；5 fps 局部高变化像素帧差和 500 ms 音频 RMS 先筛选，重模型只处理关键窗口。
 - 只有重模型成功处理的覆盖可支持“0 分”；背压、断流和模型失败均写固定失败码并 fail closed。
 - 每人 SQLite schema v5 保存分段审计、异常归档索引、分析 ledger、日级个人特征、三域候选/assessment、复核历史和月度问卷；MP4 位于同一人的 `anomaly_clips/` 私有目录，文件权限为 `0600`。
 - 风险策略和轻量选择策略分别由 [`configs/v2-multidomain-risk-policy.json`](configs/v2-multidomain-risk-policy.json) 与 [`configs/v2-edge-segment-policy.json`](configs/v2-edge-segment-policy.json) 版本化并绑定 SHA-256。
@@ -143,3 +146,4 @@ git diff --check
 - [连续取流与异常回看](docs/device-data/streaming-and-media.md)
 - [当前状态](docs/governance/current-status.md)
 - [发布门](docs/governance/release-readiness.md)
+- [公开数据集交付验证报告](docs/governance/delivery-validation-report.md)

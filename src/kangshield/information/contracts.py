@@ -122,7 +122,7 @@ class SpeechSegment(ContractModel):
 
 class FallFeatureConfig(ContractModel):
     schema_version: str = "1.0"
-    feature_version: str = "fall-motion-features-v0.1.0"
+    feature_version: str = "fall-motion-features-v0.5.0"
     selection_strategy: Literal["largest_bbox"] = "largest_bbox"
     expected_keypoint_layout: Literal["COCO-17"] = "COCO-17"
     expected_keypoint_count: int = Field(default=17, ge=1)
@@ -133,6 +133,9 @@ class FallFeatureConfig(ContractModel):
     keypoint_visible_ratio_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
     torso_horizontal_angle_max_deg: float = Field(default=45.0, ge=0.0, le=90.0)
     bbox_horizontal_ratio_threshold: float = Field(default=1.0, gt=0.0)
+    near_floor_bottom_y_ratio_threshold: float = Field(
+        default=0.9, gt=0.0, le=1.0
+    )
     descent_history_window_ms: int = Field(default=1000, gt=0)
     descent_min_span_ms: int = Field(default=600, gt=0)
     rapid_descent_center_y_ratio_threshold: float = Field(default=0.15, gt=0.0)
@@ -203,6 +206,10 @@ class FallMotionFrameValue(ContractModel):
     bbox_area_frame_ratio: float | None = Field(default=None, ge=0.0)
     bbox_horizontal_proxy: bool | None = None
     horizontal_duration_ms: int | None = Field(default=None, ge=0)
+    posture_horizontal_proxy: bool | None = None
+    posture_horizontal_duration_ms: int | None = Field(default=None, ge=0)
+    near_floor_proxy: bool | None = None
+    near_floor_duration_ms: int | None = Field(default=None, ge=0)
     descent_history_span_ms: int | None = Field(default=None, ge=0)
     center_drop_frame_height_ratio: float | None = None
     rapid_descent_proxy: bool | None = None
@@ -225,10 +232,33 @@ class FallCandidateSettledRule(ContractModel):
     low_motion_required: Literal[True] = True
 
 
+class FallCandidateBBoxSettledRule(ContractModel):
+    minimum_horizontal_duration_ms: int = Field(gt=0)
+    low_motion_required: Literal[True] = True
+
+
+class FallCandidateNearFloorRule(ContractModel):
+    minimum_near_floor_duration_ms: int = Field(gt=0)
+    rapid_descent_lookback_ms: int = Field(gt=0)
+    low_motion_required: Literal[True] = True
+
+
+class FallCandidateRecoverySuppression(ContractModel):
+    observation_ms: int = Field(gt=0)
+    minimum_upright_duration_ms: int = Field(gt=0)
+
+    @model_validator(mode="after")
+    def _duration_fits_observation(self) -> "FallCandidateRecoverySuppression":
+        if self.minimum_upright_duration_ms > self.observation_ms:
+            raise ValueError("upright recovery duration exceeds observation window")
+        return self
+
+
 class FallCandidateStateMachine(ContractModel):
     max_frame_gap_ms: int = Field(gt=0)
     release_grace_ms: int = Field(gt=0)
     refractory_ms: int = Field(ge=0)
+    merge_gap_ms: int = Field(ge=0)
     require_track_id: Literal[True] = True
     reset_on_track_change: Literal[True] = True
     transition_start_strategy: Literal[
@@ -246,16 +276,19 @@ class FallEventCandidatePolicy(ContractModel):
     review_status: Literal["fixture_only", "e1_exploratory_frozen"] = "fixture_only"
     target_event_label: Literal["simulated_fall"] = "simulated_fall"
     input_fall_feature_policy_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
-    input_fall_feature_version: str = "fall-motion-features-v0.1.0"
+    input_fall_feature_version: str = "fall-motion-features-v0.5.0"
     candidate_representation: Literal[
         "deduplicated_event_episode"
     ] = "deduplicated_event_episode"
-    candidate_event_version: str = "fall-event-candidate-v0.1.0"
+    candidate_event_version: str = "fall-event-candidate-v0.6.0"
     source_label_access: Literal[
         "forbidden_during_generation"
     ] = "forbidden_during_generation"
     transition_rule: FallCandidateTransitionRule | None = None
     settled_rule: FallCandidateSettledRule | None = None
+    bbox_settled_rule: FallCandidateBBoxSettledRule | None = None
+    near_floor_rule: FallCandidateNearFloorRule | None = None
+    recovery_suppression: FallCandidateRecoverySuppression | None = None
     state_machine: FallCandidateStateMachine | None = None
     decision_logic_summary: str = Field(min_length=1)
     risk_assessment_emitted: Literal[False] = False
@@ -264,7 +297,14 @@ class FallEventCandidatePolicy(ContractModel):
 
     @model_validator(mode="after")
     def _frozen_rules_are_complete(self) -> "FallEventCandidatePolicy":
-        rules = (self.transition_rule, self.settled_rule, self.state_machine)
+        rules = (
+            self.transition_rule,
+            self.settled_rule,
+            self.bbox_settled_rule,
+            self.near_floor_rule,
+            self.recovery_suppression,
+            self.state_machine,
+        )
         if self.fixture:
             if self.review_status != "fixture_only":
                 raise ValueError("fixture candidate policy must remain fixture_only")
@@ -296,6 +336,8 @@ class FallEventCandidateEpisode(ContractModel):
     trigger_path: Literal[
         "rapid_descent_then_horizontal",
         "settled_horizontal_low_motion",
+        "settled_bbox_horizontal_low_motion",
+        "rapid_descent_then_near_floor_low_motion",
     ]
     risk_assessment_emitted: Literal[False] = False
     alert_emitted: Literal[False] = False

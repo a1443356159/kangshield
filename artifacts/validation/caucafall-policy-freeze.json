@@ -1,0 +1,52 @@
+{
+  "schema_version": "1.0",
+  "status": "pilot_unvalidated",
+  "frozen_at": "2026-08-30T18:12:50Z",
+  "dataset": {
+    "name": "CAUCAFall",
+    "version": 5,
+    "doi": "10.17632/7w7fccy7ky.5",
+    "license": "CC-BY-4.0"
+  },
+  "evaluation_contract": {
+    "development_subjects": [1, 2, 3, 4, 5],
+    "holdout_subjects": [6, 7, 8, 9, 10],
+    "holdout_media_state_at_freeze": "not_cached_or_evaluated",
+    "holdout_runs_allowed": 1,
+    "labels_visible_to_candidate_generation": false
+  },
+  "development_selection": {
+    "round": "D10",
+    "gated_fall_clips_detected": 14,
+    "gated_fall_clip_count": 25,
+    "gated_adl_clips_flagged": 1,
+    "gated_adl_clip_count": 25,
+    "mean_selected_frame_ratio": 0.495133,
+    "mean_processing_realtime_factor": 0.378559
+  },
+  "bindings": {
+    "edge_selection_policy": {
+      "filename": "v2-edge-segment-policy.json",
+      "sha256": "ef0568e5b27169a8b7ecd40e9662a054cf6ab222a43504d2eecd6a8725e54569"
+    },
+    "fall_feature_policy": {
+      "filename": "v1-g4-fall-features.json",
+      "sha256": "e72052cec6107191899c43652a9dee14b8463f0f32b2ef4052b9202b00c400ae"
+    },
+    "fall_candidate_policy": {
+      "filename": "v1-g4-event-candidate-policy.json",
+      "sha256": "d70c29687a84931d392fb1fe89f6333604f4d95caef586fd58409ea5d618670f"
+    },
+    "pose_model": {
+      "model_name": "yolo26s-pose.pt",
+      "sha256": "a083adb42303728ae14c4bd6bd56d80da46f82fb2564dbd6f31dcc92ea321646",
+      "license": "AGPL-3.0-or-Ultralytics-Enterprise"
+    }
+  },
+  "engineering_gate_revision": "caucafall-engineering-demo-gate-v1",
+  "limitations": [
+    "freeze_is_for_public_dataset_engineering_evaluation_only",
+    "freeze_does_not_establish_target_camera_or_clinical_validity",
+    "model_license_release_gate_remains_open"
+  ]
+}

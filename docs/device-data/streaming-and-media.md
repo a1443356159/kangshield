@@ -47,6 +47,7 @@ YS7_APP_SECRET=...
 KANG_DEVICE_SERIAL=...
 KANG_ELDER_REF=elder_pseudonym
 KANG_DEVICE_REF=c6c_target
+KANGSHIELD_POSE_MODEL=/cache/DeepLearning/your-user/kangshield-models/yolo26s-pose.pt
 ```
 
 完整产品：
@@ -64,6 +65,7 @@ kangshield-info serve-product \
   --host 127.0.0.1 \
   --port 8765 \
   --continuous \
+  --pose-model "$KANGSHIELD_POSE_MODEL" \
   --edge-provider ezviz
 ```
 

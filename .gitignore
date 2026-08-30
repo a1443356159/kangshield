@@ -13,6 +13,7 @@ runs/
 logs/
 data/raw/
 data/processed/
+data/validation/
 secrets/
 models/
 slurm-*.out

@@ -1,17 +1,17 @@
 # 发布就绪门
 
 状态：本地展示可用，公开发布未通过
-更新时间：2026-08-30
+更新时间：2026-08-31
 
 ## 当前阻断
 
 - 仓库尚未包含 owner 批准的项目 LICENSE 和第三方 NOTICE。
 - 最终 Python 依赖锁与全新、非 editable 环境安装验证尚未冻结。
-- 姿态与语音模型权重不在 Git 中；来源、版本、SHA-256、许可证和携带方式尚未全部关闭。
+- 姿态与语音模型权重不在 Git 中；YOLO26s 姿态权重已冻结名称、SHA-256、推理尺寸和置信度，但来源携带方式、语音模型摘要与许可证尚未全部关闭。
 - Ultralytics 代码/模型适用 AGPL-3.0 或企业许可选择，必须由 owner 根据提交与分发方式决定。
 - 萤石当前提供 [`@ezuikit/player-hls`](https://www.npmjs.com/package/%40ezuikit/player-hls) 跨浏览器播放器，但其 npm 元数据未声明许可证，且需要自托管 JS/WASM/Worker；本提交不捆绑该 SDK，只使用浏览器原生 HLS 与新窗口降级。跨浏览器播放器在许可证关闭后再决定是否纳入。
 - WHO-5 当前按 CC BY-NC-SA 3.0 IGO、带署名用于本地非商业试点；若提交渠道涉及商业使用或重新许可，需单独复核。
-- 目标 C6c 的真实 held-out 三域校准、连续长稳、轻量门召回和云回看时间一致性未完成。
+- CAUCAFall 公开模拟数据只覆盖跌倒候选工程链；目标 C6c 的真实 held-out 三域校准、连续长稳和云回看时间一致性仍未完成。
 - 本机异常片段包含高度敏感的画面与声音；公开部署前必须由 owner 确认磁盘加密、备份排除、30 天/2 GiB 留存值和操作系统账户边界。
 
 因此页面和报告必须继续显示“本地试点”与非诊断边界，不能宣传为公开发布或临床就绪。
@@ -46,6 +46,7 @@
 ```bash
 make test PYTHON=.venv/bin/python
 bash -n scripts/run_product.sh
+bash -n scripts/slurm/benchmark_caucafall.sbatch
 git diff --check
 ```
 

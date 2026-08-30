@@ -37,6 +37,7 @@ kangshield-info serve-product \
   --host 127.0.0.1 \
   --port 8765 \
   --continuous \
+  --pose-model "$KANGSHIELD_POSE_MODEL" \
   --edge-provider ezviz \
   --edge-device-serial-env KANG_DEVICE_SERIAL
 

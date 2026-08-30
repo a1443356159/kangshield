@@ -165,12 +165,16 @@ class FallMotionFeatureExtractor:
         self._history: deque[_HistorySample] = deque()
         self._track_id: int | None = None
         self._last_timestamp_ms: int | None = None
-        self._horizontal_started_ms: int | None = None
+        self._bbox_horizontal_started_ms: int | None = None
+        self._posture_horizontal_started_ms: int | None = None
+        self._near_floor_started_ms: int | None = None
 
     def _reset_temporal(self) -> None:
         self._history.clear()
         self._track_id = None
-        self._horizontal_started_ms = None
+        self._bbox_horizontal_started_ms = None
+        self._posture_horizontal_started_ms = None
+        self._near_floor_started_ms = None
 
     def process(self, pose_event: FeatureEvent) -> FallMotionFrameValue:
         if pose_event.feature_type != "video.pose_frame":
@@ -229,6 +233,12 @@ class FallMotionFeatureExtractor:
         center_x, center_y = (x1 + x2) / 2, (y1 + y2) / 2
         ratio = width / height
         horizontal = ratio >= self.config.bbox_horizontal_ratio_threshold
+        near_floor = (
+            y2 / self.frame_height
+            >= self.config.near_floor_bottom_y_ratio_threshold
+        )
+        gate = _keypoint_gate(detection, self.config)
+        posture_horizontal = horizontal or gate.torso_horizontal_proxy is True
         raw_track = detection.get("track_id")
         track_id = (
             raw_track
@@ -247,6 +257,8 @@ class FallMotionFeatureExtractor:
         center_drop = max_displacement = None
         rapid_descent = low_motion = None
         horizontal_duration: int | None = 0
+        posture_horizontal_duration: int | None = 0
+        near_floor_duration: int | None = 0
         if track_id is not None:
             self._track_id = track_id
             self._history.append(_HistorySample(timestamp_ms, center_x, center_y))
@@ -292,13 +304,26 @@ class FallMotionFeatureExtractor:
             else:
                 reasons.append("stationary_history_not_ready")
             if horizontal:
-                if self._horizontal_started_ms is None or changed:
-                    self._horizontal_started_ms = timestamp_ms
-                horizontal_duration = timestamp_ms - self._horizontal_started_ms
+                if self._bbox_horizontal_started_ms is None or changed:
+                    self._bbox_horizontal_started_ms = timestamp_ms
+                horizontal_duration = timestamp_ms - self._bbox_horizontal_started_ms
             else:
-                self._horizontal_started_ms = None
+                self._bbox_horizontal_started_ms = None
+            if posture_horizontal:
+                if self._posture_horizontal_started_ms is None or changed:
+                    self._posture_horizontal_started_ms = timestamp_ms
+                posture_horizontal_duration = (
+                    timestamp_ms - self._posture_horizontal_started_ms
+                )
+            else:
+                self._posture_horizontal_started_ms = None
+            if near_floor:
+                if self._near_floor_started_ms is None or changed:
+                    self._near_floor_started_ms = timestamp_ms
+                near_floor_duration = timestamp_ms - self._near_floor_started_ms
+            else:
+                self._near_floor_started_ms = None
 
-        gate = _keypoint_gate(detection, self.config)
         active_path = "box_plus_keypoints" if gate.status == "passed" else "box_only"
         if active_path == "box_only":
             reasons.append(f"keypoint_gate_{gate.status}_use_box_only")
@@ -322,6 +347,10 @@ class FallMotionFeatureExtractor:
             ),
             bbox_horizontal_proxy=horizontal,
             horizontal_duration_ms=horizontal_duration,
+            posture_horizontal_proxy=posture_horizontal,
+            posture_horizontal_duration_ms=posture_horizontal_duration,
+            near_floor_proxy=near_floor,
+            near_floor_duration_ms=near_floor_duration,
             descent_history_span_ms=descent_span,
             center_drop_frame_height_ratio=center_drop,
             rapid_descent_proxy=rapid_descent,

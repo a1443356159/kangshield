@@ -32,6 +32,7 @@ def test_edge_monitor_defaults_to_policy_controlled_anomaly_archive():
     assert args.edge_policy.name == "v2-edge-segment-policy.json"
     assert args.evidence_level.value == "E2"
     assert args.local_anomaly_archive is None
+    assert args.pose_model is None
 
 
 def test_product_parser_enables_cloud_playback_automatically_for_ezviz():
@@ -42,6 +43,7 @@ def test_product_parser_enables_cloud_playback_automatically_for_ezviz():
     assert args.cloud_playback_provider == "auto"
     assert args.continuous is False
     assert args.local_anomaly_archive is None
+    assert args.pose_model is None
 
 
 def test_local_anomaly_archive_can_be_disabled_from_cli():

@@ -1,13 +1,13 @@
 {
   "schema_version": "1.0",
-  "policy_id": "v1-g4-event-candidate-policy-v0.1.0",
+  "policy_id": "v1-g4-event-candidate-policy-v0.6.0",
   "fixture": false,
   "review_status": "e1_exploratory_frozen",
   "target_event_label": "simulated_fall",
-  "input_fall_feature_policy_sha256": "3bedf218e9e413c1ab168134b8333db5cdebf764d5f8c9ece65ba212ea9d5eda",
-  "input_fall_feature_version": "fall-motion-features-v0.1.0",
+  "input_fall_feature_policy_sha256": "e72052cec6107191899c43652a9dee14b8463f0f32b2ef4052b9202b00c400ae",
+  "input_fall_feature_version": "fall-motion-features-v0.5.0",
   "candidate_representation": "deduplicated_event_episode",
-  "candidate_event_version": "fall-event-candidate-v0.1.0",
+  "candidate_event_version": "fall-event-candidate-v0.6.0",
   "source_label_access": "forbidden_during_generation",
   "transition_rule": {
     "minimum_horizontal_duration_ms": 600,
@@ -18,23 +18,39 @@
     "minimum_horizontal_duration_ms": 1200,
     "low_motion_required": true
   },
+  "bbox_settled_rule": {
+    "minimum_horizontal_duration_ms": 400,
+    "low_motion_required": true
+  },
+  "near_floor_rule": {
+    "minimum_near_floor_duration_ms": 400,
+    "rapid_descent_lookback_ms": 2500,
+    "low_motion_required": true
+  },
+  "recovery_suppression": {
+    "observation_ms": 3000,
+    "minimum_upright_duration_ms": 800
+  },
   "state_machine": {
-    "max_frame_gap_ms": 450,
+    "max_frame_gap_ms": 650,
     "release_grace_ms": 600,
     "refractory_ms": 3000,
+    "merge_gap_ms": 5000,
     "require_track_id": true,
     "reset_on_track_change": true,
     "transition_start_strategy": "earliest_recent_rapid_descent",
     "settled_start_strategy": "horizontal_duration_backfill"
   },
-  "decision_logic_summary": "Emit one episode when a tracked person remains bbox-horizontal for 600 ms after a rapid-descent proxy observed within 1500 ms; otherwise use a 1200 ms bbox-horizontal plus low-motion fallback. Close after 600 ms without horizontal evidence, reset temporal evidence on gaps or track changes, and suppress a new episode for 3000 ms after closure.",
+  "decision_logic_summary": "Emit one review episode for a tracked person after rapid descent followed by 600 ms combined horizontal posture, after 400 ms bbox-horizontal low motion, after 1200 ms combined-horizontal low motion, or after rapid descent followed by 400 ms near-floor low motion. Suppress proxy-only episodes when 800 ms upright recovery is observed within 3000 ms; near-floor recovery additionally requires leaving the near-floor zone. Merge episodes separated by at most 5000 ms and reset temporal state when selected-frame gaps exceed 650 ms or the track changes.",
   "risk_assessment_emitted": false,
   "alert_emitted": false,
   "limitations": [
-    "frozen_before_target_c6c_held_out_candidate_review",
-    "e1_engineering_policy_not_target_device_validated",
+    "development_tuned_before_caucafall_subject_6_to_10_holdout",
+    "public_simulated_fall_evidence_not_target_device_validation",
     "largest_bbox_single_primary_person_only",
-    "bbox_horizontal_proxy_is_viewpoint_sensitive",
+    "bbox_and_torso_horizontal_proxies_are_viewpoint_sensitive",
+    "near_floor_proxy_is_camera_viewpoint_sensitive",
+    "upright_recovery_suppression_can_miss_rapidly_self_recovered_falls",
     "low_motion_fallback_can_activate_on_non_fall_floor_level_actions",
     "candidate_episode_is_not_risk_assessment_or_alert"
   ]

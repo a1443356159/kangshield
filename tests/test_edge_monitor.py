@@ -138,6 +138,16 @@ def test_lightweight_selector_caps_heavy_inputs_and_keeps_key_windows():
     assert all(window.end_ms <= segment.duration_ms for window in selection.key_windows)
 
 
+def test_video_selection_ratio_is_a_hard_cap_for_odd_frame_counts():
+    segment = _segment(seconds=11)
+    policy = EdgeSelectionPolicy.load()
+
+    selection = LightweightSegmentSelector(policy).select(segment)
+
+    assert len(segment.frames) == 55
+    assert len(selection.video_frames) <= 27
+
+
 def test_selected_windows_only_are_sent_to_heavy_models():
     pose = _PoseBackend()
     speech = _SpeechBackend()
@@ -157,6 +167,27 @@ def test_selected_windows_only_are_sent_to_heavy_models():
     candidate, payload = outcome.result.candidates[0]
     assert candidate.domain.value == "fraud"
     assert payload["transcript_excerpt"] == "请立即转账并且保密"
+
+
+def test_pose_model_path_is_external_and_environment_configurable(monkeypatch):
+    model = "/cache/models/kangshield-pose.pt"
+    monkeypatch.setenv("KANGSHIELD_POSE_MODEL", model)
+
+    analyzer = EdgeModelAnalyzer(selection_policy=EdgeSelectionPolicy.load())
+
+    assert analyzer.pose_model_path.as_posix() == model
+
+
+def test_pose_model_digest_mismatch_fails_before_model_loading(tmp_path):
+    model = tmp_path / "pose.pt"
+    model.write_bytes(b"not-the-frozen-model")
+    analyzer = EdgeModelAnalyzer(
+        selection_policy=EdgeSelectionPolicy.load(),
+        pose_model_path=model,
+    )
+
+    with pytest.raises(EdgeMonitorError, match="digest mismatch"):
+        analyzer._ensure_pose()
 
 
 def test_edge_audit_contract_forbids_local_raw_media():

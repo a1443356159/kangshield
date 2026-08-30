@@ -68,6 +68,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path("configs/v2-edge-segment-policy.json"),
     )
+    monitor.add_argument(
+        "--pose-model",
+        type=Path,
+        help="外置姿态权重；默认读取 KANGSHIELD_POSE_MODEL",
+    )
     monitor.add_argument("--evidence-level", type=_evidence, default=EvidenceLevel.E2)
     monitor.add_argument(
         "--source-type", type=_source_type, default=SourceType.NETWORK_STREAM
@@ -118,6 +123,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--edge-policy",
         type=Path,
         default=Path("configs/v2-edge-segment-policy.json"),
+    )
+    product.add_argument(
+        "--pose-model",
+        type=Path,
+        help="连续模式的外置姿态权重；默认读取 KANGSHIELD_POSE_MODEL",
     )
     product.add_argument("--edge-failure-backoff-s", type=float, default=2.0)
     product.add_argument(
@@ -193,6 +203,7 @@ def _run_edge_monitor(args: argparse.Namespace) -> int:
         store_root=args.store_root,
         risk_policy_path=args.risk_policy,
         selection_policy_path=args.edge_policy,
+        pose_model_path=args.pose_model,
         evidence_level=args.evidence_level,
         source_type=args.source_type,
         open_timeout_s=args.open_timeout_s,
@@ -239,6 +250,7 @@ def _serve_product(args: argparse.Namespace) -> int:
         edge_device_serial_env=args.edge_device_serial_env,
         edge_endpoint_refresh_seconds=args.edge_endpoint_refresh_seconds,
         edge_policy_path=args.edge_policy,
+        edge_pose_model_path=args.pose_model,
         edge_failure_backoff_s=args.edge_failure_backoff_s,
         archive_anomaly_clips=args.local_anomaly_archive,
         cloud_playback_provider=args.cloud_playback_provider,

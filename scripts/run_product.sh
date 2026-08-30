@@ -13,6 +13,7 @@ set +a
 : "${KANG_DEVICE_SERIAL:?set KANG_DEVICE_SERIAL in secrets/ys7.env}"
 : "${KANG_ELDER_REF:?set KANG_ELDER_REF in secrets/ys7.env}"
 : "${KANG_DEVICE_REF:?set KANG_DEVICE_REF in secrets/ys7.env}"
+: "${KANGSHIELD_POSE_MODEL:?set KANGSHIELD_POSE_MODEL to the external frozen pose weight}"
 
 exec .venv/bin/kangshield-info serve-product \
   --elder-ref "$KANG_ELDER_REF" \
@@ -20,6 +21,7 @@ exec .venv/bin/kangshield-info serve-product \
   --host 127.0.0.1 \
   --port 8765 \
   --continuous \
+  --pose-model "$KANGSHIELD_POSE_MODEL" \
   --local-anomaly-archive \
   --edge-provider ezviz \
   --edge-device-serial-env KANG_DEVICE_SERIAL \
