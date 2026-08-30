@@ -1,0 +1,91 @@
+{
+  "schema_version": "1.0",
+  "status": "pilot_unvalidated",
+  "frozen_at": "2026-08-30T19:08:39Z",
+  "evaluation_contract": {
+    "development_round": "D1",
+    "fbs_development_partition": "sha256_case_ref_mod_5_not_bucket_0",
+    "fbs_holdout_partition": "sha256_case_ref_mod_5_bucket_0",
+    "casas_development_homes": ["hh101", "hh102", "hh103"],
+    "casas_holdout_homes": ["hh104", "hh105", "hh106"],
+    "labels_visible_to_rule_matching": false,
+    "holdout_source_bytes_present_at_freeze": true,
+    "holdout_partition_evaluated_at_freeze": false,
+    "holdout_runs_allowed": 1
+  },
+  "sources": {
+    "fbs_sms": {
+      "source_commit": "49173b12ab0a42eb9f6ce42e401e6acaef1fbdfd",
+      "archive_sha256": "3e958b6522f7ff058171837d571da2aebd7de51c8b18516869813a3c78705d18",
+      "usage_terms": "public_research_release_requires_source_and_ccs2020_citation",
+      "spdx_license": null
+    },
+    "casas_longitudinal": {
+      "record_id": 15708568,
+      "doi": "10.5281/zenodo.15708568",
+      "license": "CC-BY-4.0",
+      "archive_size_bytes": 236037656,
+      "archive_md5": "ec37d679e85a6ae39e84994888afd514",
+      "archive_sha256": "7d9e976308e1cb5bc91cb39937848bfe073fc7b44c8a33cf166de203014b0091"
+    }
+  },
+  "bindings": {
+    "multidomain_policy": {
+      "filename": "v2-multidomain-risk-policy.json",
+      "sha256": "0c495432498e355b28f2e73ec0c37e972bcaf4cbf050c726d9a4f3d4a051b800"
+    },
+    "multidomain_rule_implementation": {
+      "filename": "multidomain.py",
+      "sha256": "ee2b63e639b06e959a9c1f77049809d701309242bbc2a0c51967341de4031cac"
+    },
+    "public_domain_validator": {
+      "filename": "public_domains.py",
+      "sha256": "2f2685450fd4c2f162523028dcb7690600c487605a084db6b2cac7a2e200e5cd"
+    },
+    "slurm_runner": {
+      "filename": "benchmark_public_domains.sbatch",
+      "sha256": "0e3d5f5d6606741876c34ebd928e80c1f16e65660ae508d2c92ede1191a4e50e"
+    }
+  },
+  "development_result": {
+    "slurm_job_id": "2907",
+    "report_sha256": "265728ef2cea1c4bc8718a5c61fbd633526c0b9206b742fa0bb56599790faf12",
+    "fraud": {
+      "message_count": 10424,
+      "source_fraud_category_recall": 0.5998,
+      "source_non_fraud_category_flag_rate": 0.10772,
+      "gate_passed": true
+    },
+    "mental_wellbeing": {
+      "home_count": 3,
+      "minimum_eligible_days": 54,
+      "mean_post_baseline_assessment_rate": 1.0,
+      "all_prebaseline_days_fail_closed": true,
+      "all_controlled_responses_match": true,
+      "gate_passed": true
+    }
+  },
+  "engineering_gates": {
+    "fraud": {
+      "revision": "fbs-fraud-context-engineering-gate-v1",
+      "minimum_source_fraud_category_recall": 0.5,
+      "maximum_source_non_fraud_category_flag_rate": 0.15,
+      "minimum_evaluated_message_count": 1000
+    },
+    "mental_wellbeing": {
+      "revision": "casas-personal-baseline-engineering-gate-v1",
+      "minimum_eligible_days_per_home": 28,
+      "minimum_post_baseline_assessment_rate": 0.9,
+      "maximum_invalid_line_rate": 0.001,
+      "prebaseline_fail_closed_required": true,
+      "controlled_response_levels_required": true
+    }
+  },
+  "limitations": [
+    "freeze_is_for_public_data_engineering_evaluation_only",
+    "fbs_sms_is_not_camera_audio_or_asr_output",
+    "casas_sensors_are_proxies_without_mental_health_ground_truth",
+    "source_archives_bundle_both_partitions_so_isolation_is_procedural",
+    "freeze_does_not_establish_target_camera_clinical_or_fraud_validity"
+  ]
+}

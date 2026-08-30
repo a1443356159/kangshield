@@ -227,6 +227,21 @@ def test_who5_result_does_not_reduce_higher_behavioral_risk():
 
 def test_fraud_hard_negative_and_score_combinations():
     assert classify_fraud_text("反诈宣传提醒：不要转账，不给验证码", POLICY) == ([], True)
+    assert classify_fraud_text("公·安·局要求提供银 行 卡 号", POLICY) == (
+        ["credential_request", "impersonation"],
+        False,
+    )
+    assert classify_fraud_text(
+        "银行用户积分即将失效，请登录手机网银兑换现金", POLICY
+    ) == (
+        [
+            "credential_request",
+            "impersonation",
+            "transfer_investment",
+            "urgency_secrecy",
+        ],
+        False,
+    )
     categories, suppressed = classify_fraud_text(
         "我是公安局的，请马上转账到安全账户", POLICY
     )

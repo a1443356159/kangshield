@@ -106,3 +106,31 @@ def test_frozen_public_dataset_reports_match_manifest_and_have_no_private_paths(
         ]["pose_model"]["sha256"]
         serialized = json.dumps(payload, ensure_ascii=False)
         assert not any(value in serialized for value in forbidden)
+
+
+def test_public_domain_freeze_matches_rule_policy_and_validator():
+    path = ROOT / "artifacts/validation/public-domains-policy-freeze.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    expected = {
+        "multidomain_policy": ROOT / "configs/v2-multidomain-risk-policy.json",
+        "multidomain_rule_implementation": (
+            ROOT / "src/kangshield/information/multidomain.py"
+        ),
+        "public_domain_validator": (
+            ROOT / "src/kangshield/validation/public_domains.py"
+        ),
+        "slurm_runner": ROOT / "scripts/slurm/benchmark_public_domains.sbatch",
+    }
+    for name, source in expected.items():
+        assert payload["bindings"][name]["sha256"] == _digest(source)
+    contract = payload["evaluation_contract"]
+    assert contract["holdout_partition_evaluated_at_freeze"] is False
+    assert contract["holdout_runs_allowed"] == 1
+    assert payload["development_result"]["fraud"]["gate_passed"] is True
+    assert (
+        payload["development_result"]["mental_wellbeing"]["gate_passed"]
+        is True
+    )
+    serialized = json.dumps(payload, ensure_ascii=False)
+    assert "/home/" not in serialized
+    assert "/cache/" not in serialized

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import unicodedata
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from statistics import median
@@ -41,15 +42,30 @@ def classify_fraud_text(
     """Return matched contexts and whether a hard negative suppressed the text."""
 
     fraud = policy["fraud"]
-    normalized = "".join(text.split())
-    if any(phrase in normalized for phrase in fraud["hard_negative"]):
+    normalized = _normalize_lexical_text(text)
+    if any(
+        _normalize_lexical_text(phrase) in normalized
+        for phrase in fraud["hard_negative"]
+        if _normalize_lexical_text(phrase)
+    ):
         return [], True
     categories = sorted(
         category
         for category, phrases in fraud["categories"].items()
-        if any(phrase in normalized for phrase in phrases)
+        if any(
+            _normalize_lexical_text(phrase) in normalized
+            for phrase in phrases
+            if _normalize_lexical_text(phrase)
+        )
     )
     return categories, False
+
+
+def _normalize_lexical_text(text: str) -> str:
+    """Normalize width, case, whitespace, and punctuation-based obfuscation."""
+
+    normalized = unicodedata.normalize("NFKC", str(text)).casefold()
+    return "".join(character for character in normalized if character.isalnum())
 
 
 def candidate_from_row(row: Any) -> DomainCandidate:
