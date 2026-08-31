@@ -2,7 +2,7 @@
 
 更新日期：2026-08-31
 
-当前状态：三域公开工程验证已完成；跌倒留出门未通过，诈骗与个人基线留出门通过
+当前状态：三域公开工程验证已完成；长程正确性修订为 `2026-08-31.2`，旧公开留出绑定 predecessor revision
 产品口径：`pilot_unvalidated`
 
 ## 1. 这份报告回答什么
@@ -169,7 +169,7 @@ sbatch \
   --split dev \
   --cache-root "/cache/DeepLearning/$USER/kangshield-public-data" \
   --output "/cache/DeepLearning/$USER/kangshield-validation/results/public-domains-dev.json" \
-  --accept-fbs-source-terms \
+  --accept-fbs-terms citation-required-ccs2020 \
   --accept-casas-license CC-BY-4.0 \
   --no-download
 ```
@@ -195,8 +195,28 @@ KangShield 已具备可运行、可复核、可离线导出的本地三域工程
 
 本轮最终验收日期为 2026-08-31：
 
-- Slurm seal job `2919` 在 `hepnode3` 先执行 `compileall`，再运行全量 `pytest -q`，状态 `COMPLETED/0:0`，结果为 `85 passed in 4.22s`；同时通过全部 Slurm/启动脚本语法、`git diff --check`、隐私字符串和跟踪大资产扫描。登录节点未运行 Python 测试、数据解析或模型推理。
+- Slurm seal job `2930` 在 `hepnode3` 先执行 `compileall`，再运行全量 `pytest -q`，状态 `COMPLETED/0:0`，结果为 `88 passed in 4.29s`；同时通过全部 Slurm/启动脚本语法、`git diff --check`、隐私字符串和跟踪大资产扫描。登录节点未运行 Python 测试、数据解析或模型推理。
 - 测试覆盖本地 Markdown 链接，并封印四份最终公开报告的 SHA-256、固定划分、工程门结果、策略/模型摘要、无原始记录约束和计算节点执行标记。
 - Slurm installed-demo job `2918` 在 CPython 3.13 / Linux x86_64 上构建 wheel，在 `/cache` 全新虚拟环境以非 editable、`--no-index`、`--require-hashes` 方式安装 [`requirements-demo.lock`](../../requirements-demo.lock)，从源码目录外启动 localhost demo，并验证 health、三域 snapshot、文档页、owner/public 导出和 public 脱敏；状态 `COMPLETED/0:0`。四份运行策略随 wheel 安装，模型权重仍不进入 wheel。
 - 提交面扫描未发现 `/home` 用户路径、具体 `/cache` 用户路径、设备/老人标识、转写、本地媒体路径、下载临时链接，也没有跟踪视频、音频、模型权重、SQLite、`data/`、`models/`、`runs/`、`logs/` 或 `secrets/` 资产。
 - 旧 `models/`、`runs/`、`data/raw/` 与 `logs/` 分别由 Slurm job `2889`–`2892` 迁移到 `/cache/.../kangshield-legacy-archive/20260831/`，表观规模约为 982 MiB、1.1 GiB、720 MiB 与 258 KiB；job `2893`、`2894` 完成迁移审计。迁移可恢复且未执行删除，当前产品的 `data/processed/` 保留原位。
+
+## 13. 长程健康检测专项验收
+
+专项探针覆盖 60 个日级记录、28 天滚动窗口、低覆盖过滤、相邻自然日、SQLite 重启、月度 WHO-5、assessment 趋势、跨月提醒和 owner/public 导出。所有 Python 构造与执行都在 `hepnode3`；登录节点只编辑、调度和读取日志。
+
+Slurm job `2924` 在 predecessor revision 上发现：三个等级 2 分别发生在第 1、3、5 天时，输出仍为 `[2,2,3]` 并附带“连续三天”证据。该行为违反已声明规则。修订只在 streak 判断中加入自然日相邻条件，不改 1.5/2.5 阈值、28 天窗口、最少 7 天/每天 3 段、特征或问卷合并规则；policy 升为 `2026-08-31.2`。
+
+| 场景 | 修订后结果 | 结论 |
+|---|---|---|
+| 三个相邻自然日均为等级 2 | `[2,2,3]` | 通过 |
+| 第 1、3、5 天均为等级 2 | `[2,2,2]`，无 streak 证据 | 通过，不再误升级 |
+| 31 天旧极端值 + 最近 28 天稳定 + 当日稳定 | 心理域 0 | 旧数据未污染滚动基线 |
+| 当月 WHO-5 原始分 10 | 心理域至少 2 | 通过 |
+| SQLite 关闭后重开 | 60 日、1 份问卷、2 条心理 assessment 均保留 | 通过 |
+| 进入新月份且无新问卷、日级数据过期 | `data_stale/null`，问卷重新到期 | 通过 |
+| public JSON | 无老人/设备标识、答案、问卷原始字段 | 通过 |
+
+修订后针对性 pytest 为 Slurm job `2926`，`37 passed in 3.76s`。CASAS 只重跑开发家庭 hh101–hh103：job `2927` 的最少合格日期 54、基线后可评估率 1.0、基线前全部 fail closed、受控等级全部正确，工程门继续通过。修订审计见 [`longitudinal-health-amendment.json`](../../artifacts/validation/longitudinal-health-amendment.json)。
+
+为保持证据隔离，hh104–hh106 留出没有再次运行。原 `public-domains-dev/holdout.json` 与 freeze 清单仍是 `2026-08-31.1` 的历史证据；当前 revision 只有专项合成验收和 CASAS 开发回归，不能宣称拥有新的独立公开留出结果。离线 public HTML 会内嵌通用的人类可读原因字典，其中包含固定特征键名，但不包含任何个人特征数值、问卷答案、身份或路径；专项隐私判断以这些个人数据字段为边界。

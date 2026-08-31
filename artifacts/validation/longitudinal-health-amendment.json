@@ -1,0 +1,75 @@
+{
+  "schema_version": "1.0",
+  "status": "pilot_unvalidated",
+  "amended_on": "2026-08-31",
+  "change": {
+    "from_policy_revision": "2026-08-31.1",
+    "to_policy_revision": "2026-08-31.2",
+    "reason": "level_two_streak_must_use_consecutive_calendar_dates",
+    "thresholds_changed": false,
+    "features_changed": false,
+    "public_holdout_rerun": false
+  },
+  "pre_fix_observation": {
+    "slurm_job_id": "2924",
+    "consecutive_level_two_scores": [2, 2, 3],
+    "gapped_level_two_scores": [2, 2, 3],
+    "incorrect_evidence": "level_2_or_higher_for_three_days"
+  },
+  "post_fix_observation": {
+    "slurm_job_id": "2929",
+    "consecutive_level_two_scores": [2, 2, 3],
+    "gapped_level_two_scores": [2, 2, 2],
+    "gapped_streak_evidence_present": false,
+    "sixty_day_stable_score": 0,
+    "low_who5_score": 2,
+    "restart_profile_ready": true,
+    "restart_baseline_days": 28,
+    "persisted_daily_rows": 60,
+    "persisted_mental_history": 2,
+    "next_month_without_new_checkin_score": null,
+    "next_month_without_new_checkin_status": "data_stale",
+    "next_month_checkin_due": true,
+    "public_json_identity_and_checkin_redaction_passed": true
+  },
+  "casas_development_regression": {
+    "slurm_job_id": "2927",
+    "split": "dev",
+    "homes": ["hh101", "hh102", "hh103"],
+    "minimum_eligible_days": 54,
+    "mean_post_baseline_assessment_rate": 1.0,
+    "all_prebaseline_days_fail_closed": true,
+    "all_controlled_responses_match": true,
+    "invalid_event_line_rate": 0.000002,
+    "engineering_gate_passed": true,
+    "report_sha256": "afef47526d3877ac2d4232d9057f0406d132b241926f649996f489bb0ea298df"
+  },
+  "bindings": {
+    "multidomain_policy": {
+      "filename": "v2-multidomain-risk-policy.json",
+      "sha256": "f29a54f0d27175a81a29fb8bcbe5843fa6c6387404ebaf6a7247e9563de909f6"
+    },
+    "multidomain_rule_implementation": {
+      "filename": "multidomain.py",
+      "sha256": "508826eb0bab32ebeb139da2ed9883ef76e091e7ac0cc80a82d7c9c65e440e2a"
+    },
+    "longitudinal_health_test": {
+      "filename": "test_longitudinal_health.py",
+      "sha256": "166cf1e647f1e8a541e9808936b8ea3b22ab9abb0431f9ea7b0b3773bb92c0d9"
+    }
+  },
+  "evidence_boundary": {
+    "predecessor_freeze": "public-domains-policy-freeze.json",
+    "predecessor_holdout_reports_remain_historical": true,
+    "current_revision_has_new_independent_holdout": false,
+    "holdout_not_reused_for_tuning": true,
+    "login_node_compute_prohibited": true,
+    "execution_surface": "slurm_compute_node"
+  },
+  "limitations": [
+    "synthetic_longitudinal_scenarios_are_engineering_checks_not_clinical_validation",
+    "casas_sensors_are_proxies_without_mental_health_outcome_ground_truth",
+    "public_holdout_results_bind_only_the_predecessor_revision",
+    "results_do_not_establish_target_c6c_performance"
+  ]
+}

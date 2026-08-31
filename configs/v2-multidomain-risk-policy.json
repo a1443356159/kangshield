@@ -1,7 +1,7 @@
 {
   "schema_version": "2.0",
   "policy_id": "v2-multidomain-risk-policy",
-  "revision": "2026-08-31.1",
+  "revision": "2026-08-31.2",
   "pilot_unvalidated": true,
   "stale_after_hours": 6,
   "initial_lookback_days": 14,

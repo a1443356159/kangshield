@@ -108,21 +108,17 @@ def test_frozen_public_dataset_reports_match_manifest_and_have_no_private_paths(
         assert not any(value in serialized for value in forbidden)
 
 
-def test_public_domain_freeze_matches_rule_policy_and_validator():
+def test_historical_public_domain_freeze_remains_immutable():
     path = ROOT / "artifacts/validation/public-domains-policy-freeze.json"
     payload = json.loads(path.read_text(encoding="utf-8"))
     expected = {
-        "multidomain_policy": ROOT / "configs/v2-multidomain-risk-policy.json",
-        "multidomain_rule_implementation": (
-            ROOT / "src/kangshield/information/multidomain.py"
-        ),
-        "public_domain_validator": (
-            ROOT / "src/kangshield/validation/public_domains.py"
-        ),
-        "slurm_runner": ROOT / "scripts/slurm/benchmark_public_domains.sbatch",
+        "multidomain_policy": "0c495432498e355b28f2e73ec0c37e972bcaf4cbf050c726d9a4f3d4a051b800",
+        "multidomain_rule_implementation": "ee2b63e639b06e959a9c1f77049809d701309242bbc2a0c51967341de4031cac",
+        "public_domain_validator": "2f2685450fd4c2f162523028dcb7690600c487605a084db6b2cac7a2e200e5cd",
+        "slurm_runner": "0e3d5f5d6606741876c34ebd928e80c1f16e65660ae508d2c92ede1191a4e50e",
     }
-    for name, source in expected.items():
-        assert payload["bindings"][name]["sha256"] == _digest(source)
+    for name, digest in expected.items():
+        assert payload["bindings"][name]["sha256"] == digest
     contract = payload["evaluation_contract"]
     assert contract["holdout_partition_evaluated_at_freeze"] is False
     assert contract["holdout_runs_allowed"] == 1
@@ -131,6 +127,36 @@ def test_public_domain_freeze_matches_rule_policy_and_validator():
         payload["development_result"]["mental_wellbeing"]["gate_passed"]
         is True
     )
+    serialized = json.dumps(payload, ensure_ascii=False)
+    assert "/home/" not in serialized
+    assert "/cache/" not in serialized
+
+
+def test_longitudinal_health_amendment_matches_current_policy_and_code():
+    path = ROOT / "artifacts/validation/longitudinal-health-amendment.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    expected = {
+        "multidomain_policy": ROOT / "configs/v2-multidomain-risk-policy.json",
+        "multidomain_rule_implementation": (
+            ROOT / "src/kangshield/information/multidomain.py"
+        ),
+        "longitudinal_health_test": ROOT / "tests/test_longitudinal_health.py",
+    }
+    for name, source in expected.items():
+        assert payload["bindings"][name]["sha256"] == _digest(source)
+    assert payload["change"] == {
+        "from_policy_revision": "2026-08-31.1",
+        "to_policy_revision": "2026-08-31.2",
+        "reason": "level_two_streak_must_use_consecutive_calendar_dates",
+        "thresholds_changed": False,
+        "features_changed": False,
+        "public_holdout_rerun": False,
+    }
+    assert payload["post_fix_observation"]["gapped_level_two_scores"] == [2, 2, 2]
+    assert payload["casas_development_regression"]["engineering_gate_passed"] is True
+    boundary = payload["evidence_boundary"]
+    assert boundary["current_revision_has_new_independent_holdout"] is False
+    assert boundary["holdout_not_reused_for_tuning"] is True
     serialized = json.dumps(payload, ensure_ascii=False)
     assert "/home/" not in serialized
     assert "/cache/" not in serialized

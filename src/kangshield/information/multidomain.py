@@ -342,8 +342,10 @@ def score_mental_wellbeing(
         if not daily_stale and len({item["local_date"] for item in baseline}) >= int(
             spec["minimum_baseline_days"]
         ):
+            streak_days = int(spec["level_two_streak_days"])
             levels: list[int] = []
-            for offset in range(3):
+            level_days: list[date] = []
+            for offset in range(streak_days):
                 index = len(eligible) - 1 - offset
                 if index < 0:
                     break
@@ -353,15 +355,22 @@ def score_mental_wellbeing(
                 if level is None:
                     break
                 levels.append(level)
+                level_days.append(
+                    date.fromisoformat(str(eligible[index]["local_date"]))
+                )
                 if offset == 0:
                     evidence.extend(summaries)
                     usable_features = feature_count
             current_level = levels[0] if levels else None
             if current_level is not None:
+                consecutive = len(level_days) >= streak_days and all(
+                    (level_days[index] - level_days[index + 1]).days == 1
+                    for index in range(streak_days - 1)
+                )
                 score = (
                     3
-                    if len(levels) >= int(spec["level_two_streak_days"])
-                    and all(level >= 2 for level in levels[:3])
+                    if consecutive
+                    and all(level >= 2 for level in levels[:streak_days])
                     else current_level
                 )
                 if score == 3 and current_level < 3:

@@ -155,6 +155,8 @@ sbatch scripts/slurm/smoke_installed_demo.sbatch
 
 冻结版在 CAUCAFall 开发重放上通过预注册工程门，但唯一一次 Subject 6–10 留出评估未通过（轻量跌倒召回 0.68、ADL 片段误报率 0.16）。FBS 中文短信留出词法门通过（源诈骗类别标记率 0.536437、源非诈骗类别标记率 0.113744），CASAS 单人居家留出的个人 28 天基线门也通过。两者分别只是短信规则和行为基线机制的工程证据，不代表摄像头 ASR 诈骗准确率或心理健康预测准确率。结果、门槛与未通过项完整记录在[公开数据集交付验证报告](docs/governance/delivery-validation-report.md)，所有留出结果均未用于继续调参。
 
+长程专项测试进一步覆盖 60 天窗口、重启、跨月提醒、WHO-5 合并、趋势持久化和 public 脱敏，并修复了非相邻日期误算“连续三天”的问题。当前 policy 为 `2026-08-31.2`；旧公开留出仍只作为 predecessor revision 的历史证据，没有重复运行并包装成新的盲测。
+
 ## 文档
 
 - [三域产品设计](docs/design/multidomain-risk-mvp.md)
