@@ -293,20 +293,106 @@ def documentation_html(product_version: str) -> str:
 </html>"""
 
 
+OFFLINE_OWNER_WELLBEING_HTML = """
+<section class="panel wellbeing-panel offline-wellbeing-panel" id="questionnaire" aria-labelledby="offline-wellbeing-title">
+  <div class="wellbeing-intro">
+    <p class="eyebrow">每月关心自己一次</p>
+    <h2 id="offline-wellbeing-title">幸福感问卷与问题筛查</h2>
+    <p>回顾过去两个星期的感受。部署版保存后会立即重新计算心理健康风险；本静态页只在浏览器内预览结果。</p>
+    <span>WHO-5 · 不是诊断 · 静态页不上传、不保存</span>
+  </div>
+  <form class="wellbeing-content offline-checkin" id="offline-wellbeing-form">
+    <div class="checkin-head">
+      <div><strong id="offline-wellbeing-status">本月待填写</strong><p>请选择每一项最接近近期感受的频率。</p></div>
+      <span class="status-pill stale" id="offline-wellbeing-badge">本页预览</span>
+    </div>
+    <div class="wellbeing-questions offline-wellbeing-questions" id="offline-wellbeing-questions"></div>
+    <p class="instrument-note">采用世界卫生组织 WHO-5（2024），CC BY-NC-SA 3.0 IGO。低分只表示建议进一步关心和评估，不代表疾病诊断。</p>
+    <div class="offline-checkin-actions">
+      <button class="primary" type="submit">查看本页筛查结果</button>
+      <button class="secondary" type="reset">清空</button>
+      <span>刷新或关闭页面后，本页填写内容即消失。</span>
+    </div>
+    <div class="offline-screening-result" id="offline-screening-result" role="status" aria-live="polite">完成全部 5 项后，可在本页查看筛查提示。</div>
+  </form>
+</section>
+"""
+
+
+OFFLINE_TERMS_HTML = """
+<section class="offline-terms" id="terms" aria-labelledby="offline-terms-title">
+  <div class="section-heading">
+    <div><p class="eyebrow">使用前请了解</p><h2 id="offline-terms-title">服务条款与技术说明</h2></div>
+    <p>条款生效日期 2026-08-30 · 本地未验证试点</p>
+  </div>
+  <div class="offline-terms-grid">
+    <details open>
+      <summary>服务性质与使用约定</summary>
+      <div><p>康盾整理家庭环境中的行动变化、个人日常规律、本人月度自评和可疑对话线索，供本人及有合法权限的照护者及时核实。</p><ul><li>不是急救、报警或自动联系家属的紧急服务。</li><li>不是医疗诊断、治疗建议或诈骗认定。</li><li>重要提醒必须结合现场情况由人确认。</li><li>安装者应依法取得摄像、录音和照护记录所需的同意与权限。</li></ul></div>
+    </details>
+    <details>
+      <summary>隐私、留存与分享</summary>
+      <div><p>风险记录按个人保存在本机；连续原始视频不落本机，只有风险候选附近的短片段可按策略归档。</p><ul><li>语音事件最多保留 120 字风险相关转写，不保存完整逐字稿。</li><li>家庭照护版可包含事件和复核记录；安心分享版移除身份、问卷答案、对话、备注、路径和精确时间。</li><li>异常片段默认保留 30 天并受容量上限约束；删除个人数据会一并删除本机归档。</li></ul></div>
+    </details>
+    <details>
+      <summary>技术路线与个人中心</summary>
+      <div><p>连续直播流先在内存中按段筛查，轻量运动与声音活动门只把关键窗口送入姿态和语音模型；随后形成日级特征、28 天个人基线、三域规则评分和人工复核闭环。</p><ul><li>只与同一个人过去的有效记录比较，不做同龄人排名。</li><li>跌倒、心理健康、诈骗分别输出 0–3 或暂无判断，不合成总分。</li><li>证据不足、数据过期或模型失败时不补猜。</li></ul></div>
+    </details>
+    <details>
+      <summary>风险边界与量表来源</summary>
+      <div><p>遮挡、夜间画质、设备离线、远场噪声、多人交叉和电话另一端不可听都可能造成漏报或误报。结果统一标记为 pilot_unvalidated。</p><ul><li>WHO-5 月度自评采用世界卫生组织 2024 版本，许可为 CC BY-NC-SA 3.0 IGO；使用量表不表示世界卫生组织认可康盾。</li><li>低分问卷只提高心理健康域的照护优先级，不能单独证明疾病。</li><li>现实中存在紧急危险时，应立即联系当地紧急服务和可信赖的人。</li></ul></div>
+    </details>
+  </div>
+</section>
+"""
+
+
 def offline_report_html(payload: dict[str, object]) -> str:
     serialized = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
     visibility = str(payload.get("visibility", "owner_only"))
-    label = "家庭照护版" if visibility == "owner_only" else "安心分享版"
+    owner_only = visibility == "owner_only"
+    synthetic_demo = bool(payload.get("synthetic_demo"))
+    label = (
+        "合成数据 · 静态展示"
+        if synthetic_demo
+        else "家庭照护版"
+        if owner_only
+        else "安心分享版"
+    )
+    hero_prefix = (
+        "此页所有数值、事件与语音均为合成演示数据。" if synthetic_demo else ""
+    )
     script = OFFLINE_SCRIPT if visibility == "owner_only" else OFFLINE_PUBLIC_SCRIPT
+    navigation = (
+        '<nav class="offline-nav" aria-label="静态展示目录"><a href="#screening">问题筛查</a><a href="#personal-baseline">个人基线</a><a href="#questionnaire">月度问卷</a><a href="#alerts">近期提醒</a><a href="#terms">服务条款</a></nav>'
+        if owner_only
+        else '<nav class="offline-nav" aria-label="静态报告目录"><a href="#screening">风险概览</a><a href="#alerts">分享说明</a><a href="#terms">服务条款</a></nav>'
+    )
+    side_panel = (
+        '<article class="panel quality-panel" id="personal-baseline"><div class="panel-heading"><div><p class="eyebrow">个人专属</p><h2>我的日常基线</h2></div><span id="profile-badge" class="status-pill">准备中</span></div><div id="profile" class="profile-content"></div></article>'
+        if owner_only
+        else '<article class="panel quality-panel"><div class="panel-heading"><div><p class="eyebrow">关于这份报告</p><h2>阅读说明</h2></div></div><div id="quality" class="quality-grid"></div></article>'
+    )
+    wellbeing = OFFLINE_OWNER_WELLBEING_HTML if owner_only else ""
+    filters = (
+        '<div class="filters" id="offline-filters" aria-label="问题筛查筛选"><button class="filter active" data-domain="all" type="button">全部</button><button class="filter" data-domain="fall" type="button">跌倒</button><button class="filter" data-domain="mental_wellbeing" type="button">心理</button><button class="filter" data-domain="fraud" type="button">诈骗</button></div>'
+        if owner_only
+        else ""
+    )
     return f"""<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>康盾 · 守护报告</title><style>{STYLE}</style></head>
+<meta name="color-scheme" content="light"><title>康盾 · 守护展示</title><style>{STYLE}{OFFLINE_STYLE}</style></head>
 <body><div class="app-shell report-shell"><header class="topbar"><div class="brand"><span class="brand-mark" aria-hidden="true"></span><span><strong>康盾</strong></span></div><span class="status-pill">{html.escape(label)}</span></header>
-<main><section class="hero report-hero"><div><p class="eyebrow">守护报告</p><h1>每一份变化，<br><span>都有迹可循。</span></h1><p class="hero-copy">这份报告用于家庭照护和及时核实，不能代替医生诊断或对事件的最终认定。</p></div></section>
-<section><div class="section-heading"><div><p class="eyebrow">当前状态</p><h2>需要关注的三件事</h2></div></div><div class="risk-grid" id="cards"></div></section>
-<section class="content-grid"><article class="panel trend-panel"><div class="panel-heading"><div><p class="eyebrow">最近 28 天</p><h2>变化趋势</h2></div></div><div id="trends" class="trend-chart"></div></article><article class="panel quality-panel"><div class="panel-heading"><div><p class="eyebrow">关于这份报告</p><h2>阅读说明</h2></div></div><div id="quality" class="quality-grid"></div></article></section>
-<section class="panel events-panel"><div class="panel-heading"><div><p class="eyebrow">近期记录</p><h2>需要留意的事情</h2></div></div><div id="timeline" class="timeline"></div></section></main>
-<footer><span>康盾</span><p>风险提示仅供家庭照护参考</p></footer></div>
+{navigation}
+<main><section class="hero report-hero"><div><p class="eyebrow">部署后 demo 静态预览</p><h1>每一份变化，<br><span>都有迹可循。</span></h1><p class="hero-copy">{html.escape(hero_prefix)}这份页面呈现部署后的风险筛查、个人基线、月度问卷、近期提醒与条款。风险提示用于家庭照护和及时核实，不能代替医生诊断或对事件的最终认定。</p></div></section>
+<section id="screening"><div class="section-heading"><div><p class="eyebrow">持续问题筛查</p><h2>跌倒、心理健康与诈骗</h2></div><p>三项分别判断 · 不合成总分</p></div><div class="risk-grid" id="cards"></div></section>
+<section class="content-grid"><article class="panel trend-panel"><div class="panel-heading"><div><p class="eyebrow">最近 28 天</p><h2>变化趋势</h2></div></div><div id="trends" class="trend-chart"></div></article>{side_panel}</section>
+{wellbeing}
+<section class="panel events-panel" id="alerts"><div class="panel-heading events-heading"><div><p class="eyebrow">问题筛查结果</p><h2>筛查出的近期提醒</h2></div>{filters}</div><div id="timeline" class="timeline"></div></section>
+{OFFLINE_TERMS_HTML}
+</main>
+<footer><span>康盾</span><p>风险提示仅供家庭照护参考 · <a href="#terms">服务条款、隐私与技术路线</a></p></footer></div>
+<div class="toast" id="offline-toast" role="status" aria-live="polite"></div>
 <script type="application/json" id="payload">{serialized}</script><script>{script}</script></body></html>"""
 
 
@@ -323,6 +409,13 @@ STYLE = r"""
 .event-actions{display:grid;gap:7px}.playback-button{border:1px solid #d5cee2;border-radius:10px;background:#fbf8ff;color:#6b4d92;padding:8px 11px;font-size:11px;cursor:pointer}.playback-button:hover{background:#6b4d92;color:#fff}.playback-button:disabled{cursor:not-allowed;color:#9a92a5;background:#f5f2f7;border-color:#e7e1eb}.playback-dialog{width:min(760px,calc(100% - 30px))}.playback-dialog video{display:block;width:100%;aspect-ratio:16/9;border-radius:16px;background:#10221d}.playback-privacy{margin:12px 0;color:var(--muted);font-size:10px;line-height:1.6}.playback-fallback{display:inline-block;color:var(--green);font-size:12px;font-weight:700}
 @media(max-width:900px){.wellbeing-panel{grid-template-columns:1fr}.wellbeing-intro>p:not(.eyebrow){max-width:none}}
 footer a{color:var(--green);font-weight:700;text-decoration:none}footer a:hover{text-decoration:underline}
+"""
+
+
+OFFLINE_STYLE = r"""
+.offline-nav{max-width:1064px;margin:18px auto 0;padding:7px;display:flex;gap:5px;border:1px solid #dbe3de;border-radius:15px;background:#fffefa;box-shadow:0 8px 24px #173d3210}.offline-nav a{flex:1;padding:9px 12px;border-radius:10px;color:var(--muted);text-decoration:none;text-align:center;font-size:11px;font-weight:700}.offline-nav a:hover,.offline-nav a:focus{background:#edf6f1;color:var(--green);outline:none}.offline-wellbeing-panel{margin-top:18px}.offline-checkin{min-height:210px}.offline-wellbeing-questions{grid-template-columns:1fr 1fr;margin-top:17px}.offline-wellbeing-questions .wellbeing-question:last-child{grid-column:1/-1}.offline-checkin-actions{display:flex;align-items:center;gap:9px;margin-top:16px;flex-wrap:wrap}.offline-checkin-actions button{border-radius:11px;padding:9px 13px;cursor:pointer}.offline-checkin-actions>span{color:var(--muted);font-size:9px}.offline-screening-result{margin-top:14px;padding:14px 16px;border:1px solid #dbe6df;border-radius:14px;background:#f3f8f5;color:var(--muted);font-size:11px;line-height:1.65}.offline-screening-result strong{display:block;margin-bottom:4px;color:var(--green);font-size:14px}.offline-screening-result.attention{border-color:#edcfaa;background:#fff5e6;color:#755329}.offline-screening-result.attention strong{color:#9b5f24}.offline-terms{margin-top:48px}.offline-terms-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.offline-terms details{border:1px solid #dfe6e1;border-radius:18px;background:#fffefa;box-shadow:var(--shadow);overflow:hidden}.offline-terms summary{padding:18px 20px;cursor:pointer;color:var(--ink);font-size:13px;font-weight:800;list-style:none}.offline-terms summary::-webkit-details-marker{display:none}.offline-terms summary::after{content:"＋";float:right;color:var(--green);font-size:16px;font-weight:400}.offline-terms details[open] summary::after{content:"−"}.offline-terms details>div{padding:0 20px 20px;border-top:1px solid #edf0ed}.offline-terms details p,.offline-terms details li{color:var(--muted);font-size:11px;line-height:1.75}.offline-terms details ul{margin:8px 0 0;padding-left:18px}.offline-terms details li{margin:5px 0}.static-action-note{display:grid;gap:7px}.static-action-note button{border-radius:10px;padding:8px 11px;font-size:10px;cursor:pointer}.report-shell .events-panel{scroll-margin-top:20px}.report-shell section[id]{scroll-margin-top:20px}
+@media(max-width:900px){.offline-nav{margin-left:18px;margin-right:18px;overflow:auto}.offline-nav a{min-width:90px}.offline-wellbeing-questions,.offline-terms-grid{grid-template-columns:1fr}.offline-wellbeing-questions .wellbeing-question:last-child{grid-column:auto}}
+@media(max-width:560px){.offline-nav{margin-top:10px}.offline-checkin-actions{align-items:stretch}.offline-checkin-actions button{width:100%}.offline-terms{margin-top:38px}.offline-terms .section-heading{display:block}.offline-terms .section-heading>p{margin-top:8px}}
 """
 
 
@@ -376,8 +469,21 @@ setInterval(()=>{state.seconds-=1;if(state.seconds<=0)load();document.getElement
 OFFLINE_SCRIPT = COMMON_SCRIPT + r"""
 const payload=JSON.parse(document.getElementById('payload').textContent),snapshot=payload.snapshot||payload;
 renderCards(snapshot.assessments||[],document.getElementById('cards'));renderTrends(payload.trends||[],document.getElementById('trends'));
-const quality=document.getElementById('quality'),fresh=snapshot.data_freshness||{};for(const [a,b,c] of [['报告内容','三项独立关注','行动、日常规律和可疑对话分别查看'],['查看范围',payload.visibility==='public_evidence'?'安心分享版':'家庭照护版',payload.visibility==='public_evidence'?'已隐藏身份、备注和具体事件':'保留照护者需要的确认记录'],['记录状态',fresh.stale?'需要新的日常记录':'最近已更新','以报告生成时的家庭记录为准'],['阅读方式','每一项单独看','不会把三项合成一个笼统分数']]){const d=node('div','quality-item');d.append(node('span','',a),node('strong','',b),node('small','',c));quality.append(d)}
-const timeline=document.getElementById('timeline'),events=snapshot.timeline||[];if(!events.length){timeline.append(node('div','empty','最近没有需要特别留意的事情。'))}else{for(const x of events){const e=node('article',`event risk-${x.domain}`),dot=node('div','event-dot',KS_ICONS[x.domain]||'•'),body=node('div'),title=node('div','event-title');title.append(node('strong','',`${KS_NAMES[x.domain]} · ${KS_CATEGORIES[x.category]||x.category}`));body.append(title,node('p','event-copy',`${fmtTime(x.occurred_at)} · ${(x.evidence_summary||[]).map(v=>KS_REASONS[v]||v).join('；')}`));if(x.transcript_excerpt)body.append(node('div','voice-quote',x.transcript_excerpt),node('span','event-basis','由环境语音转写识别'));e.append(dot,body);timeline.append(e)}}
+function renderOfflineProfile(){const p=payload.profile||{},target=document.getElementById('profile');target.textContent='';const summary=node('div','profile-summary');summary.append(node('strong','',p.comparison_label||'与过去的自己相比'),node('p','',p.summary||'正在积累个人日常记录。'));target.append(summary);const features=node('div','profile-features'),stateText={stable:'与平时相近',slight_change:'有一点变化',significant_change:'变化较明显',unavailable:'记录不足'},directionText={higher:'比平时更多',lower:'比平时更少',stable:'与平时相近',unknown:'等待记录'};for(const x of p.features||[]){const changed=['slight_change','significant_change'].includes(x.state),d=node('div',`profile-feature${changed?' changed':''}${x.state==='unavailable'?' unavailable':''}`);d.append(node('span','',x.label),node('strong','',changed?`${stateText[x.state]} · ${directionText[x.direction]}`:stateText[x.state]||'等待记录'));features.append(d)}if(!(p.features||[]).length)features.append(node('div','empty','继续积累几天日常记录后，这里会显示与本人平时状态的比较。'));target.append(features);const badge=document.getElementById('profile-badge');badge.textContent=p.ready?'已建立':'积累中';badge.className=`status-pill ${p.ready?'good':'stale'}`}
+renderOfflineProfile();
+
+const checkin=payload.wellbeing_checkin||{},instrument=checkin.instrument||{},questionTarget=document.getElementById('offline-wellbeing-questions'),form=document.getElementById('offline-wellbeing-form'),result=document.getElementById('offline-screening-result'),current=checkin.current||{},existingAnswers=current.answers||[];
+for(const [index,question] of (instrument.questions||[]).entries()){const wrap=node('div','wellbeing-question'),label=node('label','',`${index+1}. ${question}`),select=node('select');const id=`offline-wellbeing-${index}`;label.htmlFor=id;select.id=id;select.dataset.index=String(index);select.setAttribute('aria-label',question);const placeholder=node('option','','请选择');placeholder.value='';select.append(placeholder);for(const option of instrument.options||[]){const item=node('option','',option.label);item.value=String(option.value);if(Number(existingAnswers[index])===Number(option.value))item.selected=true;select.append(item)}wrap.append(label,select);questionTarget.append(wrap)}
+if(current.percentage_score!==undefined){document.getElementById('offline-wellbeing-status').textContent='本月自评已完成';document.getElementById('offline-wellbeing-badge').textContent=`既有记录 ${current.percentage_score}/100`}
+function setScreeningResult(title,copy,attention=false){result.textContent='';result.className=`offline-screening-result${attention?' attention':''}`;result.append(node('strong','',title),node('span','',copy))}
+form.addEventListener('submit',event=>{event.preventDefault();const answers=[...form.querySelectorAll('select')].map(x=>x.value===''?null:Number(x.value));if(answers.length!==5||answers.some(x=>x===null)){setScreeningResult('还有项目没有填写','请完成全部 5 项后再查看筛查结果。',true);return}const raw=answers.reduce((a,b)=>a+b,0),percentage=raw*4,threshold=Number(instrument.screening_threshold_raw_below||13),attention=raw<threshold;setScreeningResult(attention?`筛查提示：建议进一步关心 · ${percentage}/100`:`筛查提示：此次未触发低分规则 · ${percentage}/100`,attention?'部署版提交后，心理健康风险至少为 2 级；这不是诊断，建议结合本人感受并在需要时寻求专业支持。':'部署版仍会把这份自评与过去 28 天个人日常基线共同判断，正常问卷不会抵消其他风险证据。',attention)});
+form.addEventListener('reset',()=>setTimeout(()=>setScreeningResult('已清空本页填写','静态页没有保存或上传任何答案。'),0));
+
+let offlineFilter='all';const timeline=document.getElementById('timeline'),events=snapshot.timeline||[];
+function showOfflineMessage(message){const toast=document.getElementById('offline-toast');toast.textContent=message;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),3000)}
+function offlineReviewStatus(value){return {pending:'待确认',confirmed:'已确认',rejected:'已忽略'}[value]||value||'待确认'}
+function renderOfflineTimeline(){timeline.textContent='';const values=events.filter(x=>offlineFilter==='all'||x.domain===offlineFilter);if(!values.length){timeline.append(node('div','empty',offlineFilter==='all'?'最近没有需要特别留意的事情。':'这一项最近没有需要确认的提醒。'));return}for(const x of values){const e=node('article',`event risk-${x.domain}`),dot=node('div','event-dot',KS_ICONS[x.domain]||'•'),body=node('div'),title=node('div','event-title');title.append(node('strong','',`${KS_NAMES[x.domain]} · ${KS_CATEGORIES[x.category]||x.category}`),node('span',`status-pill ${x.review_status==='confirmed'?'good':x.review_status==='rejected'?'stale':''}`,offlineReviewStatus(x.review_status)));body.append(title,node('p','event-copy',`${fmtTime(x.occurred_at)} · ${(x.evidence_summary||[]).map(v=>KS_REASONS[v]||v).join('；')}`));if(x.transcript_excerpt)body.append(node('div','voice-quote',x.transcript_excerpt),node('span','event-basis','由环境语音转写识别'));const actions=node('div','static-action-note'),play=node('button','playback-button','播放异常片段'),review=node('button','review-button','查看并确认');play.type='button';review.type='button';play.onclick=()=>showOfflineMessage('静态页不附带媒体；部署版会打开本机异常归档或临时云端回放。');review.onclick=()=>showOfflineMessage('静态页不会写入复核；部署版可确认、忽略并保存 owner-only 备注。');actions.append(play,review);e.append(dot,body,actions);timeline.append(e)}}
+for(const button of document.querySelectorAll('#offline-filters .filter'))button.onclick=()=>{offlineFilter=button.dataset.domain;for(const item of document.querySelectorAll('#offline-filters .filter'))item.classList.toggle('active',item===button);renderOfflineTimeline()};renderOfflineTimeline();
 """
 
 

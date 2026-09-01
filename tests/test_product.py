@@ -199,6 +199,29 @@ def test_demo_seed_requires_demo_refs_and_populates_all_domains(tmp_path):
         and item["playback_source"] == "local_archive"
         for item in runtime.candidates()
     )
+    owner_html, owner_json = export_product_report(
+        elder_ref="demo-elder",
+        device_ref="demo-device",
+        visibility="owner_only",
+        output=tmp_path / "static-showcase",
+        store_root=tmp_path,
+    )
+    rendered = owner_html.read_text(encoding="utf-8")
+    assert "合成数据 · 静态展示" in rendered
+    assert "持续问题筛查" in rendered
+    assert "跌倒、心理健康与诈骗" in rendered
+    assert "幸福感问卷与问题筛查" in rendered
+    assert "查看本页筛查结果" in rendered
+    assert "服务条款与技术说明" in rendered
+    assert "播放异常片段" in rendered
+    assert "查看并确认" in rendered
+    assert "fetch(" not in rendered
+    payload = json.loads(owner_json.read_text(encoding="utf-8"))
+    assert payload["synthetic_demo"] is True
+    assert payload["profile"]["ready"] is True
+    instrument = payload["wellbeing_checkin"]["instrument"]
+    assert len(instrument["questions"]) == 5
+    assert instrument["screening_threshold_raw_below"] == 13
 
 
 def test_review_api_requires_json_same_origin_and_csrf(tmp_path):
@@ -616,8 +639,28 @@ def test_public_export_is_redacted_and_owner_export_keeps_audit(tmp_path):
         store_root=store_root,
     )
     assert owner_html.is_file() and owner_json.is_file()
+    owner_payload = json.loads(owner_json.read_text())
     assert "private note secret" in owner_json.read_text()
     assert "请立即转账到安全账户 private transcript" in owner_json.read_text()
+    assert "profile" in owner_payload
+    assert owner_payload["wellbeing_checkin"]["current"]["answers"] == [
+        2,
+        2,
+        2,
+        2,
+        2,
+    ]
+    owner_rendered = owner_html.read_text()
+    for expected in (
+        "持续问题筛查",
+        "幸福感问卷与问题筛查",
+        "服务性质与使用约定",
+        "隐私、留存与分享",
+        "技术路线与个人中心",
+        "风险边界与量表来源",
+    ):
+        assert expected in owner_rendered
+    assert "/api/" not in owner_rendered
     serialized = public_json.read_text() + public_html.read_text()
     for forbidden in (
         "elder_a",

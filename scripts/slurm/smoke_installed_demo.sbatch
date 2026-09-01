@@ -146,6 +146,16 @@ assert {item["domain"] for item in snapshot["assessments"]} == {
 }
 assert "服务条款" in (root / "docs.html").read_text(encoding="utf-8")
 assert "康盾" in (root / "dashboard.html").read_text(encoding="utf-8")
+owner_report = (root / "owner-report" / "report.html").read_text(encoding="utf-8")
+for required in (
+    "合成数据 · 静态展示",
+    "持续问题筛查",
+    "幸福感问卷与问题筛查",
+    "查看本页筛查结果",
+    "服务条款与技术说明",
+):
+    assert required in owner_report
+assert "/api/" not in owner_report
 public_text = "\n".join(
     path.read_text(encoding="utf-8")
     for path in sorted((root / "public-report").iterdir())

@@ -27,7 +27,7 @@ from .multidomain import (
 from .resources import policy_path as bundled_policy_path
 from .product_ui import dashboard_html, documentation_html, offline_report_html
 
-PRODUCT_VERSION = "multidomain-product-v0.6.0"
+PRODUCT_VERSION = "multidomain-product-v0.7.0"
 WHO5_QUESTIONS = [
     "我感觉快乐、心情舒畅",
     "我感觉宁静和放松",
@@ -389,8 +389,8 @@ class ProductRuntime:
             )
             return self._personal_profile_from_store(store, snapshot, policy)
 
+    @staticmethod
     def _personal_profile_from_store(
-        self,
         store: LongitudinalStore,
         snapshot: Any,
         policy: dict[str, Any],
@@ -508,8 +508,8 @@ class ProductRuntime:
         with LongitudinalStore(self.elder_ref, root=self.store_root) as store:
             return self._wellbeing_checkin_from_store(store, policy, now)
 
+    @staticmethod
     def _wellbeing_checkin_from_store(
-        self,
         store: LongitudinalStore,
         policy: dict[str, Any],
         now: datetime,
@@ -548,6 +548,7 @@ class ProductRuntime:
                 "timeframe": "过去两个星期",
                 "questions": WHO5_QUESTIONS,
                 "options": WHO5_OPTIONS,
+                "screening_threshold_raw_below": threshold,
                 "attribution": "世界卫生组织 WHO-5，2024，CC BY-NC-SA 3.0 IGO",
             },
             "due": current is None,
@@ -1009,9 +1010,14 @@ def export_product_report(
     if visibility not in {"owner_only", "public_evidence"}:
         raise ValueError("unsupported report visibility")
     resolved_device = device_ref or _only_device_ref(elder_ref, store_root)
+    policy, _ = load_policy(policy_path)
+    now_utc = datetime.now(timezone.utc)
     with LongitudinalStore(elder_ref, root=store_root) as store:
         snapshot = build_snapshot(
-            store, device_ref=resolved_device, policy_path=policy_path
+            store,
+            device_ref=resolved_device,
+            policy_path=policy_path,
+            now=now_utc,
         )
         trends = [dict(row) for row in store.fetch_assessment_history(days=28)]
         reviews = [dict(row) for row in store.fetch_candidate_reviews()]
@@ -1019,6 +1025,15 @@ def export_product_report(
             str(row["candidate_id"]): json.loads(row["payload_json"])
             for row in store.fetch_domain_candidates()
         }
+        profile = ProductRuntime._personal_profile_from_store(
+            store, snapshot, policy
+        )
+        wellbeing_checkin = ProductRuntime._wellbeing_checkin_from_store(
+            store, policy, now_utc.astimezone()
+        )
+    synthetic_demo = elder_ref.startswith("demo-") and resolved_device.startswith(
+        "demo-"
+    )
     if visibility == "owner_only":
         owner_snapshot = snapshot.model_dump(mode="json")
         for item in owner_snapshot["timeline"]:
@@ -1032,6 +1047,9 @@ def export_product_report(
             "elder_ref": elder_ref,
             "device_ref": resolved_device,
             "snapshot": owner_snapshot,
+            "synthetic_demo": synthetic_demo,
+            "profile": profile,
+            "wellbeing_checkin": wellbeing_checkin,
             "trends": [
                 {
                     "assessed_at": row["assessed_at"],
@@ -1045,6 +1063,7 @@ def export_product_report(
         }
     else:
         payload = _public_payload(snapshot, trends)
+        payload["synthetic_demo"] = synthetic_demo
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True, mode=0o700)
     output.chmod(0o700)

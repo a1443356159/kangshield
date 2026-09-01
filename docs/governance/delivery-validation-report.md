@@ -220,3 +220,14 @@ Slurm job `2924` 在 predecessor revision 上发现：三个等级 2 分别发�
 修订后针对性 pytest 为 Slurm job `2926`，`37 passed in 3.76s`。CASAS 只重跑开发家庭 hh101–hh103：job `2927` 的最少合格日期 54、基线后可评估率 1.0、基线前全部 fail closed、受控等级全部正确，工程门继续通过。修订审计见 [`longitudinal-health-amendment.json`](../../artifacts/validation/longitudinal-health-amendment.json)。
 
 为保持证据隔离，hh104–hh106 留出没有再次运行。原 `public-domains-dev/holdout.json` 与 freeze 清单仍是 `2026-08-31.1` 的历史证据；当前 revision 只有专项合成验收和 CASAS 开发回归，不能宣称拥有新的独立公开留出结果。离线 public HTML 会内嵌通用的人类可读原因字典，其中包含固定特征键名，但不包含任何个人特征数值、问卷答案、身份或路径；专项隐私判断以这些个人数据字段为边界。
+
+## 14. 静态部署演示验收
+
+2026-09-01 将 owner 离线报告扩展为部署 demo 的单文件展示面：三域问题筛查、28 天趋势、个人基线、风险相关语音、五项 WHO-5、近期候选筛选、复核/回看入口说明，以及服务条款、隐私、技术路线和量表来源均内嵌在 HTML。静态问卷在浏览器内计算原始分和百分制筛查提示；它不调用 API、不上传或持久化答案，也不改变报告中冻结的心理健康等级。正式写入、人工复核和媒体播放仍只由 localhost 服务完成。
+
+- 最终 Slurm seal job `2964` 在 `hepnode1` 完成 `88 passed in 4.35s`，覆盖新增 owner 载荷、WHO-5 五项和阈值、合成标记、静态页面内容以及 public 不携带问卷/身份数据。
+- Slurm static export job `2958` 从正式 demo SQLite 重新生成 owner/public HTML+JSON，断言三域齐全、`global_score=null`、问卷/条款/问题筛查入口完整、owner 页面无 `/api/` 调用且 public 继续移除身份、转写、备注和路径；状态 `COMPLETED/0:0`。
+- Slurm JavaScript job `2959` 使用 Node 编译最终 [`showcase/index.html`](../../showcase/index.html) 的内嵌脚本，并解析内嵌 JSON，确认合成数据标记、三个域、五项问卷与无全局总分；状态 `COMPLETED/0:0`。
+- Slurm installed-demo job `2963` 构建并从源码目录外全新安装 `kangshield-0.7.0` wheel，启动 localhost demo 后验证 health、三域快照、文档、owner/public 导出及新增静态内容；状态 `COMPLETED/0:0`，wheel SHA-256 为 `d26bce6f75e753ceae6c91dea86dde307b181079a82e84520beb11b3a1cc1f7a`。
+
+以上验收验证的是静态作品呈现、离线交互边界和隐私约束，不是浏览器兼容矩阵、真实问卷效果或临床筛查有效性。静态页不附带异常 MP4；按钮只说明部署版将如何回看与复核，避免在单文件中复制 owner-only 媒体。
