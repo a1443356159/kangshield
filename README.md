@@ -17,6 +17,8 @@ C6c 连续直播流（内存）
 
 ## 一分钟演示
 
+无需启动服务即可直接打开 [`showcase/index.html`](showcase/index.html) 查看静态展示页。页面只包含合成演示数据，资源已全部内嵌，适合断网浏览和作品提交；复核、问卷填写与异常视频播放仍使用下方本地服务。
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
